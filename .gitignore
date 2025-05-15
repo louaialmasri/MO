@@ -1,0 +1,46 @@
+# ------------------------
+# Global ignores
+# ------------------------
+node_modules/
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# dotenv environment files
+.env
+.env.*
+
+
+# ------------------------
+# Frontend: my-booking-app
+# ------------------------
+my-booking-app/node_modules/
+my-booking-app/build/
+my-booking-app/dist/
+my-booking-app/.env
+my-booking-app/.env.*
+
+# ------------------------
+# Backend: my-booking-backend
+# ------------------------
+my-booking-backend/node_modules/
+my-booking-backend/build/
+my-booking-backend/dist/
+my-booking-backend/.env
+my-booking-backend/.env.*
+
+# ------------------------
+# IDE / System
+# ------------------------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ------------------------
+# Misc
+# ------------------------
+coverage/
+*.tgz
