@@ -1,16 +1,9 @@
-export type User = {
-    id: number
-    email: string
-    password: string
-    role: 'user' | 'admin'
-  }
-  
-  // In-Memory-Datenbank
-  export const users: User[] = []
-  
-  let userIdCounter = 1
-  
-  export function getNextUserId(): number {
-    return userIdCounter++
-  }
-  
+import mongoose from 'mongoose'
+
+const userSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  role: { type: String, enum: ['user', 'admin'], default: 'user' },
+}, { timestamps: true })
+
+export const User = mongoose.model('User', userSchema)

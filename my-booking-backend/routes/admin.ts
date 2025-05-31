@@ -1,5 +1,5 @@
 import express from 'express'
-import { authOnly, adminOnly } from '../middleware/auth'
+import { authOnly, adminOnly } from '../middlewares/auth'
 
 const router = express.Router()
 
