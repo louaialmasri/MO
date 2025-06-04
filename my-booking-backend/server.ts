@@ -5,6 +5,8 @@ import authRoutes from './routes/auth'
 import adminRoutes from './routes/admin'
 import mongoose from 'mongoose'
 import serviceRoutes from './routes/service'
+import bookingRoutes from './routes/booking'
+import userRoutes from './routes/user'
 
 const app = express()
 const PORT = 5000
@@ -16,6 +18,10 @@ app.use('/api', authRoutes)
 app.use('/api', adminRoutes)
 
 app.use('/api/services', serviceRoutes)
+
+app.use('/api/bookings', bookingRoutes)
+app.use('/api/users', userRoutes)
+
 
 
 app.listen(PORT, () => {

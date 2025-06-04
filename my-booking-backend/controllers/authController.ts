@@ -47,10 +47,14 @@ export const login = async (req: Request, res: Response) => {
 }
 
 export const register = async (req: Request, res: Response) => {
-  const { email, password } = req.body
+  const { email, password, role } = req.body
 
   if (!email || !password) {
     return res.status(400).json({ success: false, message: 'E-Mail und Passwort erforderlich' })
+  }
+
+  if (!['user', 'admin', 'staff'].includes(role)) {
+    return res.status(400).json({ success: false, message: 'Ungültige Rolle' })
   }
 
   const exists = await User.findOne({ email })
@@ -58,10 +62,8 @@ export const register = async (req: Request, res: Response) => {
     return res.status(409).json({ success: false, message: 'Benutzer existiert bereits' })
   }
 
-  const role = email === 'admin@booking.com' ? 'admin' : 'user'
-
-  const user = new User({ email, password, role })
-  await user.save()
+  const newUser = new User({ email, password, role })
+  await newUser.save()
 
   return res.status(201).json({ success: true, message: 'Registrierung erfolgreich' })
 }
