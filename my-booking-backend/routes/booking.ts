@@ -5,8 +5,10 @@ import {
   createBooking,
   cancelBooking,
   getAllBookings,
-  getUserBookings // 👈 hinzugefügt
+  getUserBookings
 } from '../controllers/bookingController'
+import { getStaffBookings } from '../controllers/bookingController'
+import { verifyStaff } from '../middlewares/staffMiddleware'
 
 const router = express.Router()
 
@@ -15,5 +17,7 @@ router.delete('/:id', verifyToken, cancelBooking)
 
 router.get('/all', verifyToken, verifyAdmin, getAllBookings)
 router.get('/user', verifyToken, getUserBookings)
+
+router.get('/staff', verifyToken, verifyStaff ,getStaffBookings)
 
 export default router

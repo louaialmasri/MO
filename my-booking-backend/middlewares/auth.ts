@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express'
-import jwt from 'jsonwebtoken'
+import { verifyToken } from '../utils/jwt'
 
-const SECRET_KEY = 'supersecretkey123' // gleiche wie in jwt.ts
 
 export const authOnly = (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization
@@ -13,7 +12,7 @@ export const authOnly = (req: Request, res: Response, next: NextFunction) => {
   const token = authHeader.split(' ')[1]
 
   try {
-    const decoded = jwt.verify(token, SECRET_KEY)
+    const decoded = verifyToken(token)
     // @ts-ignore: wir hängen User an Request
     req.user = decoded
     next()

@@ -1,9 +1,8 @@
 import { Request, Response } from 'express'
 import { User } from '../models/User'
-import jwt from 'jsonwebtoken'
+import { generateToken } from '../utils/jwt'
 
-// Geheimschlüssel (am besten aus .env)
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey'
+
 
 export const login = async (req: Request, res: Response) => {
   const { email, password } = req.body
@@ -25,11 +24,8 @@ export const login = async (req: Request, res: Response) => {
     }
 
     // JWT erzeugen
-    const token = jwt.sign(
-      { userId: user._id, email: user.email, role: user.role },
-      JWT_SECRET,
-      { expiresIn: '2h' }
-    )
+    const token = generateToken(
+      { userId: user._id, email: user.email, role: user.role })
 
     return res.status(200).json({
       success: true,
@@ -47,19 +43,23 @@ export const login = async (req: Request, res: Response) => {
 }
 
 export const register = async (req: Request, res: Response) => {
-  const { email, password, role } = req.body
+  const { email, password } = req.body
 
   if (!email || !password) {
     return res.status(400).json({ success: false, message: 'E-Mail und Passwort erforderlich' })
   }
 
-  if (!['user', 'admin', 'staff'].includes(role)) {
-    return res.status(400).json({ success: false, message: 'Ungültige Rolle' })
-  }
-
   const exists = await User.findOne({ email })
   if (exists) {
     return res.status(409).json({ success: false, message: 'Benutzer existiert bereits' })
+  }
+
+  // Standardmäßig ist jeder registrierte Benutzer ein "user"
+  let role: 'user' | 'admin' | 'staff' = 'user'
+
+  // Nur bestimmte E-Mail darf admin sein
+  if (email === 'admin@booking.com') {
+    role = 'admin'
   }
 
   const newUser = new User({ email, password, role })

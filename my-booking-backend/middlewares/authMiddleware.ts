@@ -8,7 +8,7 @@ export interface AuthRequest extends Request {
   user?: {
     userId: string
     email: string
-    role: 'user' | 'admin'
+    role: 'user' | 'admin' | 'staff'
   }
 }
 
@@ -25,7 +25,7 @@ export const verifyToken = (req: AuthRequest, res: Response, next: NextFunction)
     const decoded = jwt.verify(token, JWT_SECRET) as {
       userId: string
       email: string
-      role: 'user' | 'admin'
+      role: 'user' | 'admin' | 'staff'
     }
 
     req.user = decoded
