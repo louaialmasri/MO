@@ -61,23 +61,46 @@ export const getUserBookings = async (req: AuthRequest, res: Response) => {
 
 // ➡ Buchung stornieren (nur eigene)
 export const cancelBooking = async (req: AuthRequest, res: Response) => {
-  const bookingId = req.params.id
-
   try {
-    const booking = await Booking.findOne({ _id: bookingId, user: req.user?.userId })
+    const booking = await Booking.findById(req.params.id)
 
     if (!booking) {
-      return res.status(404).json({ success: false, message: 'Buchung nicht gefunden oder nicht autorisiert' })
+      return res.status(404).json({ success: false, message: 'Buchung nicht gefunden' })
     }
 
-    await Booking.deleteOne({ _id: bookingId })
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Nicht autorisiert' })
+    }
 
-    return res.status(200).json({ success: true, message: 'Buchung storniert' })
-  } catch (err) {
-    console.error('Fehler beim Stornieren der Buchung:', err)
-    return res.status(500).json({ success: false, message: 'Serverfehler beim Stornieren' })
+    const userRole = req.user.role
+    const userId = req.user.userId
+
+    // 🔒 User darf nur seine eigenen Buchungen stornieren
+    if (userRole === 'user' && booking.user.toString() !== userId) {
+      return res.status(403).json({ success: false, message: 'Nicht autorisiert' })
+    }
+
+    // ⏰ Prüfe Zeit bis zum Termin
+    const now = new Date()
+    const bookingTime = new Date(booking.dateTime)
+    const diffInHours = (bookingTime.getTime() - now.getTime()) / (1000 * 60 * 60)
+
+    if (userRole === 'user' && diffInHours < 24) {
+      return res.status(403).json({
+        success: false,
+        message: 'Stornierung nur bis 24 Stunden vor Termin möglich',
+      })
+    }
+
+    await Booking.findByIdAndDelete(req.params.id)
+
+    res.json({ success: true, message: 'Buchung erfolgreich storniert' })
+  } catch (error) {
+    console.error('Fehler beim Stornieren der Buchung:', error)
+    res.status(500).json({ success: false, message: 'Serverfehler' })
   }
 }
+
 
 export const getAllBookings = async (req: AuthRequest, res: Response) => {
   try {
