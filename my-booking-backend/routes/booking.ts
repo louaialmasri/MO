@@ -5,7 +5,8 @@ import {
   createBooking,
   cancelBooking,
   getAllBookings,
-  getUserBookings
+  getUserBookings,
+  updateBooking
 } from '../controllers/bookingController'
 import { getStaffBookings } from '../controllers/bookingController'
 import { verifyStaff } from '../middlewares/staffMiddleware'
@@ -15,9 +16,11 @@ const router = express.Router()
 router.post('/', verifyToken, createBooking)
 router.delete('/:id', verifyToken, cancelBooking)
 
-router.get('/all', verifyToken, verifyAdmin, getAllBookings)
-router.get('/user', verifyToken, getUserBookings)
+router.get('/all', verifyToken, getAllBookings)
+router.get('/user', verifyToken, verifyAdmin, getUserBookings)
 
 router.get('/staff', verifyToken, verifyStaff ,getStaffBookings)
+
+router.patch('/bookings/:id', verifyToken, updateBooking)
 
 export default router

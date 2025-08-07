@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { User } from '../models/User'
 import { generateToken } from '../utils/jwt'
+import bcrypt from 'bcrypt'
 
 
 
@@ -43,27 +44,29 @@ export const login = async (req: Request, res: Response) => {
 }
 
 export const register = async (req: Request, res: Response) => {
-  const { email, password } = req.body
+  const { email, password, name, address, phone, role } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({ success: false, message: 'E-Mail und Passwort erforderlich' })
+    return res.status(400).json({ message: 'E-Mail und Passwort sind erforderlich' });
   }
 
-  const exists = await User.findOne({ email })
-  if (exists) {
-    return res.status(409).json({ success: false, message: 'Benutzer existiert bereits' })
+  const existingUser = await User.findOne({ email });
+  if (existingUser) {
+    return res.status(409).json({ message: 'E-Mail ist bereits registriert' });
   }
 
-  // Standardmäßig ist jeder registrierte Benutzer ein "user"
-  let role: 'user' | 'admin' | 'staff' = 'user'
+  const hashedPassword = await bcrypt.hash(password, 10);
 
-  // Nur bestimmte E-Mail darf admin sein
-  if (email === 'admin@booking.com') {
-    role = 'admin'
-  }
+  const newUser = new User({
+    email,
+    password: hashedPassword,
+    name: name || '',
+    address: address || '',
+    phone: phone || '',
+    role: role || 'user', // Default ist 'user'
+  });
 
-  const newUser = new User({ email, password, role })
-  await newUser.save()
+  await newUser.save();
 
-  return res.status(201).json({ success: true, message: 'Registrierung erfolgreich' })
-}
+  res.status(201).json({ message: 'Benutzer erfolgreich erstellt', user: newUser });
+};

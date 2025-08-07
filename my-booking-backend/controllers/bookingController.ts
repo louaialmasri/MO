@@ -101,6 +101,31 @@ export const cancelBooking = async (req: AuthRequest, res: Response) => {
   }
 }
 
+export const updateBooking = async (req: AuthRequest, res: Response) => {
+  try {
+    const bookingId = req.params.id
+    const { serviceId, dateTime } = req.body
+
+    const booking = await Booking.findById(bookingId)
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Buchung nicht gefunden' })
+    }
+
+    // Berechtigungsprüfung (nur Staff/Admin oder Besitzer)
+    if (req.user?.role !== 'staff' && req.user?.role !== 'admin' && booking.user.toString() !== req.user?.userId) {
+      return res.status(403).json({ success: false, message: 'Nicht autorisiert' })
+    }
+
+    if (serviceId) booking.service = serviceId
+    if (dateTime) booking.dateTime = dateTime
+
+    await booking.save()
+    res.json({ success: true, booking })
+  } catch (err) {
+    console.error('Fehler beim Aktualisieren der Buchung:', err)
+    res.status(500).json({ success: false, message: 'Fehler beim Aktualisieren der Buchung' })
+  }
+}
 
 export const getAllBookings = async (req: AuthRequest, res: Response) => {
   try {
