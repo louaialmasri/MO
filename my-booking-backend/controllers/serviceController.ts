@@ -14,19 +14,19 @@ export const getAllServices = async (req: Request, res: Response) => {
 
 // ➡ Service erstellen (Admin only)
 export const createService = async (req: AuthRequest, res: Response) => {
-  const { name } = req.body
+  const { name, duration } = req.body
 
-  if (!name) {
-    return res.status(400).json({ success: false, message: 'Name erforderlich' })
+  if (!name || !duration) {
+    return res.status(400).json({ success: false, message: 'Name und Dauer erforderlich' })
   }
 
   try {
-    const exists = await Service.findOne({ name })
+    const exists = await Service.findOne({ name, duration })
     if (exists) {
       return res.status(409).json({ success: false, message: 'Service existiert bereits' })
     }
 
-    const service = new Service({ name })
+    const service = new Service({ name, duration })
     await service.save()
 
     return res.status(201).json({ success: true, message: 'Service erstellt', service })

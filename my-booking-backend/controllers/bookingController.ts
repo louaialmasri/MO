@@ -91,19 +91,21 @@ export const getAllBookings = async (req: AuthRequest, res: Response) => {
 
 // Bestellungen eines einzelnen Mitarbeiters
 export const getStaffBookings = async (req: AuthRequest, res: Response) => {
+  const staffId = req.user?.userId
+
+  if (!staffId) {
+    return res.status(401).json({ success: false, message: 'Nicht autorisiert' })
+  }
+
   try {
-    const staffId = req.user?.userId
-    if (!staffId) {
-      return res.status(401).json({ success: false, message: 'Nicht autorisiert' })
-    }
-
     const bookings = await Booking.find({ staff: staffId })
-      .populate('service')
-      .populate('user')
-
+      .populate('user', 'email')     // zeigt den Kunden
+      .populate('service', 'name duration' )  // zeigt den Service
+      .sort({ dateTime: 1 }) // nach Datum sortieren
     res.status(200).json({ success: true, bookings })
-  } catch (err) {
-    console.error('Fehler beim Laden der Mitarbeiter-Buchungen:', err)
-    res.status(500).json({ success: false, message: 'Serverfehler' })
+  } catch (error) {
+    console.error('Fehler beim Laden der Mitarbeiter-Buchungen:', error)
+    res.status(500).json({ success: false, message: 'Fehler beim Laden der Buchungen' })
   }
 }
+

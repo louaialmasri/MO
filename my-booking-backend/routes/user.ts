@@ -1,7 +1,13 @@
 import express from 'express'
+import { verifyToken } from '../middlewares/authMiddleware'
+import { verifyAdmin } from '../middlewares/adminMiddleware'
+import { getAllUsers, updateUserRole } from '../controllers/userController'
 import { User } from '../models/User'
 
 const router = express.Router()
+
+router.get('/', verifyToken, verifyAdmin, getAllUsers)
+router.patch('/:id/role', verifyToken, verifyAdmin, updateUserRole)
 
 router.get('/staff', async (req, res) => {
   try {
