@@ -19,8 +19,8 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, message: 'Ungültige Anmeldedaten' })
     }
 
-    // ➡ (Optional) Hier würdest du ein sicheres Password Hashing verwenden (bcrypt)
-    if (user.password !== password) {
+    // ➡ Hier würdest du ein sicheres Password Hashing verwenden (bcrypt)
+    if (!await bcrypt.compare(password, user.password)) {
       return res.status(401).json({ success: false, message: 'Ungültige Anmeldedaten' })
     }
 

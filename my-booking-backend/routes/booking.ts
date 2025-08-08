@@ -17,9 +17,9 @@ router.post('/', verifyToken, createBooking)
 router.delete('/:id', verifyToken, cancelBooking)
 
 router.get('/all', verifyToken, getAllBookings)
-router.get('/user', verifyToken, verifyAdmin, getUserBookings)
+router.get('/user', verifyToken, getUserBookings)
 
-router.get('/staff', verifyToken, verifyStaff ,getStaffBookings)
+router.get('/staff', verifyToken, verifyStaff, getStaffBookings)
 
 router.patch('/bookings/:id', verifyToken, updateBooking)
 
