@@ -6,7 +6,8 @@ import {
   cancelBooking,
   getAllBookings,
   getUserBookings,
-  updateBooking
+  updateBooking,
+  updateBookingController
 } from '../controllers/bookingController'
 import { getStaffBookings } from '../controllers/bookingController'
 import { verifyStaff } from '../middlewares/staffMiddleware'
@@ -22,5 +23,7 @@ router.get('/user', verifyToken, getUserBookings)
 router.get('/staff', verifyToken, verifyStaff, getStaffBookings)
 
 router.patch('/bookings/:id', verifyToken, updateBooking)
+
+router.patch('/:id', verifyToken, verifyAdmin, updateBookingController)
 
 export default router

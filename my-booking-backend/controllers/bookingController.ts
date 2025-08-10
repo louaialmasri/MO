@@ -165,3 +165,26 @@ export const getStaffBookings = async (req: AuthRequest, res: Response) => {
   }
 }
 
+export const updateBookingController = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params
+    const { dateTime, serviceId, staffId } = req.body
+
+    const patch: any = {}
+    if (dateTime) patch.dateTime = new Date(dateTime)
+    if (serviceId) patch.service = serviceId
+    if (staffId) patch.staff = staffId
+
+    const updated = await Booking.findByIdAndUpdate(id, patch, { new: true })
+      .populate('service','name duration')
+      .populate('user', 'email name')
+      .populate('staff', 'email name')
+
+    if (!updated) return res.status(404).json({ success:false, message:'Booking not found' })
+    return res.json({ success:true, booking: updated })
+  } catch (e) {
+    console.error(e)
+    return res.status(500).json({ success:false, message:'Update failed' })
+  }
+}
+
