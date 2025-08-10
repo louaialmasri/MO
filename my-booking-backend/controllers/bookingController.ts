@@ -129,11 +129,19 @@ export const updateBooking = async (req: AuthRequest, res: Response) => {
 
 export const getAllBookings = async (req: AuthRequest, res: Response) => {
   try {
-    const bookings = await Booking.find().populate('service').populate('user')
+    const bookings = await Booking.find()
+      .populate('service', 'name duration')          // Dauer mitliefern
+      .populate('user', 'email name phone')          // nur benötigte User-Felder
+      .populate('staff', 'email name')               // zuständiger Mitarbeiter
+      .sort({ dateTime: 1 })
+      .lean()
+
     return res.status(200).json({ success: true, bookings })
   } catch (err) {
     console.error('Fehler beim Abrufen aller Buchungen:', err)
-    return res.status(500).json({ success: false, message: 'Serverfehler beim Laden der Buchungen' })
+    return res
+      .status(500)
+      .json({ success: false, message: 'Serverfehler beim Laden der Buchungen' })
   }
 }
 
