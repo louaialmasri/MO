@@ -51,3 +51,20 @@ export const deleteService = async (req: AuthRequest, res: Response) => {
     return res.status(500).json({ success: false, message: 'Fehler beim Löschen des Services' })
   }
 }
+
+export const updateService = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params
+    const { name, duration } = req.body
+    const updated = await Service.findByIdAndUpdate(
+      id,
+      { ...(name && { name }), ...(duration !== undefined && { duration }) },
+      { new: true }
+    )
+    if (!updated) return res.status(404).json({ success: false, message: 'Service nicht gefunden' })
+    return res.json({ success: true, service: updated })
+  } catch (e) {
+    console.error('updateService error', e)
+    return res.status(500).json({ success: false, message: 'Update fehlgeschlagen' })
+  }
+}
