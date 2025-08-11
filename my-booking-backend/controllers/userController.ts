@@ -1,13 +1,18 @@
 import { User } from '../models/User'
 import { Request, Response } from 'express'
 import bcrypt from 'bcrypt'
+import mongoose from 'mongoose'
 
 export const getAllUsers = async (req: Request, res: Response) => {
   try {
-    const users = await User.find().select('-password')
-    res.json({ users })
+    const filter: any = {};
+    if (req.query.role) {
+      filter.role = req.query.role;
+    }
+    const users = await User.find(filter).select('-password').populate('skills');
+    res.json({ users });
   } catch {
-    res.status(500).json({ message: 'Fehler beim Laden der Nutzer' })
+    res.status(500).json({ message: 'Fehler beim Laden der Nutzer' });
   }
 }
 
@@ -52,5 +57,30 @@ export const createUserManually = async (req: Request, res: Response) => {
   } catch (err) {
     console.error('Fehler beim manuellen Anlegen:', err)
     res.status(500).json({ message: 'Interner Serverfehler' })
+  }
+}
+
+export const updateUserSkills = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const { skills } = req.body // Array von Service-IDs
+
+    if (!Array.isArray(skills)) {
+      return res.status(400).json({ message: 'skills muss ein Array sein' })
+    }
+    if (!mongoose.Types.ObjectId.isValid(id) || !skills.every(mongoose.Types.ObjectId.isValid)) {
+      return res.status(400).json({ message: 'Ungültige ID' })
+    }
+
+    const user = await User.findByIdAndUpdate(
+      id,
+      { skills },
+      { new: true }
+    ).populate('skills')
+
+    if (!user) return res.status(404).json({ message: 'User nicht gefunden' })
+    res.json(user)
+  } catch (e) {
+    res.status(500).json({ message: 'Fehler beim Aktualisieren der Skills' })
   }
 }
