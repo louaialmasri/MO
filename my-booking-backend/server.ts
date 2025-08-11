@@ -1,7 +1,5 @@
 import dotenv from 'dotenv'
 dotenv.config()
-
-
 import express from 'express'
 import cors from 'cors'
 import bodyParser from 'body-parser'
@@ -15,18 +13,26 @@ import userRoutes from './routes/user'
 const app = express()
 const PORT = 5000
 
-app.use(cors())
+app.use(cors({
+  origin: 'http://localhost:3000',
+  methods: ['GET','POST','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization'],
+  credentials: true,
+}))
+app.options('*', cors({
+  origin: 'http://localhost:3000',
+  methods: ['GET','POST','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization'],
+  credentials: true,
+}))
+
 app.use(bodyParser.json())
 
 app.use('/api', authRoutes)
 app.use('/api', adminRoutes)
-
 app.use('/api/services', serviceRoutes)
-
 app.use('/api/bookings', bookingRoutes)
 app.use('/api/users', userRoutes)
-
-
 
 app.listen(PORT, () => {
   console.log(`🚀 Backend läuft auf http://localhost:${PORT}`)

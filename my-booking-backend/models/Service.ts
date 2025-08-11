@@ -1,11 +1,11 @@
-import mongoose from 'mongoose'
+import mongoose, { Schema } from 'mongoose'
 
-const serviceSchema = new mongoose.Schema(
-  {
-    name: { type: String, required: true },
-    duration: { type: Number, required: true },
-  },
-  { timestamps: true }
-)
+const serviceSchema = new Schema({
+  title: { type: String, required: true },
+  description: String,
+  price: { type: Number, required: true },
+  duration: { type: Number, required: true }, // Minuten
+  salon: { type: Schema.Types.ObjectId, ref: 'Salon', default: null }, // 👈 optional
+}, { timestamps: true })
 
 export const Service = mongoose.model('Service', serviceSchema)

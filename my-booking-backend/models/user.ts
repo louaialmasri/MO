@@ -1,15 +1,11 @@
-import mongoose from 'mongoose'
+import mongoose, { Schema } from 'mongoose'
 
-const userSchema = new mongoose.Schema(
-  {
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    role: { type: String, enum: ['user', 'staff', 'admin'], default: 'user' },
-    name: { type: String, required: true },
-    address: { type: String, required: true },
-    phone: { type: String }, // optional
-  },
-  { timestamps: true }
-)
+const userSchema = new Schema({
+  email: { type: String, required: true, unique: true },
+  password: String,
+  role: { type: String, enum: ['user','staff','admin'], required: true },
+  skills: [{ type: Schema.Types.ObjectId, ref: 'Service' }], // welche Services kann er/sie
+  salon: { type: Schema.Types.ObjectId, ref: 'Salon', default: null }, // optional
+})
 
 export const User = mongoose.model('User', userSchema)

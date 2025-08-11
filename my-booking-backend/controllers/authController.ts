@@ -6,39 +6,43 @@ import bcrypt from 'bcrypt'
 
 
 export const login = async (req: Request, res: Response) => {
-  const { email, password } = req.body
-
-  if (!email || !password) {
-    return res.status(400).json({ success: false, message: 'E-Mail und Passwort erforderlich' })
-  }
-
   try {
-    const user = await User.findOne({ email })
+    const { email, password } = req.body as { email?: string; password?: string }
 
-    if (!user) {
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'E-Mail und Passwort sind erforderlich' })
+    }
+
+    // Wichtig: Passwort explizit selektieren (falls im Schema select:false)
+    const user = await User.findOne({ email }).select('+password +role +email +name +address +phone')
+    if (!user || typeof user.password !== 'string') {
       return res.status(401).json({ success: false, message: 'Ungültige Anmeldedaten' })
     }
 
-    // ➡ Hier würdest du ein sicheres Password Hashing verwenden (bcrypt)
-    if (!await bcrypt.compare(password, user.password)) {
+    const ok = await bcrypt.compare(password, user.password)
+    if (!ok) {
       return res.status(401).json({ success: false, message: 'Ungültige Anmeldedaten' })
     }
 
-    // JWT erzeugen
-    const token = generateToken(
-      { userId: user._id, email: user.email, role: user.role })
-
-    return res.status(200).json({
-      success: true,
-      message: 'Login erfolgreich',
-      token,
-      user: {
-        email: user.email,
-        role: user.role,
-      },
+    const token = generateToken({
+      userId: user._id.toString(),
+      email: user.email,
+      role: user.role
     })
+
+    // Niemals Passwort zurückgeben
+    const safeUser = {
+      _id: user._id,
+      email: user.email,
+      role: user.role,
+      name: (user as any).name,
+      address: (user as any).address,
+      phone: (user as any).phone,
+    }
+
+    return res.json({ success: true, token, user: safeUser })
   } catch (err) {
-    console.error('Login Fehler:', err)
+    console.error('Login error:', err)
     return res.status(500).json({ success: false, message: 'Serverfehler beim Login' })
   }
 }
