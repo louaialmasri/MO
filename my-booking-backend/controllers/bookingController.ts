@@ -4,10 +4,11 @@ import { Booking } from '../models/Booking'
 import { Service } from '../models/Service'
 import { AuthRequest } from '../middlewares/authMiddleware'
 import { User } from '../models/User'
+import { Availability } from '../models/Availability'
 
 // Booking erstellen
 export const createBooking = async (req: AuthRequest, res: Response) => {
-  const { serviceId, dateTime, staffId } = req.body
+  const { serviceId, dateTime, staffId, userId } = req.body
 
   if (!serviceId || !dateTime || !staffId) {
     return res.status(400).json({ success: false, message: 'ServiceId, Datum/Uhrzeit und Mitarbeiter erforderlich' })
@@ -21,29 +22,36 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
     const service = await Service.findById(serviceId)
     const staff = await User.findById(staffId).select('role skills')
 
-    if (!service) {
-      return res.status(404).json({ success: false, message: 'Service nicht gefunden' })
-    }
-
-    if (!staff || staff.role !== 'staff') {
-      return res.status(404).json({ success: false, message: 'Mitarbeiter nicht gefunden oder ungültig' })
-    }
+    if (!service) return res.status(404).json({ success: false, message: 'Service nicht gefunden' })
+    if (!staff || staff.role !== 'staff') return res.status(404).json({ success: false, message: 'Mitarbeiter nicht gefunden oder ungültig' })
 
     // Skill-Check
     const canDo = (staff.skills || []).some((id: any) => String(id) === String(serviceId))
-    if (!canDo) {
-      return res.status(400).json({ success: false, message: 'Mitarbeiter hat nicht die erforderlichen Skills für diesen Service' })
+    if (!canDo) return res.status(400).json({ success: false, message: 'Mitarbeiter hat nicht die erforderlichen Skills für diesen Service' })
+
+    // Zielkunde bestimmen:
+    let targetUserId = req.user?.userId // Standard: der eingeloggte Nutzer
+    if ((req.user?.role === 'admin' || req.user?.role === 'staff') && userId) {
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
+        return res.status(400).json({ success: false, message: 'Ungültige Kunden-ID' })
+      }
+      const targetUser = await User.findById(userId).select('role')
+      if (!targetUser) return res.status(404).json({ success: false, message: 'Kunde nicht gefunden' })
+      // Optional: nur echte Kunden zulassen
+      // if (targetUser.role !== 'user') return res.status(400).json({ success: false, message: 'Nur für Kunden buchbar' })
+      targetUserId = String(targetUser._id)
     }
 
     const booking = new Booking({
-      user: req.user?.userId,
+      user: targetUserId,
       service: serviceId,
       staff: staffId,
       dateTime,
     })
 
+    const clash = await ensureNoConflicts(staffId, dateTime, serviceId)
+    if (!clash.ok) return res.status(400).json({ success:false, message: clash.message }) 
     await booking.save()
-
     return res.status(201).json({ success: true, message: 'Buchung erstellt', booking })
   } catch (err) {
     console.error('Fehler beim Erstellen der Buchung:', err)
@@ -151,6 +159,16 @@ export const updateBooking = async (req: AuthRequest, res: Response) => {
     if (dateTime) booking.dateTime = dateTime
     if (staffId) booking.staff = staffId
 
+      // effektive IDs/Zeit bestimmen
+      const effectiveDateTime  = dateTime || booking.dateTime.toISOString()
+      // Konfliktcheck
+      const clash = await ensureNoConflicts(
+        effectiveStaffId,
+        effectiveDateTime,
+        effectiveServiceId
+      )
+      if (!clash.ok) return res.status(400).json({ success:false, message: clash.message })
+
     await booking.save()
     res.json({ success: true, booking })
   } catch (err) {
@@ -234,10 +252,90 @@ export const updateBookingController = async (req: AuthRequest, res: Response) =
       .populate('user', 'email name')
       .populate('staff', 'email name')
 
+      // effektive IDs/Zeit bestimmen
+      const effectiveDateTime  = dateTime || existing.dateTime.toISOString()
+      // Konfliktcheck
+      const clash = await ensureNoConflicts(
+        effectiveStaffId,
+        effectiveDateTime,
+        effectiveServiceId
+      )
+      if (!clash.ok) return res.status(400).json({ success:false, message: clash.message })
+
     if (!updated) return res.status(404).json({ success: false, message: 'Booking not found' })
     return res.json({ success: true, booking: updated })
   } catch (e) {
     console.error(e)
     return res.status(500).json({ success: false, message: 'Update failed' })
   }
+}
+
+function overlaps(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date) {
+  return aStart < bEnd && bStart < aEnd
+}
+
+async function getServiceDurationMinutes(serviceId: string) {
+  const svc = await Service.findById(serviceId).select('duration')
+  return svc?.duration ?? 30
+}
+
+async function getBookingEnd(serviceId: string, startISO: string) {
+  const mins = await getServiceDurationMinutes(serviceId)
+  const start = new Date(startISO)
+  return new Date(start.getTime() + mins * 60000)
+}
+
+async function ensureNoConflicts(staffId: string, startISO: string, serviceId: string) {
+  const start = new Date(startISO)
+  const end   = await getBookingEnd(serviceId, startISO)
+
+  // 1) gegen andere Buchungen
+  const windowBefore = new Date(start.getTime() - 4 * 60 * 60 * 1000)
+  const windowAfter  = new Date(end.getTime()   + 4 * 60 * 60 * 1000)
+
+  const neighborBookings = await Booking.find({
+    staff: staffId,
+    dateTime: { $gte: windowBefore, $lte: windowAfter }
+  }).populate('service', 'duration').lean()
+
+  for (const b of neighborBookings) {
+    const bStart = new Date(b.dateTime as any)
+    const bDur   = (b as any).service?.duration ?? 30
+    const bEnd   = new Date(bStart.getTime() + bDur * 60000)
+    if (overlaps(start, end, bStart, bEnd)) {
+      return { ok: false, message: 'Konflikt mit bestehender Buchung' }
+    }
+  }
+
+  // 2) gegen Abwesenheit/Pause
+  const blocks = await Availability.find({
+    staff: staffId,
+    type: { $in: ['absence', 'break'] },
+    start: { $lt: end },
+    end:   { $gt: start }
+  }).lean()
+
+  if (blocks.length > 0) {
+    return { ok: false, message: 'Konflikt mit Abwesenheit/Pause' }
+  }
+
+  // 3) optional: innerhalb Arbeitszeit (falls Work-Fenster existieren)
+  const dayStart = new Date(start); dayStart.setHours(0,0,0,0)
+  const dayEnd   = new Date(start); dayEnd.setHours(23,59,59,999)
+
+  const works = await Availability.find({
+    staff: staffId,
+    type: 'work',
+    start: { $lt: dayEnd },
+    end:   { $gt: dayStart }
+  }).lean()
+
+  if (works.length > 0) {
+    const insideSomeWork = works.some(w => new Date(w.start) <= start && end <= new Date(w.end))
+    if (!insideSomeWork) {
+      return { ok: false, message: 'Termin liegt außerhalb der Arbeitszeit' }
+    }
+  }
+
+  return { ok: true }
 }
