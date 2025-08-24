@@ -20,13 +20,13 @@ const PORT = 5000
 app.use(cors({
   origin: 'http://localhost:3000',
   methods: ['GET','POST','PATCH','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization'],
+  allowedHeaders: ['Content-Type','Authorization', 'x-salon-id'],
   credentials: true,
 }))
 app.options('*', cors({
   origin: 'http://localhost:3000',
   methods: ['GET','POST','PATCH','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization'],
+  allowedHeaders: ['Content-Type','Authorization', 'x-salon-id'],
   credentials: true,
 }))
 

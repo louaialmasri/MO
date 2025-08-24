@@ -180,7 +180,23 @@ export const updateBooking = async (req: AuthRequest, res: Response) => {
 // GET /api/bookings (alle – Admin-Übersicht)
 export const getAllBookings = async (req: AuthRequest, res: Response) => {
   try {
-    const bookings = await Booking.find()
+    // Filterung nach salonId
+    const { salonId } = req.query as { salonId?: string }
+    let staffIds: string[] = []
+    let serviceIds: string[] = []
+    if (salonId) {
+      // Hole alle Staff-IDs und Service-IDs des Salons
+      staffIds = (await User.find({ salon: salonId, role: 'staff' }).select('_id')).map(u => String(u._id))
+      serviceIds = (await Service.find({ salon: salonId }).select('_id')).map(s => String(s._id))
+    }
+    const filter: any = {}
+    if (salonId) {
+      filter.$or = [
+        { staff: { $in: staffIds } },
+        { service: { $in: serviceIds } }
+      ]
+    }
+    const bookings = await Booking.find(filter)
       .populate('service', 'name duration')
       .populate('user', 'email name phone')
       .populate('staff', 'email name')

@@ -2,21 +2,22 @@ import { User } from '../models/User'
 import { Request, Response } from 'express'
 import bcrypt from 'bcrypt'
 import mongoose from 'mongoose'
+import { AuthRequest } from '../middlewares/authMiddleware'
+import { Booking } from '../models/Booking'
 
-export const getAllUsers = async (req: Request, res: Response) => {
+export const getAllUsers = async (req: any, res: Response) => {
   try {
-    const filter: any = {};
-    if (req.query.role) {
-      filter.role = req.query.role;
-    }
-    const users = await User.find(filter).select('-password').populate('skills');
-    res.json({ users });
-  } catch {
-    res.status(500).json({ message: 'Fehler beim Laden der Nutzer' });
+    const q: any = {}
+    if (req.query.role) q.role = req.query.role
+    if (req.salonId) q.salon = req.salonId
+    const users = await User.find(q).populate('skills')
+    res.json({ success: true, users })
+  } catch (e) {
+    res.status(500).json({ success:false, message:'Fehler beim Laden der Nutzer' })
   }
 }
 
-export const updateUserRole = async (req: Request, res: Response) => {
+export const updateUserRole = async (req: AuthRequest & { salonId?: string }, res: Response) => {
   const { id } = req.params
   const { role } = req.body
 
@@ -25,16 +26,25 @@ export const updateUserRole = async (req: Request, res: Response) => {
   }
 
   try {
-    const user = await User.findByIdAndUpdate(id, { role }, { new: true }).select('-password')
+    // When promoting to staff, attach the current active salon; when demoting, remove salon
+    const updateData: any = { role }
+    if (role === 'staff') {
+      if (req.salonId) updateData.salon = req.salonId
+    } else {
+      updateData.salon = null
+    }
+
+    const user = await User.findByIdAndUpdate(id, updateData, { new: true }).select('-password')
     res.json({ user })
-  } catch {
+  } catch (err) {
+    console.error('Rollen-Update fehlgeschlagen:', err)
     res.status(500).json({ message: 'Rollen-Update fehlgeschlagen' })
   }
 }
 
 export const createUserManually = async (req: Request, res: Response) => {
   try {
-    const { email, password, role, name, address, phone } = req.body
+    const { email, password, role, name, address, phone, salonId } = req.body
 
     const existing = await User.findOne({ email })
     if (existing) {
@@ -50,6 +60,7 @@ export const createUserManually = async (req: Request, res: Response) => {
       name,
       address,
       phone,
+      salon: salonId || null,
     })
 
     await newUser.save()
@@ -57,6 +68,35 @@ export const createUserManually = async (req: Request, res: Response) => {
   } catch (err) {
     console.error('Fehler beim manuellen Anlegen:', err)
     res.status(500).json({ message: 'Interner Serverfehler' })
+  }
+}
+
+export const deleteStaff = async (req: AuthRequest & { salonId?: string }, res: Response) => {
+  try {
+    if (req.user?.role !== 'admin') return res.status(403).json({ success:false, message:'Nur Admin' })
+    const { id } = req.params
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success:false, message:'Ungültige ID' })
+    const staff = await User.findById(id).select('role salon')
+    if (!staff) return res.status(404).json({ success:false, message:'User nicht gefunden' })
+    if (staff.role !== 'staff') return res.status(400).json({ success:false, message:'Nur Mitarbeiter können gelöscht werden' })
+    // darf nur im aktiven Salon gelöscht werden
+    if (req.salonId && String(staff.salon) !== String(req.salonId)) {
+      return res.status(403).json({ success:false, message:'Falscher Salon' })
+    }
+    const now = new Date()
+    const future = await Booking.countDocuments({ staff: staff._id, dateTime: { $gte: now } })
+    if (future > 0) {
+      return res.status(409).json({
+        success:false,
+        message:'Mitarbeiter hat noch zukünftige Termine. Bitte umbuchen/stornieren.',
+        details:{ futureBookings: future }
+      })
+    }
+    // Statt den User-Datensatz zu löschen, entfernen wir nur die Salon-Zuordnung und setzen die Rolle zurück
+    await User.findByIdAndUpdate(staff._id, { role: 'user', salon: null })
+    return res.json({ success:true, message:'Mitarbeiter aus diesem Salon entfernt' })
+  } catch (e) {
+    res.status(500).json({ success:false, message:'Serverfehler beim Löschen' })
   }
 }
 

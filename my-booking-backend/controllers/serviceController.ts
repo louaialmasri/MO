@@ -1,13 +1,16 @@
 import { Request, Response } from 'express'
 import { Service } from '../models/Service'
 import { AuthRequest } from '../middlewares/authMiddleware'
+import { SalonRequest } from '../middlewares/activeSalon'
 
 
 export const listServices = async (req: Request, res: Response) => {
   try {
+    // Respect active salon from middleware (if present) but allow explicit query
     const { salonId } = req.query as { salonId?: string }
     const filter: any = {}
-    if (salonId) filter.salon = salonId
+    if ((req as any).salonId) filter.salon = (req as any).salonId
+    else if (salonId) filter.salon = salonId
     const services = await Service.find(filter).sort({ title: 1 }).lean()
     return res.json({ success: true, services })
   } catch (e) {
@@ -27,9 +30,9 @@ export const getAllServices = async (req: Request, res: Response) => {
 }
 
 // ➡ Service erstellen (Admin only)
-export const createService = async (req: AuthRequest, res: Response) => {
+export const createService = async (req: SalonRequest, res: Response) => {
   try {
-    const { title, description, price, duration, salonId } = req.body
+    const { title, description, price, duration } = req.body
     if (!title || !duration || price == null) {
       return res.status(400).json({ success: false, message: 'title, duration, price sind erforderlich' })
     }
@@ -38,7 +41,8 @@ export const createService = async (req: AuthRequest, res: Response) => {
       description: description ? String(description).trim() : '',
       price: Number(price),
       duration: Number(duration),
-      salon: salonId ?? null,
+      // Prefer salon from middleware (header/user) to ensure correct binding
+      salon: req.salonId ?? null,
     })
     return res.status(201).json({ success: true, service })
   } catch (e) {
@@ -49,9 +53,14 @@ export const createService = async (req: AuthRequest, res: Response) => {
 
 
 // ➡ Service löschen (Admin only)
-export const deleteService = async (req: AuthRequest, res: Response) => {
+export const deleteService = async (req: SalonRequest, res: Response) => {
   try {
     const { id } = req.params
+    const svc = await Service.findById(id)
+    if (!svc) return res.status(404).json({ success: false, message: 'Service nicht gefunden' })
+    if (req.salonId && String(svc.salon) !== String(req.salonId)) {
+      return res.status(403).json({ success:false, message:'Nicht autorisiert (Salon)'} )
+    }
     const deleted = await Service.findByIdAndDelete(id)
     if (!deleted) return res.status(404).json({ success: false, message: 'Service nicht gefunden' })
     return res.json({ success: true })
@@ -61,7 +70,7 @@ export const deleteService = async (req: AuthRequest, res: Response) => {
   }
 }
 
-export const updateService = async (req: AuthRequest, res: Response) => {
+export const updateService = async (req: SalonRequest, res: Response) => {
   try {
     const { id } = req.params
     const { title, description, price, duration, salonId } = req.body
@@ -70,11 +79,23 @@ export const updateService = async (req: AuthRequest, res: Response) => {
     if (description !== undefined) patch.description = String(description).trim()
     if (price !== undefined) patch.price = Number(price)
     if (duration !== undefined) patch.duration = Number(duration)
-    if (salonId !== undefined) patch.salon = salonId ?? null
+    // Prevent changing salon to another salon if middleware provides one
+    if (salonId !== undefined) {
+      if (req.salonId && salonId && String(salonId) !== String(req.salonId)) {
+        return res.status(403).json({ success:false, message:'Nicht autorisiert (Salon)'} )
+      }
+      patch.salon = salonId ?? null
+    }
 
-    const updated = await Service.findByIdAndUpdate(id, patch, { new: true })
-    if (!updated) return res.status(404).json({ success: false, message: 'Service nicht gefunden' })
-    return res.json({ success: true, service: updated })
+    const service = await Service.findById(id)
+    if (!service) return res.status(404).json({ success: false, message: 'Service nicht gefunden' })
+    if (req.salonId && service.salon && String(service.salon) !== String(req.salonId)) {
+      return res.status(403).json({ success:false, message:'Nicht autorisiert (Salon)'} )
+    }
+
+    Object.assign(service, patch)
+    await service.save()
+    return res.json({ success: true, service })
   } catch (e) {
     console.error('updateService error', e)
     return res.status(500).json({ success: false, message: 'Fehler beim Aktualisieren' })
