@@ -1,18 +1,14 @@
 import express from 'express'
 import { verifyToken } from '../middlewares/authMiddleware'
 import { verifyAdmin } from '../middlewares/adminMiddleware'
-import { getAllServices, createService, deleteService, updateService, listServices } from '../controllers/serviceController'
+import { listServices, createService, deleteService, updateService } from '../controllers/serviceController'
 
 const router = express.Router()
 
-// ➡ Öffentlich abrufbar (z.B. für Buchungs-Formulare)
-router.get('/', getAllServices)
+// Nur diese Liste verwenden – sie respektiert req.salonId (aus activeSalon)
+router.get('/', listServices)
 
-// ➡ Nur Admin
-router.post('/', verifyToken, verifyAdmin, createService)
-router.delete('/:id', verifyToken, verifyAdmin, deleteService)
-router.patch('/:id', verifyToken, verifyAdmin, updateService)
-router.get('/', listServices)                                     // ?salonId= optional
+// Admin-CRUD
 router.post('/', verifyToken, verifyAdmin, createService)
 router.patch('/:id', verifyToken, verifyAdmin, updateService)
 router.delete('/:id', verifyToken, verifyAdmin, deleteService)

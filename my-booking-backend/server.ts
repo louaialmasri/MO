@@ -14,6 +14,7 @@ import timeslotRoutes from './routes/timeslots'
 import { activeSalon } from './middlewares/activeSalon'
 import salonRoutes from './routes/salons'
 import assignmentRoutes from './routes/assignments'
+import adminCatalogRoutes from './routes/adminCatalog'
 
 const app = express()
 const PORT = 5000
@@ -44,6 +45,7 @@ app.use('/api/availability', activeSalon, availabilityRoutes)
 app.use('/api/timeslots', activeSalon, timeslotRoutes)
 app.use('/api/salons', activeSalon, salonRoutes)
 app.use('/api/assignments', activeSalon, assignmentRoutes)
+app.use('/api/admin', adminCatalogRoutes)
 
 app.listen(PORT, () => {
   console.log(`🚀 Backend läuft auf http://localhost:${PORT}`)
