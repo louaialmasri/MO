@@ -2,6 +2,7 @@ import { Response } from 'express'
 import mongoose from 'mongoose'
 import { AuthRequest } from '../middlewares/authMiddleware'
 import { Availability } from '../models/Availability'
+
 import { User } from '../models/User'
 
 const canManage = (req: AuthRequest, targetStaffId: string) => {
