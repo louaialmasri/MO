@@ -6,6 +6,8 @@ import { User } from '../models/User'
 import { Service } from '../models/Service'
 import { Booking } from '../models/Booking'
 import { Availability } from '../models/Availability'
+import { ServiceSalon } from '../models/ServiceSalon'
+import { StaffSalon } from '../models/StaffSalon'
 
 export const getMySalons = async (req: AuthRequest, res: Response) => {
   if (req.user?.role !== 'admin') return res.status(403).json({ success:false, message:'Nur Admin' })
@@ -107,5 +109,74 @@ export const migrateDefaultSalon = async (req: AuthRequest, res: Response) => {
   } catch (e) {
     console.error(e)
     return res.status(500).json({ success:false, message:'Migration fehlgeschlagen' })
+  }
+}
+
+export const listSalonGuards = async (req: AuthRequest, res: Response) => {
+  try {
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({ success:false, message:'Nur Admin' })
+    }
+
+    const salons = await Salon.find({}).lean()
+    const total = salons.length
+    const now = new Date()
+
+    // Alle Counts in einem Rutsch je Salon
+    const salonIds = salons.map(s => new Types.ObjectId(String(s._id)))
+
+    const [staffCounts, serviceCounts, futureBookingCounts, availabilityCounts] = await Promise.all([
+      StaffSalon.aggregate([
+        { $match: { salon: { $in: salonIds }, active: true } },
+        { $group: { _id: '$salon', cnt: { $sum: 1 } } }
+      ]),
+      ServiceSalon.aggregate([
+        { $match: { salon: { $in: salonIds }, active: true } },
+        { $group: { _id: '$salon', cnt: { $sum: 1 } } }
+      ]),
+      // zukünftige Buchungen zählen (über Staff)
+      Booking.aggregate([
+        { $match: { dateTime: { $gte: now } } },
+        { $lookup: { from: 'staffsalons', localField: 'staff', foreignField: 'staff', as: 'ss' } },
+        { $unwind: '$ss' },
+        { $match: { 'ss.active': true, 'ss.salon': { $in: salonIds } } },
+        { $group: { _id: '$ss.salon', cnt: { $sum: 1 } } }
+      ]),
+      // Availability pro Salon (falls dein Modell salon speichert)
+      Availability.aggregate([
+        { $match: { salon: { $in: salonIds } } },
+        { $group: { _id: '$salon', cnt: { $sum: 1 } } }
+      ]),
+    ])
+
+    const idx = (arr: any[]) => Object.fromEntries(arr.map(r => [String(r._id), r.cnt]))
+    const staffBy = idx(staffCounts)
+    const svcBy = idx(serviceCounts)
+    const bookBy = idx(futureBookingCounts)
+    const avBy = idx(availabilityCounts)
+
+    const result = salons.map(s => {
+      const id = String(s._id)
+      const counts = {
+        staff: staffBy[id] || 0,
+        services: svcBy[id] || 0,
+        futureBookings: bookBy[id] || 0,
+        availabilities: avBy[id] || 0,
+      }
+      const isLast = total <= 1
+      const reasons: string[] = []
+      if (isLast) reasons.push('Letzter Salon')
+      if (counts.staff > 0) reasons.push(`${counts.staff} Mitarbeiter zugeordnet`)
+      if (counts.services > 0) reasons.push(`${counts.services} Services zugeordnet`)
+      if (counts.futureBookings > 0) reasons.push(`${counts.futureBookings} zukünftige Buchungen`)
+      if (counts.availabilities > 0) reasons.push(`${counts.availabilities} Abwesenheiten/Arbeitszeiten`)
+      const deletable = !isLast && Object.values(counts).every(n => n === 0)
+      return { _id: s._id, name: s.name, logoUrl: (s as any).logoUrl ?? null, deletable, reasons, counts }
+    })
+
+    return res.json({ success:true, salons: result })
+  } catch (e) {
+    console.error('listSalonGuards error', e)
+    return res.status(500).json({ success:false, message:'Serverfehler' })
   }
 }
