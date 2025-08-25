@@ -11,8 +11,12 @@ import {
 } from '../controllers/bookingController'
 import { getStaffBookings } from '../controllers/bookingController'
 import { verifyStaff } from '../middlewares/staffMiddleware'
+import { activeSalon } from '../middlewares/activeSalon'
+
 
 const router = express.Router()
+
+router.use(activeSalon)
 
 router.post('/', verifyToken, createBooking)
 router.delete('/:id', verifyToken, cancelBooking)

@@ -2,43 +2,43 @@ import { Response, NextFunction } from 'express'
 import { AuthRequest } from './authMiddleware'
 import { User } from '../models/User'
 
-// erweitert AuthRequest um salonId
 export interface SalonRequest extends AuthRequest {
   salonId?: string | null
 }
 
-// Liest aktiven Salon aus Header (x-salon-id) oder vom Benutzer
 export const activeSalon = async (req: SalonRequest, res: Response, next: NextFunction) => {
   try {
     const headerSalonId = req.header('x-salon-id') || null
 
-    // Benutzer laden (brauchen wir für role + salon)
-    const uid = req.user?.userId
-    const userDoc = uid ? await User.findById(uid).select('role salon') : null
-    const role = userDoc?.role || req.user?.role
-
-    if (!role) {
-      req.salonId = null
+    // 1) Kein Login? -> trotzdem per Header scopen (z.B. öffentliche /services-Liste)
+    if (!req.user) {
+      req.salonId = headerSalonId
       return next()
     }
 
-    // Admin: darf Salon aus Header setzen (wenn vorhanden), sonst sein eigener/fallback null
+    // 2) Eingeloggt: Rolle ermitteln
+    const userDoc = await User.findById(req.user.userId).select('role salon')
+    const role = userDoc?.role || req.user.role
+
     if (role === 'admin') {
+      // Admin darf per Header den aktiven Salon wählen; sonst eigener Salon (falls gesetzt)
       req.salonId = headerSalonId || (userDoc?.salon ? String(userDoc.salon) : null)
       return next()
     }
 
-    // Staff/User: immer an eigenen Salon binden; Header ignorieren
     if (role === 'staff' || role === 'user') {
+      // Staff/User werden IMMER auf den eigenen Salon festgenagelt (Header wird ignoriert)
       req.salonId = userDoc?.salon ? String(userDoc.salon) : null
       return next()
     }
 
-    req.salonId = null
+    // Fallback
+    req.salonId = headerSalonId || null
     next()
   } catch (e) {
     console.error('activeSalon error:', e)
-    req.salonId = null
+    const headerSalonId = req.header('x-salon-id') || null
+    req.salonId = headerSalonId || null
     next()
   }
 }

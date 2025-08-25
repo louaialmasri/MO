@@ -5,9 +5,12 @@ import { Service } from '../models/Service'
 import { AuthRequest } from '../middlewares/authMiddleware'
 import { User } from '../models/User'
 import { Availability } from '../models/Availability'
+import { StaffSalon } from '../models/StaffSalon'
+import { ServiceSalon } from '../models/ServiceSalon'
+import { SalonRequest } from '../middlewares/activeSalon'
 
 // Booking erstellen
-export const createBooking = async (req: AuthRequest, res: Response) => {
+export const createBooking = async (req: AuthRequest & SalonRequest, res: Response) => {
   const { serviceId, dateTime, staffId, userId } = req.body
 
   if (!serviceId || !dateTime || !staffId) {
@@ -19,6 +22,16 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
   }
 
   try {
+    const sid = req.salonId
+
+    // Prüfe, ob der Mitarbeiter im aktuellen Salon aktiv ist
+    const staffMember = await StaffSalon.findOne({ staff: staffId, salon: sid, active: true })
+    if (!staffMember) return res.status(403).json({ success:false, message:'Mitarbeiter nicht diesem Salon zugeordnet' })
+
+    // Prüfe, ob der Service im aktuellen Salon aktiv ist
+    const svcAssign = await ServiceSalon.findOne({ service: serviceId, salon: sid, active: true })
+    if (!svcAssign) return res.status(403).json({ success:false, message:'Service nicht diesem Salon zugeordnet' })
+
     const service = await Service.findById(serviceId)
     const staff = await User.findById(staffId).select('role skills')
 
@@ -37,8 +50,6 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
       }
       const targetUser = await User.findById(userId).select('role')
       if (!targetUser) return res.status(404).json({ success: false, message: 'Kunde nicht gefunden' })
-      // Optional: nur echte Kunden zulassen
-      // if (targetUser.role !== 'user') return res.status(400).json({ success: false, message: 'Nur für Kunden buchbar' })
       targetUserId = String(targetUser._id)
     }
 
@@ -121,7 +132,7 @@ export const cancelBooking = async (req: AuthRequest, res: Response) => {
 }
 
 // PATCH /api/bookings/:id  (einfaches Update)
-export const updateBooking = async (req: AuthRequest, res: Response) => {
+export const updateBooking = async (req: AuthRequest & SalonRequest, res: Response) => {
   try {
     const bookingId = req.params.id
     const { serviceId, dateTime, staffId } = req.body
@@ -144,6 +155,14 @@ export const updateBooking = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ success: false, message: 'Ungültige ID' })
     }
 
+    // NEU: Salon-Check
+    const sid = req.salonId
+    const staffMember = await StaffSalon.findOne({ staff: effectiveStaffId, salon: sid, active: true })
+    if (!staffMember) return res.status(403).json({ success:false, message:'Mitarbeiter nicht diesem Salon zugeordnet' })
+
+    const svcAssign = await ServiceSalon.findOne({ service: effectiveServiceId, salon: sid, active: true })
+    if (!svcAssign) return res.status(403).json({ success:false, message:'Service nicht diesem Salon zugeordnet' })
+
     // Staff validieren + Skill-Check
     const staff = await User.findById(effectiveStaffId).select('skills role')
     if (!staff || staff.role !== 'staff') {
@@ -159,15 +178,15 @@ export const updateBooking = async (req: AuthRequest, res: Response) => {
     if (dateTime) booking.dateTime = dateTime
     if (staffId) booking.staff = staffId
 
-      // effektive IDs/Zeit bestimmen
-      const effectiveDateTime  = dateTime || booking.dateTime.toISOString()
-      // Konfliktcheck
-      const clash = await ensureNoConflicts(
-        effectiveStaffId,
-        effectiveDateTime,
-        effectiveServiceId
-      )
-      if (!clash.ok) return res.status(400).json({ success:false, message: clash.message })
+    // effektive IDs/Zeit bestimmen
+    const effectiveDateTime  = dateTime || booking.dateTime.toISOString()
+    // Konfliktcheck
+    const clash = await ensureNoConflicts(
+      effectiveStaffId,
+      effectiveDateTime,
+      effectiveServiceId
+    )
+    if (!clash.ok) return res.status(400).json({ success:false, message: clash.message })
 
     await booking.save()
     res.json({ success: true, booking })

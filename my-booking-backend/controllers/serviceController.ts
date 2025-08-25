@@ -1,33 +1,43 @@
 import { Request, Response } from 'express'
 import { Service } from '../models/Service'
+import { ServiceSalon } from '../models/ServiceSalon'
 import { AuthRequest } from '../middlewares/authMiddleware'
 import { SalonRequest } from '../middlewares/activeSalon'
 
 
-export const listServices = async (req: Request, res: Response) => {
+export const listServices = async (req: any, res: any) => {
   try {
-    // Respect active salon from middleware (if present) but allow explicit query
-    const { salonId } = req.query as { salonId?: string }
-    const filter: any = {}
-    if ((req as any).salonId) filter.salon = (req as any).salonId
-    else if (salonId) filter.salon = salonId
-    const services = await Service.find(filter).sort({ title: 1 }).lean()
-    return res.json({ success: true, services })
+    const sid = req.salonId || (req.query?.salonId as string | undefined)
+    if (!sid) return res.json({ success:true, services: [] })
+
+    // 1) bevorzugt: Zuordnungen nutzen
+    const rows = await ServiceSalon.find({ salon: sid, active: true }).lean()
+    if (rows.length > 0) {
+      const ids = rows.map(r => r.service)
+      const svcs = await Service.find({ _id: { $in: ids } }).lean()
+      const byId = new Map(svcs.map(s => [String(s._id), s]))
+      const services = rows.map(r => {
+        const base = byId.get(String(r.service))!
+        return {
+          ...base,
+          price: r.priceOverride ?? base.price,
+          duration: r.durationOverride ?? base.duration,
+        }
+      })
+      return res.json({ success:true, services })
+    }
+
+    // 2) Fallback: alte Logik (falls noch keine Zuordnungen existieren)
+    const services = await Service.find({ salon: sid }).sort({ title: 1 }).lean()
+    return res.json({ success:true, services })
   } catch (e) {
     console.error('listServices error', e)
-    return res.status(500).json({ success: false, message: 'Fehler beim Laden der Services' })
+    return res.status(500).json({ success:false, message:'Fehler beim Laden der Services' })
   }
 }
 
 // ➡ Alle Services abrufen (öffentlich)
-export const getAllServices = async (req: Request, res: Response) => {
-  try {
-    const services = await Service.find()
-    return res.status(200).json({ success: true, services })
-  } catch (err) {
-    return res.status(500).json({ success: false, message: 'Fehler beim Laden der Services' })
-  }
-}
+export const getAllServices = listServices;
 
 // ➡ Service erstellen (Admin only)
 export const createService = async (req: SalonRequest, res: Response) => {

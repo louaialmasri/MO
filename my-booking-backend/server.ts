@@ -13,6 +13,7 @@ import availabilityRoutes from './routes/availability'
 import timeslotRoutes from './routes/timeslots'
 import { activeSalon } from './middlewares/activeSalon'
 import salonRoutes from './routes/salons'
+import assignmentRoutes from './routes/assignments'
 
 const app = express()
 const PORT = 5000
@@ -32,20 +33,17 @@ app.options('*', cors({
 
 app.use(bodyParser.json())
 
-app.use('/api', authRoutes)
+app.use('/api', activeSalon, authRoutes)
 app.use('/api', adminRoutes)
-app.use('/api/services', serviceRoutes)
-app.use('/api/bookings', bookingRoutes)
-app.use('/api/users', userRoutes)
-app.use('/api/availability', availabilityRoutes)
-app.use('/api/timeslots', timeslotRoutes)
-app.use('/api/salons', salonRoutes)
+
+// WICHTIG: nur noch EIN Mount pro Router, MIT activeSalon davor
 app.use('/api/services', activeSalon, serviceRoutes)
-app.use('/api/users', activeSalon, userRoutes)
 app.use('/api/bookings', activeSalon, bookingRoutes)
+app.use('/api/users', activeSalon, userRoutes)
 app.use('/api/availability', activeSalon, availabilityRoutes)
 app.use('/api/timeslots', activeSalon, timeslotRoutes)
 app.use('/api/salons', activeSalon, salonRoutes)
+app.use('/api/assignments', activeSalon, assignmentRoutes)
 
 app.listen(PORT, () => {
   console.log(`🚀 Backend läuft auf http://localhost:${PORT}`)

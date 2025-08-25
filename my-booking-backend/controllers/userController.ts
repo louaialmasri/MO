@@ -1,19 +1,32 @@
 import { User } from '../models/User'
+import { StaffSalon } from '../models/StaffSalon'
 import { Request, Response } from 'express'
 import bcrypt from 'bcrypt'
 import mongoose from 'mongoose'
 import { AuthRequest } from '../middlewares/authMiddleware'
 import { Booking } from '../models/Booking'
 
-export const getAllUsers = async (req: any, res: Response) => {
+export const getAllUsers = async (req: any, res: any) => {
   try {
-    const q: any = {}
-    if (req.query.role) q.role = req.query.role
-    if (req.salonId) q.salon = req.salonId
-    const users = await User.find(q).populate('skills')
-    res.json({ success: true, users })
+    const { role } = req.query as { role?: string }
+    const sid = req.salonId
+    if (!sid) return res.json({ success:true, users: [] })
+
+    if (role === 'staff') {
+      const rows = await StaffSalon.find({ salon: sid, active: true }).select('staff').lean()
+      const ids = rows.map(r => r.staff)
+      const users = await User.find({ _id: { $in: ids } }).populate('skills').lean()
+      return res.json({ success:true, users })
+    }
+
+    // andere Rollen weiter wie bisher (user/admin am Salon)
+    const q: any = { salon: sid }
+    if (role) q.role = role
+    const users = await User.find(q).populate('skills').lean()
+    return res.json({ success:true, users })
   } catch (e) {
-    res.status(500).json({ success:false, message:'Fehler beim Laden der Nutzer' })
+    console.error('getAllUsers error', e)
+    return res.status(500).json({ success:false, message:'Fehler beim Laden der Nutzer' })
   }
 }
 
@@ -42,9 +55,9 @@ export const updateUserRole = async (req: AuthRequest & { salonId?: string }, re
   }
 }
 
-export const createUserManually = async (req: Request, res: Response) => {
+export const createUserManually = async (req: Request & { salonId?: string }, res: Response) => {
   try {
-    const { email, password, role, name, address, phone, salonId } = req.body
+    const { email, password, role, name, address, phone } = req.body
 
     const existing = await User.findOne({ email })
     if (existing) {
@@ -60,7 +73,7 @@ export const createUserManually = async (req: Request, res: Response) => {
       name,
       address,
       phone,
-      salon: salonId || null,
+      salon: req.salonId ?? null, // <-- Patch: Salon aus Middleware!
     })
 
     await newUser.save()
@@ -76,13 +89,16 @@ export const deleteStaff = async (req: AuthRequest & { salonId?: string }, res: 
     if (req.user?.role !== 'admin') return res.status(403).json({ success:false, message:'Nur Admin' })
     const { id } = req.params
     if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success:false, message:'Ungültige ID' })
+
     const staff = await User.findById(id).select('role salon')
     if (!staff) return res.status(404).json({ success:false, message:'User nicht gefunden' })
     if (staff.role !== 'staff') return res.status(400).json({ success:false, message:'Nur Mitarbeiter können gelöscht werden' })
+
     // darf nur im aktiven Salon gelöscht werden
     if (req.salonId && String(staff.salon) !== String(req.salonId)) {
       return res.status(403).json({ success:false, message:'Falscher Salon' })
     }
+
     const now = new Date()
     const future = await Booking.countDocuments({ staff: staff._id, dateTime: { $gte: now } })
     if (future > 0) {
@@ -92,11 +108,45 @@ export const deleteStaff = async (req: AuthRequest & { salonId?: string }, res: 
         details:{ futureBookings: future }
       })
     }
-    // Statt den User-Datensatz zu löschen, entfernen wir nur die Salon-Zuordnung und setzen die Rolle zurück
-    await User.findByIdAndUpdate(staff._id, { role: 'user', salon: null })
-    return res.json({ success:true, message:'Mitarbeiter aus diesem Salon entfernt' })
+
+    // tatsächliche Löschung des Dokuments (statt nur Demote)
+    await User.findByIdAndDelete(staff._id)
+
+    return res.json({ success:true, message:'Mitarbeiter gelöscht' })
   } catch (e) {
+    console.error('Fehler beim Löschen des Mitarbeiters:', e)
     res.status(500).json({ success:false, message:'Serverfehler beim Löschen' })
+  }
+}
+
+export const deleteUserById = async (req: AuthRequest & { salonId?: string }, res: Response) => {
+  try {
+    const { id } = req.params
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success:false, message:'Ungültige ID' })
+
+    const user = await User.findById(id).select('role salon')
+    if (!user) return res.status(404).json({ success:false, message:'User nicht gefunden' })
+
+    // nur innerhalb des aktiven Salons erlauben
+    if (req.salonId && user.salon && String(user.salon) !== String(req.salonId)) {
+      return res.status(403).json({ success:false, message:'Nicht autorisiert (Salon)' })
+    }
+
+    // Verhindern, falls der User noch zukünftige Buchungen hat
+    const now = new Date()
+    const futureCount = await Booking.countDocuments({
+      $or: [{ user: user._id }, { staff: user._id }],
+      dateTime: { $gte: now }
+    })
+    if (futureCount > 0) {
+      return res.status(409).json({ success:false, message:'User hat noch zukünftige Termine', details:{ future: futureCount } })
+    }
+
+    await User.findByIdAndDelete(id)
+    return res.json({ success:true, message:'User gelöscht' })
+  } catch (e:any) {
+    console.error(e)
+    return res.status(500).json({ success:false, message:'Fehler beim Löschen' })
   }
 }
 

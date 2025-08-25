@@ -39,7 +39,8 @@ export const createAvailability = async (req: AuthRequest, res: Response) => {
     if (!canManage(req, staffId))
       return res.status(403).json({ success:false, message:'Nicht autorisiert' })
 
-    const item = await Availability.create({ staff: staffId, type, start: s, end: e, note })
+    const salonId = (req as any).salonId || null
+    const item = await Availability.create({ staff: staffId, type, start: s, end: e, note, salon: salonId })
     return res.status(201).json({ success:true, availability: item })
   } catch (e) {
     console.error(e)
