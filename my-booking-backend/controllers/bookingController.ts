@@ -148,8 +148,8 @@ export const updateBooking = async (req: AuthRequest & SalonRequest, res: Respon
     }
 
     // Effektive IDs bestimmen (Body > Bestand)
-    const effectiveServiceId = serviceId || String(booking.service)
-    const effectiveStaffId = staffId || String(booking.staff)
+    const effectiveServiceId = String(serviceId || booking.service)
+    const effectiveStaffId = String(staffId || booking.staff)
 
     if (!mongoose.Types.ObjectId.isValid(effectiveServiceId) || !mongoose.Types.ObjectId.isValid(effectiveStaffId)) {
       return res.status(400).json({ success: false, message: 'Ungültige ID' })
@@ -184,7 +184,8 @@ export const updateBooking = async (req: AuthRequest & SalonRequest, res: Respon
     const clash = await ensureNoConflicts(
       effectiveStaffId,
       effectiveDateTime,
-      effectiveServiceId
+      effectiveServiceId,
+      bookingId // ID der aktuellen Buchung übergeben, um sie auszuschließen
     )
     if (!clash.ok) return res.status(400).json({ success:false, message: clash.message })
 
@@ -293,7 +294,8 @@ export const updateBookingController = async (req: AuthRequest, res: Response) =
       const clash = await ensureNoConflicts(
         effectiveStaffId,
         effectiveDateTime,
-        effectiveServiceId
+        effectiveServiceId,
+        id // ID der aktuellen Buchung übergeben, um sie auszuschließen
       )
       if (!clash.ok) return res.status(400).json({ success:false, message: clash.message })
 
@@ -320,7 +322,7 @@ async function getBookingEnd(serviceId: string, startISO: string) {
   return new Date(start.getTime() + mins * 60000)
 }
 
-async function ensureNoConflicts(staffId: string, startISO: string, serviceId: string) {
+async function ensureNoConflicts(staffId: string, startISO: string, serviceId: string, excludeBookingId?: string) {
   const start = new Date(startISO)
   const end   = await getBookingEnd(serviceId, startISO)
 
@@ -328,10 +330,16 @@ async function ensureNoConflicts(staffId: string, startISO: string, serviceId: s
   const windowBefore = new Date(start.getTime() - 4 * 60 * 60 * 1000)
   const windowAfter  = new Date(end.getTime()   + 4 * 60 * 60 * 1000)
 
-  const neighborBookings = await Booking.find({
+  const bookingQuery: any = {
     staff: staffId,
     dateTime: { $gte: windowBefore, $lte: windowAfter }
-  }).populate('service', 'duration').lean()
+  }
+  if (excludeBookingId) {
+    bookingQuery._id = { $ne: excludeBookingId }
+  }
+
+  const neighborBookings = await Booking.find(bookingQuery)
+    .populate('service', 'duration').lean()
 
   for (const b of neighborBookings) {
     const bStart = new Date(b.dateTime as any)

@@ -10,14 +10,45 @@ router.use(verifyToken, verifyAdmin)
 
 // Globale Staff-Liste (nur role=staff)
 router.get('/staff-all', async (_, res) => {
-  const users = await User.find({ role: 'staff' }).lean()
+  // KORREKTUR: Leerer Filter {} holt ALLE Benutzer aus der Datenbank.
+  const users = await User.find({}).lean() 
   res.json({ success:true, users })
 })
+// in routes/adminCatalog.ts
+
 router.post('/staff', async (req, res) => {
-  const { email, password, name } = req.body
-  const user = await User.create({ email, password, name, role: 'staff', salon: null }) // GLOBAL → keine Salonbindung
-  res.status(201).json({ success:true, user })
-})
+  try {
+    const { email, password, name } = req.body;
+
+    // 1. Validierung und Prüfung auf Duplikate
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'E-Mail und Passwort sind erforderlich.' });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(409).json({ success: false, message: 'Ein Benutzer mit dieser E-Mail-Adresse existiert bereits.' });
+    }
+
+    // Erst jetzt den Benutzer erstellen (Passwort wird idealerweise gehasht)
+    // HINWEIS: Du solltest Passwörter immer hashen, bevor du sie speicherst!
+    // const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await User.create({
+      email,
+      password, // Ersetze dies durch hashedPassword, wenn du bcrypt verwendest
+      name,
+      role: 'staff',
+      salon: null
+    });
+
+    return res.status(201).json({ success: true, user });
+
+  } catch (err: any) {
+    // 2. Alle anderen Fehler sicher abfangen
+    console.error('Fehler beim Erstellen des globalen Staff-Mitglieds:', err);
+    return res.status(500).json({ success: false, message: 'Ein interner Serverfehler ist aufgetreten.' });
+  }
+});
 router.delete('/users/:id', async (req, res) => {
   await User.findByIdAndDelete(req.params.id)
   res.json({ success:true })
