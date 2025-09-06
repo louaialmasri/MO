@@ -1,0 +1,34 @@
+/* [project]/app/globals.css [app-client] (css) */
+input, textarea, select {
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  width: 100%;
+  margin-bottom: 1rem;
+  padding: .5rem;
+}
+
+label {
+  color: var(--text-color);
+  margin-bottom: .5rem;
+  font-weight: bold;
+  display: block;
+}
+
+button {
+  color: #fff;
+  cursor: pointer;
+  background-color: #4f46e5;
+  border: none;
+  border-radius: 6px;
+  padding: .6rem 1.2rem;
+  font-size: 1rem;
+  transition: background .2s;
+}
+
+button:hover {
+  background-color: #3730a3;
+}
+
+/*# sourceMappingURL=app_globals_css_f9ee138c._.single.css.map*/

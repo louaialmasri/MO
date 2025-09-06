@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["file://C%3A/Users/louai/Desktop/Louai/MO/my-booking-app/app/page.module.css"],"sourcesContent":[".main {\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  justify-content: center;\n  height: 100vh;\n  text-align: center;\n}\n\n.title {\n  font-size: 2rem;\n  margin-bottom: 0.5rem;\n}\n\n.description {\n  font-size: 1.2rem;\n  margin-bottom: 1.5rem;\n}\n\n.nav {\n  display: flex;\n  gap: 1rem;\n}\n\n.link {\n  background-color: #0070f3;\n  color: white;\n  padding: 0.5rem 1rem;\n  text-decoration: none;\n  border-radius: 8px;\n  transition: background-color 0.3s ease;\n}\n\n.link:hover {\n  background-color: #005bb5;\n}\n"],"names":[],"mappings":"AAAA;;;;;;;;;AASA;;;;;AAKA;;;;;AAKA;;;;;AAKA;;;;;;;;;AASA","debugId":null}}]
+}
