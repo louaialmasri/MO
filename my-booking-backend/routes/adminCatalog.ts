@@ -69,4 +69,21 @@ router.delete('/services/:id', async (req, res) => {
   res.json({ success:true })
 })
 
+router.patch('/services/:id', async (req, res) => {
+  try {
+    const { title, description, price, duration } = req.body;
+    const updatedService = await Service.findByIdAndUpdate(
+      req.params.id,
+      { title, description, price, duration },
+      { new: true, runValidators: true } // new:true gibt das aktualisierte Dokument zurück
+    );
+    if (!updatedService) {
+      return res.status(404).json({ success: false, message: 'Service nicht gefunden' });
+    }
+    res.json({ success: true, service: updatedService });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Fehler beim Aktualisieren des Services' });
+  }
+});
+
 export default router
