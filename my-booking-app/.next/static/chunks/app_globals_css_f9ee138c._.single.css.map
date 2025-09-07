@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["turbopack:///[project]/app/globals.css"],"sourcesContent":["@import 'react-datepicker/dist/react-datepicker.css';\n\ninput, textarea, select {\n  background-color: var(--input-bg);\n  color: var(--input-text);\n  border: 1px solid var(--input-border);\n  padding: 0.5rem;\n  border-radius: 4px;\n  margin-bottom: 1rem;\n  width: 100%;\n}\n\nlabel {\n  display: block;\n  margin-bottom: 0.5rem;\n  font-weight: bold;\n  color: var(--text-color);\n}\n\nbutton {\n  background-color: #4f46e5; /* Lila */\n  color: white;\n  border: none;\n  padding: 0.6rem 1.2rem;\n  border-radius: 6px;\n  cursor: pointer;\n  font-size: 1rem;\n  transition: background 0.2s ease;\n}\n\nbutton:hover {\n  background-color: #3730a3;\n}\n"],"names":[],"mappings":"AAEA;;;;;;;;;;AAUA;;;;;;;AAOA;;;;;;;;;;;AAWA"}}]
-}

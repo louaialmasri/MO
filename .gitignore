@@ -19,6 +19,8 @@ yarn-error.log*
 my-booking-app/node_modules/
 my-booking-app/build/
 my-booking-app/dist/
+my-booking-app/.next/
+my-booking-app/out/
 my-booking-app/.env
 my-booking-app/.env.*
 
