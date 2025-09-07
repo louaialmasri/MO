@@ -212,9 +212,6 @@ export default function Navbar() {
       </MenuItem>
     )
   })}
-  <MenuItem onClick={() => { setSalonEl(null); router.push('/admin/salons') }}>
-    Salons
-  </MenuItem>
   <MenuItem onClick={() => { setSalonEl(null); router.push('/admin/availability') }}>
     Abwesenheiten & Arbeitszeiten
   </MenuItem>
