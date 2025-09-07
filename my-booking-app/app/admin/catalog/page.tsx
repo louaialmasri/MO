@@ -57,7 +57,7 @@ export default function AdminCatalogPage() {
   const [ovrDur, setOvrDur] = useState<number | ''>('')
 
   // forms
-  const [formStaff, setFormStaff] = useState({ email: '', password: '', name: '' })
+  const [formStaff, setFormStaff] = useState({ email: '', password: '', firstName: '', lastName: '' })
   const [formService, setFormService] = useState({ title: '', description: '', price: '', duration: '' } as any)
   const [formSalon, setFormSalon] = useState({ name: '', logoUrl: '' })
 
@@ -168,27 +168,21 @@ export default function AdminCatalogPage() {
 
   // create global
   const createStaff = async () => {
-    if (!formStaff.email || !formStaff.password) {
-      setToast({ open: true, msg: 'E-Mail & Passwort erforderlich', sev: 'error' });
-      return;
+    if (!formStaff.email || !formStaff.password || !formStaff.firstName || !formStaff.lastName) {
+      setToast({ open: true, msg: 'Bitte alle Felder ausfüllen', sev: 'error' })
+      return
     }
-    
     try {
-      // Versuche, den Mitarbeiter zu erstellen
-      await createGlobalStaff(formStaff);
-
-      // Dieser Teil wird nur bei Erfolg ausgeführt
-      setGStaff(await fetchGlobalStaff());
-      setDlgStaffOpen(false);
-      setFormStaff({ email: '', password: '', name: '' });
-      setToast({ open: true, msg: 'Staff angelegt', sev: 'success' });
-
-    } catch (e: any) {
-      // Dieser Teil wird ausgeführt, wenn die API einen Fehler zurückgibt
-      const errorMsg = e?.response?.data?.message || 'Ein unbekannter Fehler ist aufgetreten.';
-      setToast({ open: true, msg: errorMsg, sev: 'error' });
+      await createGlobalStaff(formStaff) // sendet das ganze formStaff Objekt
+      setDlgStaffOpen(false)
+      setToast({ open: true, msg: 'Mitarbeiter angelegt', sev: 'success' })
+      await reloadGuards() // neu laden
+    } catch (e) {
+      console.error('Fehler beim Anlegen des Staff-Mitglieds', e)
+      setToast({ open: true, msg: 'Mitarbeiter konnte nicht angelegt werden', sev: 'error' })
     }
-  };
+  }
+
   const createService = async () => {
     const { title, price, duration } = formService
     if (!title || !price || !duration) { setToast({open:true,msg:'Titel, Preis, Dauer erforderlich',sev:'error'}); return }
@@ -477,16 +471,17 @@ export default function AdminCatalogPage() {
       </Paper>
 
       {/* Dialogs */}
-      <Dialog open={dlgStaffOpen} onClose={()=> setDlgStaffOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Staff anlegen (global)</DialogTitle>
-        <DialogContent sx={{ display:'flex', flexDirection:'column', gap:2, pt:2 }}>
-          <TextField label="Name (optional)" value={formStaff.name} onChange={e=>setFormStaff({...formStaff, name:e.target.value})} />
-          <TextField label="E-Mail" value={formStaff.email} onChange={e=>setFormStaff({...formStaff, email:e.target.value})} />
-          <TextField label="Passwort" type="password" value={formStaff.password} onChange={e=>setFormStaff({...formStaff, password:e.target.value})} />
-          <Typography variant="body2" color="text.secondary">Rolle wird auf <b>staff</b> gesetzt.</Typography>
+      <Dialog open={dlgStaffOpen} onClose={() => setDlgStaffOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Neuen Staff-Mitarbeiter anlegen</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+          {/* Neue Felder für Vor- und Nachname hinzufügen */}
+          <TextField label="Vorname" value={formStaff.firstName} onChange={e => setFormStaff(p => ({ ...p, firstName: e.target.value }))} />
+          <TextField label="Nachname" value={formStaff.lastName} onChange={e => setFormStaff(p => ({ ...p, lastName: e.target.value }))} />
+          <TextField label="E-Mail" type="email" value={formStaff.email} onChange={e => setFormStaff(p => ({ ...p, email: e.target.value }))} />
+          <TextField label="Passwort" type="password" value={formStaff.password} onChange={e => setFormStaff(p => ({ ...p, password: e.target.value }))} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={()=> setDlgStaffOpen(false)}>Abbrechen</Button>
+          <Button onClick={() => setDlgStaffOpen(false)}>Abbrechen</Button>
           <Button variant="contained" onClick={createStaff}>Anlegen</Button>
         </DialogActions>
       </Dialog>

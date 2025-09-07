@@ -4,6 +4,7 @@ import { verifyToken } from '../middlewares/authMiddleware'
 import { verifyAdmin } from '../middlewares/adminMiddleware'
 import { User } from '../models/User'
 import { Service } from '../models/Service'
+import bcrypt from 'bcrypt';
 
 const router = express.Router()
 router.use(verifyToken, verifyAdmin)
@@ -18,37 +19,32 @@ router.get('/staff-all', async (_, res) => {
 
 router.post('/staff', async (req, res) => {
   try {
-    const { email, password, name } = req.body;
+    // Hol dir alle benötigten Daten aus dem Request Body
+    const { email, password, firstName, lastName } = req.body;
 
-    // 1. Validierung und Prüfung auf Duplikate
-    if (!email || !password) {
-      return res.status(400).json({ success: false, message: 'E-Mail und Passwort sind erforderlich.' });
+    // Validierung
+    if (!email || !password || !firstName || !lastName) {
+      return res.status(400).json({ message: 'Alle Felder sind erforderlich' });
     }
 
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(409).json({ success: false, message: 'Ein Benutzer mit dieser E-Mail-Adresse existiert bereits.' });
-    }
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Erst jetzt den Benutzer erstellen (Passwort wird idealerweise gehasht)
-    // HINWEIS: Du solltest Passwörter immer hashen, bevor du sie speicherst!
-    // const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.create({
+    const newStaff = await User.create({
       email,
-      password, // Ersetze dies durch hashedPassword, wenn du bcrypt verwendest
-      name,
+      password: hashedPassword,
+      firstName, // Feld übergeben
+      lastName,  // Feld übergeben
       role: 'staff',
-      salon: null
     });
 
-    return res.status(201).json({ success: true, user });
-
-  } catch (err: any) {
-    // 2. Alle anderen Fehler sicher abfangen
-    console.error('Fehler beim Erstellen des globalen Staff-Mitglieds:', err);
-    return res.status(500).json({ success: false, message: 'Ein interner Serverfehler ist aufgetreten.' });
+    res.status(201).json(newStaff);
+  } catch (error) {
+    console.error('Fehler beim Erstellen des globalen Staff-Mitglieds:', error);
+    res.status(500).json({ message: 'Fehler beim Erstellen des Staff-Mitglieds' });
   }
 });
+
 router.delete('/users/:id', async (req, res) => {
   await User.findByIdAndDelete(req.params.id)
   res.json({ success:true })

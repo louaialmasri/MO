@@ -123,25 +123,28 @@ function AdminPage() {
 
   // Reload when active salon changes (Navbar sets localStorage and can dispatch event)
   useEffect(() => {
-    const handler = async () => {
+    if (!token) return
+    const fetchData = async () => {
       try {
-        if (!user || user.role !== 'admin') return
-        const all = await getAllBookings(token!)
-        setBookings(all)
-        await loadServices()
-        await fetchUsers()
-      } catch (err) {
-        console.error('Fehler beim Nachladen nach Salon-Wechsel:', err)
+        const [bookingsData, usersData, servicesData] = await Promise.all([
+          getAllBookings(token),
+          fetchAllUsers(token),
+          fetchServices(token),
+        ])
+        // KORREKTUR: Sorge dafür, dass die States immer Arrays sind
+        setBookings(bookingsData || [])
+        setUsers(usersData || [])
+        setServices(servicesData || [])
+      } catch (error) {
+        console.error("Failed to fetch admin data:", error)
+        // Setze die States auch bei einem Fehler auf leere Arrays
+        setBookings([])
+        setUsers([])
+        setServices([])
       }
     }
-
-    window.addEventListener('activeSalonChanged', handler)
-    window.addEventListener('storage', handler)
-    return () => {
-      window.removeEventListener('activeSalonChanged', handler)
-      window.removeEventListener('storage', handler)
-    }
-  }, [user, token])
+    fetchData()
+  }, [token])
 
   const loadServices = async () => {
     try {
