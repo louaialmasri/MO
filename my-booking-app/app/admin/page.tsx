@@ -148,7 +148,7 @@ function AdminPage() {
 
   const loadServices = async () => {
     try {
-      const data = await fetchServices()
+      const data = await fetchServices(token)
       setServices(data)
     } catch (err) {
       console.error('Fehler beim Laden der Services:', err)

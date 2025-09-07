@@ -23,7 +23,7 @@ router.delete('/:id', verifyToken, cancelBooking)
 
 router.get('/all', verifyToken, getAllBookings)
 router.get('/user', verifyToken, getUserBookings)
-
+router.get('/', getAllBookings)
 router.get('/staff', verifyToken, verifyStaff, getStaffBookings)
 
 router.patch('/bookings/:id', verifyToken, updateBooking)

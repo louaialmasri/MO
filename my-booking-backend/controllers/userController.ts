@@ -6,21 +6,29 @@ import mongoose from 'mongoose'
 import { AuthRequest } from '../middlewares/authMiddleware'
 import { Booking } from '../models/Booking'
 
-export const getAllUsers = async (req: Request & { salonId?: string }, res: Response) => {
+export const getAllUsers = async (req: any, res: Response) => {
   try {
-    // Erstelle ein leeres Query-Objekt
-    const query: any = { salon: req.salonId };
+    const { role } = req.query as { role?: string };
+    const sid = req.salonId;
 
-    // Füge den Rollen-Filter hinzu, WENN er in der URL mitgegeben wird
-    if (req.query.role) {
-      query.role = req.query.role;
+    // KORREKTUR: Wenn 'staff' als Rolle angefragt wird,
+    // ignoriere den Salon-Filter und gib alle Mitarbeiter zurück.
+    if (role === 'staff') {
+      const users = await User.find({ role: 'staff' }).populate('skills').lean();
+      return res.json({ success: true, users });
     }
 
-    // Führe die Suche mit dem kombinierten Query aus
-    const users = await User.find(query);
-    res.json(users);
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching users', error });
+    // Die bestehende Logik für andere Anfragen bleibt erhalten
+    if (!sid) return res.json({ success: true, users: [] });
+
+    const q: any = { salon: sid };
+    if (role) q.role = role;
+    const users = await User.find(q).populate('skills').lean();
+    return res.json({ success: true, users });
+
+  } catch (e) {
+    console.error('getAllUsers error', e);
+    return res.status(500).json({ success: false, message: 'Fehler beim Laden der Nutzer' });
   }
 };
 

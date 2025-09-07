@@ -33,7 +33,7 @@ export default function BookingPage() {
   useEffect(() => {
     (async () => {
       try {
-        const svc = await fetchServices()
+        const svc = await fetchServices(token)
         setServices(svc)
         if (isPrivileged && token) {
           const all = await fetchAllUsers(token)

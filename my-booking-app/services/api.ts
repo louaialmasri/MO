@@ -112,10 +112,20 @@ api.interceptors.request.use((config) => {
 })
 
 // SERVICE API
-export async function fetchServices(salonId?: string): Promise<Service[]> {
-  const res = await api.get('/services', { params: salonId ? { salonId } : {} })
-  return res.data.services
-}
+export const fetchServices = async (token: string | null) => {
+  try {
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const res = await api.get('/services', { headers });
+    // KORREKTUR: Array aus res.data.services extrahieren
+    if (res.data && Array.isArray(res.data.services)) {
+      return res.data.services;
+    }
+    return Array.isArray(res.data) ? res.data : [];
+  } catch (error) {
+    console.error("API Error in fetchServices:", error);
+    return [];
+  }
+};
 
 export async function createService(
   payload: { title: string; description?: string; price: number; duration: number; salonId?: string | null },
@@ -169,19 +179,18 @@ export async function getUserBookings(token: string): Promise<Booking[]> {
       Authorization: `Bearer ${token}`
     }
   })
-  return res.data.bookings
+  return res.data?.bookings || [];
 }
 
-export async function getAllBookings(token: string): Promise<Booking[]> {
-  const activeSalonId = localStorage.getItem('activeSalonId')
-  const res = await api.get('/bookings/all', {
-    headers: {
-      Authorization: `Bearer ${token}`
-    },
-    params: activeSalonId ? { salonId: activeSalonId } : undefined
-  })
-  return res.data.bookings
-}
+export const getAllBookings = async (token: string) => {
+  try {
+    const res = await api.get('/bookings', { headers: { Authorization: `Bearer ${token}` } });
+    return res.data?.bookings || []; // Immer ein Array zurückgeben
+  } catch (error) {
+    console.error("API Error in getAllBookings:", error);
+    return []; // Auch bei Fehler ein leeres Array zurückgeben
+  }
+};
 
 export async function deleteBooking(id: string, token: string) {
   const res = await api.delete(`/bookings/${id}`, {
@@ -236,6 +245,13 @@ export async function getStaffBookings(token: string): Promise<StaffBooking[]> {
   return res.data.bookings
 }
 
+export const updateStaffSkills = async (staffId: string, skills: string[], token: string) => {
+  const res = await api.put(`/staff/${staffId}/skills`, { skills }, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data;
+};
+
 export async function createUserManually(
   email: string,
   password: string,
@@ -252,12 +268,19 @@ export async function createUserManually(
 }
 
 // ➡ Alle Nutzer abrufen
-export async function fetchAllUsers(token: string) {
-  const res = await api.get('/users', {
-    headers: authHeaders(token),
-  });
-  return res.data.users
-}
+export const fetchAllUsers = async (token: string, role?: string) => {
+    try {
+        const url = role ? `/users?role=${role}` : '/users';
+        const res = await api.get(url, { headers: { Authorization: `Bearer ${token}` } });
+        if (res.data && Array.isArray(res.data.users)) {
+            return res.data.users;
+        }
+        return Array.isArray(res.data) ? res.data : [];
+    } catch (error) {
+        console.error("API Error in fetchAllUsers:", error);
+        return [];
+    }
+};
 
 // ➡ Mitarbeiterrolle aktualisieren
 export async function updateUserRole(userId: string, role: string, token: string) {
