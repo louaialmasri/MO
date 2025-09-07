@@ -1,4 +1,5 @@
 import mongoose, { Schema } from 'mongoose'
+import sequelize from 'sequelize/types/sequelize';
 
 const serviceSchema = new Schema({
   title: { type: String, required: true },
@@ -8,6 +9,7 @@ const serviceSchema = new Schema({
   salon: { type: Schema.Types.ObjectId, ref: 'Salon', default: null }, // 👈 optional
 }, { timestamps: true })
 
-Service.belongsToMany(sequelize.models.User, { through: 'StaffService', foreignKey: 'serviceId', as: 'staff' });
 
 export const Service = mongoose.model('Service', serviceSchema)
+
+Service.belongsToMany(sequelize.models.User, { through: 'StaffService', foreignKey: 'serviceId', as: 'staff' });

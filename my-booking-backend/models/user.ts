@@ -20,6 +20,7 @@ userSchema.set('toJSON', {
   }
 })
 
+export const User = mongoose.model('User', userSchema)
+
 User.belongsToMany(sequelize.models.Service, { through: 'StaffService', foreignKey: 'staffId', as: 'services' });
 
-export const User = mongoose.model('User', userSchema)
