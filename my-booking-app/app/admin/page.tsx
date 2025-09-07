@@ -105,46 +105,27 @@ function AdminPage() {
       router.push('/login')
       return
     }
-
-    const fetchData = async () => {
-      try {
-        const all = await getAllBookings(token!)
-        setBookings(all)
-        await loadServices()
-        await fetchUsers()
-      } catch (err) {
-        console.error('Fehler beim Laden der Buchungen oder Nutzer:', err)
-      }
-    }
-
-    fetchData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, token])
-
-  // Reload when active salon changes (Navbar sets localStorage and can dispatch event)
-  useEffect(() => {
     if (!token) return
+
     const fetchData = async () => {
       try {
-        const [bookingsData, usersData, servicesData] = await Promise.all([
+        const [bookingsData, staffUsersData, servicesData] = await Promise.all([
           getAllBookings(token),
-          fetchAllUsers(token),
+          fetchAllUsers(token, 'staff'), // Nur Staff laden!
           fetchServices(token),
         ])
-        // KORREKTUR: Sorge dafür, dass die States immer Arrays sind
-        setBookings(bookingsData || [])
-        setUsers(usersData || [])
-        setServices(servicesData || [])
+        setBookings(bookingsData)
+        setUsers(staffUsersData) // users enthält jetzt nur Staff
+        setServices(servicesData)
       } catch (error) {
         console.error("Failed to fetch admin data:", error)
-        // Setze die States auch bei einem Fehler auf leere Arrays
         setBookings([])
         setUsers([])
         setServices([])
       }
     }
     fetchData()
-  }, [token])
+  }, [user, token])
 
   const loadServices = async () => {
     try {
