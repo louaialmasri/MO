@@ -1,13 +1,13 @@
 'use client'
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
-import api, { fetchServices, fetchStaff, fetchAllUsers, createBooking, fetchTimeslots } from '@/services/api'
-import { TextField, MenuItem, Button, Snackbar, Alert, SelectChangeEvent, SelectChangeEvent, FormControl, InputLabel, Select } from '@mui/material'
+import { useEffect, useState } from 'react'
+import api, { fetchServices, fetchAllUsers, createBooking, fetchTimeslots } from '@/services/api'
+import { TextField, MenuItem, Button, Snackbar, Alert, FormControl, InputLabel, Select } from '@mui/material'
 
 type User = { _id: string; email: string; role: 'user' | 'staff' | 'admin'; name?: string }
 type Service = { _id: string; title: string; duration?: number; price?: number }
-type Staff = { _id: string; email: string; name?: string; skills?: (string | { _id: string })[] }
+type Staff = { _id: string; email: string; name?: string; firstName?: string; lastName?: string; skills?: (string | { _id: string })[] }
 
 export default function BookingPage() {
   const { user, token } = useAuth()
@@ -15,7 +15,7 @@ export default function BookingPage() {
   const isPrivileged = user?.role === 'admin' || user?.role === 'staff'
 
   const [services, setServices] = useState<Service[]>([])
-  const [staff, setStaff] = useState<Staff[]>([])
+  const [staffForService, setStaffForService] = useState<Staff[]>([])
   const [customers, setCustomers] = useState<User[]>([])
 
   const [selectedServiceId, setSelectedServiceId] = useState('')
@@ -33,8 +33,8 @@ export default function BookingPage() {
   useEffect(() => {
     (async () => {
       try {
-        const [svc, stf] = await Promise.all([fetchServices(), fetchStaff()])
-        setServices(svc); setStaff(stf)
+        const svc = await fetchServices()
+        setServices(svc)
         if (isPrivileged && token) {
           const all = await fetchAllUsers(token)
           setCustomers(all.filter((u:User)=>u.role==='user'))
@@ -45,19 +45,28 @@ export default function BookingPage() {
     })()
   }, [isPrivileged, token])
 
-  // Staff-Skill-Filter
-  const filteredStaff = useMemo(() => {
-    if (!selectedServiceId) return staff
-    return staff.filter(s =>
-      (s.skills ?? []).some((k:any) => (typeof k === 'string' ? k : k._id) === selectedServiceId)
-    )
-  }, [staff, selectedServiceId])
+  // Lade die Mitarbeiter, die den Service können
+  useEffect(() => {
+    setSelectedStaffId('')
+    setSlots([])
+    setSlot('')
+    setStaffForService([])
+    if (!selectedServiceId) return
+    (async () => {
+      try {
+        const res = await api.get(`/staff/service/${selectedServiceId}`)
+        setStaffForService(res.data)
+      } catch (error) {
+        setToast({open:true, msg:'Fehler beim Laden der Mitarbeiter für den Service', sev:'error'})
+      }
+    })()
+  }, [selectedServiceId])
 
   // Timeslots laden, sobald Service + Staff + Date gesetzt
   useEffect(() => {
+    setSlots([]); setSlot('')
+    if (!token || !selectedServiceId || !selectedStaffId || !date) return
     (async () => {
-      setSlots([]); setSlot('')
-      if (!token || !selectedServiceId || !selectedStaffId || !date) return
       try {
         const { slots: s } = await fetchTimeslots({ staffId: selectedStaffId, serviceId: selectedServiceId, date }, token)
         setSlots(s)
@@ -89,27 +98,6 @@ export default function BookingPage() {
     } finally { setLoading(false) }
   }
 
-  const handleServiceChange = async (event: SelectChangeEvent) => {
-    const serviceId = event.target.value;
-    setSelectedServiceId(serviceId);
-
-    // Mitarbeiter basierend auf dem Service laden
-    if (serviceId) {
-        try {
-            const res = await api.get(`/staff/services/${serviceId}/staff`);
-            setStaff(res.data);
-        } catch (error) {
-            console.error("Fehler beim Laden der Mitarbeiter für den Service:", error);
-            setStaff([]);
-        }
-    } else {
-        setStaff([]);
-    }
-    setSelectedStaffId('');
-    setAvailableSlots([]);
-};
-
-
   return (
     <div style={{ maxWidth: 560, margin: '24px auto' }}>
       <h1>Termin buchen</h1>
@@ -122,17 +110,28 @@ export default function BookingPage() {
       )}
 
       <TextField select label="Service" value={selectedServiceId}
-        onChange={(e)=> { setSelectedServiceId(e.target.value); setSelectedStaffId(''); setSlots([]); setSlot('') }}
+        onChange={(e)=> setSelectedServiceId(e.target.value)}
         fullWidth margin="normal" required>
         {services.map(s => <MenuItem key={s._id} value={s._id}>{s.title}</MenuItem>)}
       </TextField>
 
-      <TextField select label="Mitarbeiter" value={selectedStaffId}
-        onChange={(e)=> { setSelectedStaffId(e.target.value); setSlots([]); setSlot('') }}
-        fullWidth margin="normal" required disabled={!selectedServiceId}
-        helperText={!selectedServiceId ? 'Bitte zuerst Service wählen' : undefined}>
-        {filteredStaff.map(s => <MenuItem key={s._id} value={s._id}>{s.name || s.email}</MenuItem>)}
-      </TextField>
+      <FormControl fullWidth margin="normal">
+        <InputLabel>Mitarbeiter</InputLabel>
+        <Select
+          value={selectedStaffId}
+          onChange={e => setSelectedStaffId(e.target.value)}
+          disabled={!selectedServiceId || staffForService.length === 0}
+          required
+        >
+          {staffForService.map((staff) => (
+            <MenuItem key={staff._id} value={staff._id}>
+              {staff.firstName && staff.lastName
+                ? `${staff.firstName} ${staff.lastName}`
+                : staff.name || staff.email}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
 
       <TextField type="date" label="Datum" value={date}
         onChange={(e)=> setDate(e.target.value)} fullWidth margin="normal"
@@ -154,21 +153,6 @@ export default function BookingPage() {
       } sx={{ mt: 2 }}>
         Termin buchen
       </Button>
-
-      <FormControl fullWidth margin="normal">
-        <InputLabel>Mitarbeiter</InputLabel>
-        <Select
-            value={selectedStaff}
-            onChange={(e) => setSelectedStaff(e.target.value)}
-            disabled={!selectedService}
-        >
-            {staff.map((s) => (
-                <MenuItem key={s.id} value={s.id}>
-                    {s.firstName} {s.lastName}
-                </MenuItem>
-            ))}
-        </Select>
-    </FormControl>
 
       <Snackbar open={toast.open} autoHideDuration={2200} onClose={() => setToast(p=>({...p, open:false}))}
         anchorOrigin={{ vertical:'bottom', horizontal:'center' }}>

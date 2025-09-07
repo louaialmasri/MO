@@ -11,5 +11,3 @@ const serviceSchema = new Schema({
 
 
 export const Service = mongoose.model('Service', serviceSchema)
-
-Service.belongsToMany(sequelize.models.User, { through: 'StaffService', foreignKey: 'serviceId', as: 'staff' });
