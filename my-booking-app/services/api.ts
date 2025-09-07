@@ -185,10 +185,12 @@ export async function getUserBookings(token: string): Promise<Booking[]> {
 export const getAllBookings = async (token: string) => {
   try {
     const res = await api.get('/bookings', { headers: { Authorization: `Bearer ${token}` } });
-    return res.data?.bookings || []; // Immer ein Array zurückgeben
+    // KORREKTUR: Gib direkt das 'bookings'-Array aus dem Response-Objekt zurück.
+    // Wenn es nicht existiert, gib ein leeres Array zurück, um Fehler zu vermeiden.
+    return res.data?.bookings || [];
   } catch (error) {
     console.error("API Error in getAllBookings:", error);
-    return []; // Auch bei Fehler ein leeres Array zurückgeben
+    return []; // Auch bei einem Fehler ein leeres Array zurückgeben
   }
 };
 

@@ -1,4 +1,4 @@
-import { Request, Response } from 'express'
+import { query, Request, Response } from 'express'
 import mongoose from 'mongoose'
 import { Booking } from '../models/Booking'
 import { Service } from '../models/Service'
@@ -217,13 +217,12 @@ export const getAllBookings = async (req: AuthRequest, res: Response) => {
       ]
     }
     const bookings = await Booking.find(filter)
-      .populate('service', 'name duration')
-      .populate('user', 'email name phone')
-      .populate('staff', 'email name')
-      .sort({ dateTime: 1 })
-      .lean()
+      .populate('user', 'firstName lastName')
+      .populate('service', 'title')
+      .populate('staff', 'firstName lastName')
+      .lean();
 
-    return res.status(200).json({ success: true, bookings })
+    return res.json({ success: true, bookings });
   } catch (err) {
     console.error('Fehler beim Abrufen aller Buchungen:', err)
     return res.status(500).json({ success: false, message: 'Serverfehler beim Laden der Buchungen' })

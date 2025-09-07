@@ -345,7 +345,6 @@ const eventsByStaff: Record<string, any[]> = useMemo(() => {
   })
   return map
 }, [bookings, services, currentDate])
-
   
   return (
     <>
