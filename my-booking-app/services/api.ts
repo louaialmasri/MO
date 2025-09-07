@@ -487,3 +487,4 @@ export async function applyTemplateApi(payload: { templateId: string; weekStart:
   return res.data as { success: boolean; created: number; replaced: number }
 }
 
+export default api

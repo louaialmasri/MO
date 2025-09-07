@@ -2,8 +2,8 @@
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { fetchServices, fetchStaff, fetchAllUsers, createBooking, fetchTimeslots } from '@/services/api'
-import { TextField, MenuItem, Button, Snackbar, Alert } from '@mui/material'
+import api, { fetchServices, fetchStaff, fetchAllUsers, createBooking, fetchTimeslots } from '@/services/api'
+import { TextField, MenuItem, Button, Snackbar, Alert, SelectChangeEvent, SelectChangeEvent, FormControl, InputLabel, Select } from '@mui/material'
 
 type User = { _id: string; email: string; role: 'user' | 'staff' | 'admin'; name?: string }
 type Service = { _id: string; title: string; duration?: number; price?: number }
@@ -89,6 +89,27 @@ export default function BookingPage() {
     } finally { setLoading(false) }
   }
 
+  const handleServiceChange = async (event: SelectChangeEvent) => {
+    const serviceId = event.target.value;
+    setSelectedServiceId(serviceId);
+
+    // Mitarbeiter basierend auf dem Service laden
+    if (serviceId) {
+        try {
+            const res = await api.get(`/staff/services/${serviceId}/staff`);
+            setStaff(res.data);
+        } catch (error) {
+            console.error("Fehler beim Laden der Mitarbeiter für den Service:", error);
+            setStaff([]);
+        }
+    } else {
+        setStaff([]);
+    }
+    setSelectedStaffId('');
+    setAvailableSlots([]);
+};
+
+
   return (
     <div style={{ maxWidth: 560, margin: '24px auto' }}>
       <h1>Termin buchen</h1>
@@ -133,6 +154,21 @@ export default function BookingPage() {
       } sx={{ mt: 2 }}>
         Termin buchen
       </Button>
+
+      <FormControl fullWidth margin="normal">
+        <InputLabel>Mitarbeiter</InputLabel>
+        <Select
+            value={selectedStaff}
+            onChange={(e) => setSelectedStaff(e.target.value)}
+            disabled={!selectedService}
+        >
+            {staff.map((s) => (
+                <MenuItem key={s.id} value={s.id}>
+                    {s.firstName} {s.lastName}
+                </MenuItem>
+            ))}
+        </Select>
+    </FormControl>
 
       <Snackbar open={toast.open} autoHideDuration={2200} onClose={() => setToast(p=>({...p, open:false}))}
         anchorOrigin={{ vertical:'bottom', horizontal:'center' }}>

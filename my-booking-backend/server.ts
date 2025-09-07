@@ -16,6 +16,9 @@ import salonRoutes from './routes/salons'
 import assignmentRoutes from './routes/assignments'
 import adminCatalogRoutes from './routes/adminCatalog'
 import availabilityTemplateRoutes from './routes/availabilityTemplates'
+import { initStaffServiceModel } from './models/StaffService';
+import staffRoutes from './routes/staff';
+import sequelize from 'sequelize/types/sequelize'
 
 
 const app = express()
@@ -39,6 +42,8 @@ app.use(bodyParser.json())
 app.use('/api', activeSalon, authRoutes)
 app.use('/api', adminRoutes)
 
+initStaffServiceModel(sequelize);
+
 // WICHTIG: nur noch EIN Mount pro Router, MIT activeSalon davor
 app.use('/api/services', activeSalon, serviceRoutes)
 app.use('/api/bookings', activeSalon, bookingRoutes)
@@ -49,6 +54,7 @@ app.use('/api/salons', activeSalon, salonRoutes)
 app.use('/api/assignments', activeSalon, assignmentRoutes)
 app.use('/api/admin', adminCatalogRoutes)
 app.use('/api/availability-templates', availabilityTemplateRoutes)
+app.use('/api/staff', staffRoutes);
 
 app.listen(PORT, () => {
   console.log(`🚀 Backend läuft auf http://localhost:${PORT}`)
