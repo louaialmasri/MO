@@ -35,17 +35,30 @@ const AdminUsersPage = () => {
         setError('');
         const res = await api.get('/users?role=staff');
         
-        // Korrektur: Wir greifen auf res.data.users zu
+        // --- START DER KORREKTUR ---
+        let userList: User[] = [];
+        
+        // Fall 1: Die API sendet ein Objekt { users: [...] }
         if (res.data && Array.isArray(res.data.users)) {
-          setUsers(res.data.users);
-        } else {
-          console.error('API did not return a user array:', res.data);
+          userList = res.data.users;
+        } 
+        // Fall 2: Die API sendet direkt ein Array [...]
+        else if (Array.isArray(res.data)) {
+          userList = res.data;
+        } 
+        // Fall 3: Unerwartete Antwort
+        else {
+          console.error('Unerwartetes API-Antwortformat:', res.data);
           setError('Mitarbeiterdaten konnten nicht korrekt geladen werden.');
-          setUsers([]); 
         }
+        
+        setUsers(userList);
+        // --- ENDE DER KORREKTUR ---
+
       } catch (err: any) {
         console.error('Fehler beim Laden der Mitarbeiter:', err);
         setError(err.message || 'Ein unbekannter Fehler ist aufgetreten.');
+        setUsers([]); // Sicherstellen, dass users ein Array bleibt
       } finally {
         setLoading(false);
       }
@@ -61,7 +74,7 @@ const AdminUsersPage = () => {
         Mitarbeiter verwalten
       </Typography>
       
-      {error && <Alert severity="error">{error}</Alert>}
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
       <Paper>
         <List>
@@ -82,9 +95,11 @@ const AdminUsersPage = () => {
               </ListItem>
             ))
           ) : (
-            <ListItem>
-              <ListItemText primary="Keine Mitarbeiter für diesen Salon gefunden." />
-            </ListItem>
+            !error && (
+              <ListItem>
+                <ListItemText primary="Keine Mitarbeiter für diesen Salon gefunden." />
+              </ListItem>
+            )
           )}
         </List>
       </Paper>
