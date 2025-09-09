@@ -1,165 +1,243 @@
 'use client'
-import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import api, { fetchServices, fetchAllUsers, createBooking, fetchTimeslots } from '@/services/api'
-import { TextField, MenuItem, Button, Snackbar, Alert, FormControl, InputLabel, Select } from '@mui/material'
+import {
+  Container, Box, Stepper, Step, StepLabel, Button, Typography, CircularProgress,
+  Card, CardActionArea, CardContent, Avatar, Chip, Alert, Paper, Stack
+} from '@mui/material'
+import Grid from '@mui/material/Grid' // Grid v2 (aktuell)
+import api, { fetchServices, createBooking, fetchTimeslots, type Service } from '@/services/api'
+import { useAuth } from '@/context/AuthContext'
+import dayjs from 'dayjs'
 
-type User = { _id: string; email: string; role: 'user' | 'staff' | 'admin'; name?: string }
-type Service = { _id: string; title: string; duration?: number; price?: number }
-type Staff = { _id: string; email: string; name?: string; firstName?: string; lastName?: string; skills?: (string | { _id: string })[] }
+// Icons
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+
+type Staff = { _id: string; email: string; name?: string; firstName?: string; lastName?: string; skills?: string[] }
+
+const steps = ['Service wählen', 'Mitarbeiter wählen', 'Datum & Zeit wählen', 'Bestätigung'];
+
+const getInitials = (name = '') => name.split(' ').map(n => n[0]).join('').toUpperCase();
 
 export default function BookingPage() {
   const { user, token } = useAuth()
   const router = useRouter()
-  const isPrivileged = user?.role === 'admin' || user?.role === 'staff'
 
+  const [activeStep, setActiveStep] = useState(0);
+
+  // Data states
   const [services, setServices] = useState<Service[]>([])
   const [staffForService, setStaffForService] = useState<Staff[]>([])
-  const [customers, setCustomers] = useState<User[]>([])
+  const [availableSlots, setAvailableSlots] = useState<string[]>([])
+  const [loading, setLoading] = useState({ services: true, staff: false, slots: false });
 
-  const [selectedServiceId, setSelectedServiceId] = useState('')
-  const [selectedStaffId, setSelectedStaffId] = useState('')
-  const [selectedCustomerId, setSelectedCustomerId] = useState('')
-  const [date, setDate] = useState<string>('')           // YYYY-MM-DD
-  const [slots, setSlots] = useState<string[]>([])       // ISO strings
-  const [slot, setSlot] = useState<string>('')           // chosen ISO
+  // Selection states
+  const [selectedService, setSelectedService] = useState<Service | null>(null)
+  const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null)
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
+  const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
 
-  const [loading, setLoading] = useState(false)
-  const [toast, setToast] = useState<{open:boolean; msg:string; sev:'success'|'error'}>({open:false,msg:'',sev:'success'})
+  const [error, setError] = useState('');
 
-  useEffect(() => { if (!user) router.push('/login') }, [user])
-
+  // Lade initiale Services
   useEffect(() => {
     (async () => {
       try {
         const svc = await fetchServices(token)
         setServices(svc)
-        if (isPrivileged && token) {
-          const all = await fetchAllUsers(token)
-          setCustomers(all.filter((u:User)=>u.role==='user'))
-        }
       } catch {
-        setToast({open:true, msg:'Fehler beim Laden der Daten', sev:'error'})
+        setError('Dienstleistungen konnten nicht geladen werden.')
+      } finally {
+        setLoading(p => ({ ...p, services: false }))
       }
     })()
-  }, [isPrivileged, token])
+  }, [])
 
-  // Lade die Mitarbeiter, die den Service können
+  // Lade Mitarbeiter, wenn ein Service gewählt wurde
   useEffect(() => {
-    setSelectedStaffId('')
-    setSlots([])
-    setSlot('')
-    setStaffForService([])
-    if (!selectedServiceId) return
-    (async () => {
+    if (!selectedService) return;
+    const loadStaff = async () => {
+      setLoading(p => ({ ...p, staff: true }));
       try {
-        const res = await api.get(`/staff/service/${selectedServiceId}`)
-        setStaffForService(res.data)
+        const res = await api.get(`/staff/service/${selectedService._id}`);
+        setStaffForService(res.data);
       } catch (error) {
-        setToast({open:true, msg:'Fehler beim Laden der Mitarbeiter für den Service', sev:'error'})
+        setError('Mitarbeiter für diesen Service konnten nicht geladen werden.');
+      } finally {
+        setLoading(p => ({ ...p, staff: false }));
       }
-    })()
-  }, [selectedServiceId])
+    };
+    loadStaff();
+  }, [selectedService]);
 
-  // Timeslots laden, sobald Service + Staff + Date gesetzt
+  // Lade Zeitslots, wenn Datum, Service und Mitarbeiter gewählt sind
   useEffect(() => {
-    setSlots([]); setSlot('')
-    if (!token || !selectedServiceId || !selectedStaffId || !date) return
-    (async () => {
+    if (!selectedService || !selectedStaff || !selectedDate) return;
+    const loadSlots = async () => {
+      setLoading(p => ({ ...p, slots: true }));
+      setSelectedSlot(null);
       try {
-        const { slots: s } = await fetchTimeslots({ staffId: selectedStaffId, serviceId: selectedServiceId, date }, token)
-        setSlots(s)
+        const dateStr = dayjs(selectedDate).format('YYYY-MM-DD');
+        const { slots } = await fetchTimeslots(
+          { staffId: selectedStaff._id, serviceId: selectedService._id, date: dateStr },
+          token!
+        );
+        setAvailableSlots(slots);
       } catch {
-        setToast({open:true, msg:'Fehler beim Laden der Zeit-Slots', sev:'error'})
+        setError('Verfügbare Zeiten konnten nicht geladen werden.');
+      } finally {
+        setLoading(p => ({ ...p, slots: false }));
       }
-    })()
-  }, [token, selectedServiceId, selectedStaffId, date])
+    }
+    loadSlots();
+  }, [selectedService, selectedStaff, selectedDate, token]);
 
-  const handleBook = async () => {
-    if (!token) { setToast({open:true,msg:'Bitte logge dich ein',sev:'error'}); return }
-    if (!selectedServiceId || !selectedStaffId || !date || !slot || (isPrivileged && !selectedCustomerId)) {
-      setToast({open:true, msg:'Bitte alle Felder ausfüllen', sev:'error'}); return
+  const handleNext = () => setActiveStep((prev) => prev + 1);
+  const handleBack = () => setActiveStep((prev) => prev - 1);
+
+  const handleBookingSubmit = async () => {
+    if (!token || !selectedService || !selectedStaff || !selectedSlot) {
+      setError('Alle Angaben sind erforderlich.');
+      return;
     }
     try {
-      setLoading(true)
-      await createBooking(
-        selectedServiceId,
-        slot, // ISO vom Slot
-        selectedStaffId,
-        token,
-        isPrivileged ? selectedCustomerId : undefined
-      )
-      setToast({open:true, msg:'Termin gebucht', sev:'success'})
-      router.push('/dashboard')
+      await createBooking(selectedService._id, selectedSlot, selectedStaff._id, token);
+      handleNext(); // Zum Bestätigungsschritt
     } catch (e: any) {
-      const msg = e?.response?.data?.message || 'Buchung fehlgeschlagen'
-      setToast({open:true, msg, sev:'error'})
-    } finally { setLoading(false) }
+      setError(e?.response?.data?.message || 'Buchung fehlgeschlagen.');
+    }
   }
 
+  const renderStepContent = (step: number) => {
+    switch (step) {
+      case 0: // Service wählen
+        return (
+          <Grid container spacing={2}>
+            {loading.services ? <CircularProgress /> : services.map(service => (
+              <Grid key={service._id} size={{ xs: 12, sm: 6, md: 4 }}>
+                <Card variant="outlined" sx={{ borderColor: selectedService?._id === service._id ? 'primary.main' : undefined }}>
+                  <CardActionArea onClick={() => { setSelectedService(service); handleNext(); }}>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>{service.title}</Typography>
+                      <Typography variant="body2" color="text.secondary">{service.duration} Minuten</Typography>
+                    </CardContent>
+                  </CardActionArea>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        );
+      case 1: // Mitarbeiter wählen
+        return (
+          <Grid container spacing={2}>
+            {loading.staff ? <CircularProgress /> : staffForService.map(staff => (
+              <Grid key={staff._id} size={{ xs: 12, sm: 6, md: 4 }}>
+                <Card variant="outlined" sx={{ borderColor: selectedStaff?._id === staff._id ? 'primary.main' : undefined }}>
+                  <CardActionArea onClick={() => { setSelectedStaff(staff); handleNext(); }}>
+                    <CardContent sx={{ textAlign: 'center' }}>
+                      <Avatar sx={{ width: 64, height: 64, mx: 'auto', mb: 1, bgcolor: 'primary.light' }}>
+                        {getInitials(staff.name || `${staff.firstName} ${staff.lastName}`)}
+                      </Avatar>
+                      <Typography variant="h6">{staff.name || `${staff.firstName} ${staff.lastName}`}</Typography>
+                    </CardContent>
+                  </CardActionArea>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        );
+      case 2: // Datum & Zeit
+        return (
+          <Box>
+            <Typography variant="h6" gutterBottom>Wähle ein Datum</Typography>
+            {/* Hier würde man einen schönen Kalender-Komponente einfügen */}
+            <input
+              type="date"
+              value={dayjs(selectedDate).format('YYYY-MM-DD')}
+              onChange={(e) => setSelectedDate(new Date(e.target.value))}
+            />
+
+            <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>Wähle eine Uhrzeit</Typography>
+            {loading.slots ? <CircularProgress /> : (
+              <Stack direction="row" flexWrap="wrap" gap={1}>
+                {availableSlots.map(slot => (
+                  <Chip
+                    key={slot}
+                    label={dayjs(slot).format('HH:mm')}
+                    onClick={() => setSelectedSlot(slot)}
+                    color={selectedSlot === slot ? 'primary' : 'default'}
+                    variant="outlined"
+                  />
+                ))}
+              </Stack>
+            )}
+          </Box>
+        );
+      case 3: // Zusammenfassung
+        return (
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h5" gutterBottom>Deine Buchung</Typography>
+            <Typography><strong>Service:</strong> {selectedService?.title}</Typography>
+            <Typography><strong>Mitarbeiter:</strong> {selectedStaff?.name || `${selectedStaff?.firstName} ${selectedStaff?.lastName}`}</Typography>
+            <Typography><strong>Datum & Zeit:</strong> {dayjs(selectedSlot).format('dd, DD.MM.YYYY [um] HH:mm [Uhr]')}</Typography>
+          </Paper>
+        );
+      case 4: // Bestätigung
+        return (
+          <Box sx={{ textAlign: 'center' }}>
+            <CheckCircleIcon color="success" sx={{ fontSize: 60, mb: 2 }} />
+            <Typography variant="h5">Termin erfolgreich gebucht!</Typography>
+            <Typography color="text.secondary">Eine Bestätigung wurde an deine E-Mail-Adresse gesendet.</Typography>
+            <Button variant="contained" sx={{ mt: 3 }} onClick={() => router.push('/dashboard')}>Zu meinen Terminen</Button>
+          </Box>
+        )
+      default:
+        return <Typography>Unbekannter Schritt</Typography>;
+    }
+  };
+
   return (
-    <div style={{ maxWidth: 560, margin: '24px auto' }}>
-      <h1>Termin buchen</h1>
+    <Container maxWidth="md" sx={{ py: 5 }}>
+      <Stepper activeStep={activeStep} sx={{ mb: 5 }}>
+        {steps.map((label) => (
+          <Step key={label}>
+            <StepLabel>{label}</StepLabel>
+          </Step>
+        ))}
+      </Stepper>
 
-      {isPrivileged && (
-        <TextField select label="Kunde" value={selectedCustomerId}
-          onChange={(e)=> setSelectedCustomerId(e.target.value)} fullWidth margin="normal" required>
-          {customers.map(c => <MenuItem key={c._id} value={c._id}>{c.name ? `${c.name} – ${c.email}` : c.email}</MenuItem>)}
-        </TextField>
-      )}
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      <TextField select label="Service" value={selectedServiceId}
-        onChange={(e)=> setSelectedServiceId(e.target.value)}
-        fullWidth margin="normal" required>
-        {services.map(s => <MenuItem key={s._id} value={s._id}>{s.title}</MenuItem>)}
-      </TextField>
+      <Box>
+        {renderStepContent(activeStep)}
 
-      <FormControl fullWidth margin="normal">
-        <InputLabel>Mitarbeiter</InputLabel>
-        <Select
-          value={selectedStaffId}
-          onChange={e => setSelectedStaffId(e.target.value)}
-          disabled={!selectedServiceId || staffForService.length === 0}
-          required
-        >
-          {staffForService.map((staff) => (
-            <MenuItem key={staff._id} value={staff._id}>
-              {staff.firstName && staff.lastName
-                ? `${staff.firstName} ${staff.lastName}`
-                : staff.name || staff.email}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-
-      <TextField type="date" label="Datum" value={date}
-        onChange={(e)=> setDate(e.target.value)} fullWidth margin="normal"
-        InputLabelProps={{ shrink: true }} required />
-
-      <TextField select label="Zeit-Slot" value={slot}
-        onChange={(e)=> setSlot(e.target.value)} fullWidth margin="normal"
-        helperText={(!date || slots.length === 0) ? 'Keine freien Zeiten' : undefined}
-        disabled={!date || slots.length === 0} required>
-        {slots.map(sIso => {
-          const dt = new Date(sIso)
-          const label = dt.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' })
-          return <MenuItem key={sIso} value={sIso}>{label}</MenuItem>
-        })}
-      </TextField>
-
-      <Button variant="contained" onClick={handleBook} disabled={
-        loading || !selectedServiceId || !selectedStaffId || !date || !slot || (isPrivileged && !selectedCustomerId)
-      } sx={{ mt: 2 }}>
-        Termin buchen
-      </Button>
-
-      <Snackbar open={toast.open} autoHideDuration={2200} onClose={() => setToast(p=>({...p, open:false}))}
-        anchorOrigin={{ vertical:'bottom', horizontal:'center' }}>
-        <Alert severity={toast.sev} variant="filled" onClose={() => setToast(p=>({...p, open:false}))}>
-          {toast.msg}
-        </Alert>
-      </Snackbar>
-    </div>
-  )
+        {activeStep < 4 && (
+          <Box sx={{ display: 'flex', flexDirection: 'row', pt: 4 }}>
+            <Button
+              color="inherit"
+              disabled={activeStep === 0}
+              onClick={handleBack}
+              sx={{ mr: 1 }}
+            >
+              Zurück
+            </Button>
+            <Box sx={{ flex: '1 1 auto' }} />
+            {activeStep === 3 ? (
+              <Button variant="contained" onClick={handleBookingSubmit}>
+                Termin bestätigen
+              </Button>
+            ) : activeStep < 3 && (
+              <Button onClick={handleNext} disabled={
+                (activeStep === 0 && !selectedService) ||
+                (activeStep === 1 && !selectedStaff) ||
+                (activeStep === 2 && !selectedSlot)
+              }>
+                Weiter
+              </Button>
+            )}
+          </Box>
+        )}
+      </Box>
+    </Container>
+  );
 }

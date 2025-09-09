@@ -24,6 +24,7 @@ import InstagramIcon from '@mui/icons-material/Instagram'
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth'
 import ArrowOutwardIcon from '@mui/icons-material/ArrowOutward'
 import { GridLegacy as Grid } from '@mui/material';
+import { Token } from '@mui/icons-material'
 
 
 type Service = { _id: string; title: string; duration?: number }
