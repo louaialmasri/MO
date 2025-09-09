@@ -25,6 +25,7 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth'
 import ArrowOutwardIcon from '@mui/icons-material/ArrowOutward'
 import { GridLegacy as Grid } from '@mui/material';
 import { Token } from '@mui/icons-material'
+import { useAuth } from '@/context/AuthContext'
 
 
 type Service = { _id: string; title: string; duration?: number }
@@ -49,6 +50,7 @@ const OPENING_HOURS: OpeningHour[] = [
 
 export default function LandingPage() {
   const router = useRouter()
+  const { user, token } = useAuth()
   const [services, setServices] = useState<Service[]>([])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
@@ -56,7 +58,7 @@ export default function LandingPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const data = await fetchServices()
+        const data = await fetchServices(token)
         setServices(data)
       } catch (e) {
         console.error('Service-Liste konnte nicht geladen werden', e)

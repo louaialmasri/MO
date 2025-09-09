@@ -1,10 +1,14 @@
 import axios from 'axios'
 
 // --- Types ---
+
 export type User = {
   _id: string
   email: string
   role: 'user' | 'admin' | 'staff'
+  name?: string;
+  firstName?: string;
+  lastName?: string;
 }
 
 export type Service = {
@@ -21,6 +25,7 @@ export type Booking = {
   user: string
   serviceId: string
   dateTime: string
+  service: Service; // Hinzugefügt für das Dashboard
 }
 
 export type StaffBooking  = {
@@ -48,11 +53,14 @@ export type Availability = {
 // --- Global Types ---
 export type Salon = { _id: string; name: string; logoUrl?: string }
 
+// KORREKTUR: Auch der GlobalStaff-Typ wird vervollständigt.
 export type GlobalStaff = {
   _id: string
   email: string
   role: 'user' | 'staff' | 'admin'
   name?: string
+  firstName?: string;
+  lastName?: string;
   skills?: Array<string | { _id: string; title?: string }>
 }
 
@@ -94,16 +102,11 @@ const api = axios.create({
   },
 })
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  'http://localhost:5000/api'; 
-
 // --- Axios Interceptor ---
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
   if (token) config.headers.Authorization = `Bearer ${token}`
 
-  // salon header nur setzen, wenn gewünscht (global-Calls brauchen ihn NICHT)
   if (!(config as any).noSalonHeader) {
     const salonId = localStorage.getItem('activeSalonId')
     if (salonId) (config.headers as any)['x-salon-id'] = salonId
@@ -112,11 +115,11 @@ api.interceptors.request.use((config) => {
 })
 
 // SERVICE API
-export const fetchServices = async (token: string | null) => {
+export const fetchServices = async (token?: string | null) => {
   try {
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
     const res = await api.get('/services', { headers });
-    // KORREKTUR: Array aus res.data.services extrahieren
+    
     if (res.data && Array.isArray(res.data.services)) {
       return res.data.services;
     }
@@ -126,6 +129,7 @@ export const fetchServices = async (token: string | null) => {
     return [];
   }
 };
+
 
 export async function createService(
   payload: { title: string; description?: string; price: number; duration: number; salonId?: string | null },
@@ -185,12 +189,10 @@ export async function getUserBookings(token: string): Promise<Booking[]> {
 export const getAllBookings = async (token: string) => {
   try {
     const res = await api.get('/bookings', { headers: { Authorization: `Bearer ${token}` } });
-    // KORREKTUR: Gib direkt das 'bookings'-Array aus dem Response-Objekt zurück.
-    // Wenn es nicht existiert, gib ein leeres Array zurück, um Fehler zu vermeiden.
     return res.data?.bookings || [];
   } catch (error) {
     console.error("API Error in getAllBookings:", error);
-    return []; // Auch bei einem Fehler ein leeres Array zurückgeben
+    return []; 
   }
 };
 
@@ -206,7 +208,7 @@ export async function deleteBooking(id: string, token: string) {
 // AUTH API
 export async function login(email: string, password: string) {
   const res = await api.post('/login', { email, password })
-  return res.data // { token, user: { email, role } }
+  return res.data
 }
 
 export async function register(
@@ -231,13 +233,13 @@ export async function register(
 const authHeaders = (token?: string) =>
   token ? { Authorization: `Bearer ${token}` } : {};
 
-// ➡ Alle Mitarbeiter abrufen
+
 export async function fetchStaff(token?: string) {
   const res = await api.get('/users', { params: { role: 'staff' }, headers: authHeaders(token) })
   return res.data.users
 }
 
-// ➡ Buchungen für Mitarbeiter abrufen
+
 export async function getStaffBookings(token: string): Promise<StaffBooking[]> {
   const res = await api.get('/bookings/staff', {
     headers: {
@@ -269,8 +271,8 @@ export async function createUserManually(
   return res.data.user
 }
 
-// ➡ Alle Nutzer abrufen
-export const fetchAllUsers = async (token: string, role?: string) => {
+
+export const fetchAllUsers = async (token: string, role?: string): Promise<User[]> => {
     try {
         const url = role ? `/users?role=${role}` : '/users';
         const res = await api.get(url, { headers: { Authorization: `Bearer ${token}` } });
@@ -284,7 +286,7 @@ export const fetchAllUsers = async (token: string, role?: string) => {
     }
 };
 
-// ➡ Mitarbeiterrolle aktualisieren
+
 export async function updateUserRole(userId: string, role: string, token: string) {
   const res = await api.patch(`/users/${userId}/role`, { role }, {
     headers: { Authorization: `Bearer ${token}` }
@@ -306,7 +308,7 @@ export async function deleteUserById(id: string, token: string) {
   return res.data
 }
 
-// ➡ Buchungen bearbeiten
+
 export async function updateBooking(
   id: string,
   data: { serviceId?: string; dateTime?: string, staffId?: string },
@@ -439,7 +441,7 @@ export async function unassignServiceFromSalon(serviceId: string, salonId: strin
 }
 
 
-export async function createGlobalStaff(payload: { email: string; password: string; name?: string }) {
+export async function createGlobalStaff(payload: { email: string; password: string; name?: string, firstName: string, lastName: string }) {
   const res = await api.post('/admin/staff', payload, {} as any);
   (res.config as any).noSalonHeader = true;
   return res.data.user as GlobalStaff
