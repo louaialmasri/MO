@@ -366,7 +366,8 @@ function AdminPage() {
                       {activeBooking?.status === 'paid' ? (
                           <Button 
                               variant="contained" 
-                              onClick={() => router.push(`/invoice/${activeBooking.invoiceNumber}`)} // WICHTIG: Auf Rechnungsnummer geändert
+                              // KORREKTUR: Verwende die invoiceNumber für den Link
+                              onClick={() => router.push(`/invoice/${activeBooking.invoiceNumber}`)}
                           >
                               Rechnung ansehen
                           </Button>

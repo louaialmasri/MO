@@ -220,7 +220,7 @@ export const getAllBookings = async (req: AuthRequest, res: Response) => {
     }
     const bookings = await Booking.find(filter)
       .populate('user', 'firstName lastName')
-      .populate('service', 'title')
+      .populate('service', 'title price duration')
       .populate('staff', 'firstName lastName')
       .lean();
 
