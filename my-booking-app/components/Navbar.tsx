@@ -1,3 +1,4 @@
+
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -40,12 +41,10 @@ export default function Navbar() {
   const isMobile = useMediaQuery('(max-width:999px)', { noSsr: true })
   const [hydrated, setHydrated] = useState(false)
 
-  // State für die verschiedenen Menüs
   const [mobileMenuAnchor, setMobileMenuAnchor] = useState<null | HTMLElement>(null)
   const [salonMenuAnchor, setSalonMenuAnchor] = useState<null | HTMLElement>(null)
   const [adminMenuAnchor, setAdminMenuAnchor] = useState<null | HTMLElement>(null)
 
-  // Salon-spezifischer State
   const [salons, setSalons] = useState<Salon[]>([])
   const [activeSalonId, setActiveSalonId] = useState<string | null>(null)
 
@@ -91,7 +90,6 @@ export default function Navbar() {
   
   const activeSalon = salons.find(s => s._id === activeSalonId);
 
-  // --- Render-Komponenten ---
   const Brand = (
     <Typography
       variant="h6"
@@ -104,7 +102,6 @@ export default function Navbar() {
 
   const adminNav = user?.role === 'admin' ? (
     <>
-      {/* 1. Admin-Menü (Mein Salon) */}
       <Button
         color="inherit"
         startIcon={<SettingsIcon />}
@@ -124,7 +121,6 @@ export default function Navbar() {
         <MenuItem onClick={() => { setAdminMenuAnchor(null); router.push('/admin/availability/templates') }}><ScheduleIcon sx={{ mr: 1.5 }}/> Zeit-Vorlagen</MenuItem>
       </Menu>
 
-      {/* 2. Salon-Wechsler (King & Queen) */}
       <Button
         color="inherit"
         onClick={(e) => setSalonMenuAnchor(e.currentTarget)}
@@ -159,7 +155,8 @@ export default function Navbar() {
   const userNav = (
     <>
       <Button color="inherit" onClick={() => router.push('/booking')}>Termin buchen</Button>
-      {user && (
+      {/* KORREKTUR: Zeige den Dashboard-Button nur für 'user' und 'staff' an */}
+      {user && user.role !== 'admin' && (
           <Button color="inherit" onClick={() => router.push(user.role === 'staff' ? '/staff-dashboard' : '/dashboard')}>
               Dashboard
           </Button>

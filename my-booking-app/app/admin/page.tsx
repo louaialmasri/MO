@@ -16,7 +16,8 @@ import {
 import dynamic from 'next/dynamic'
 import {
   Box, Button, Chip, Stack, Dialog, DialogTitle, DialogContent,
-  DialogActions, TextField, MenuItem, Typography, Avatar, Tooltip, IconButton, Container, Paper
+  DialogActions, TextField, MenuItem, Typography, Avatar, Tooltip, IconButton, Container, Paper,
+  Snackbar, Alert // Snackbar und Alert importieren
 } from '@mui/material'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
@@ -26,12 +27,12 @@ import type { Service } from '@/services/api'
 import dayjs from 'dayjs'
 import 'dayjs/locale/de';
 import AdminBreadcrumbs from '@/components/AdminBreadcrumbs'
-import PaymentIcon from '@mui/icons-material/Payment';
 
 // Icons
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import TodayIcon from '@mui/icons-material/Today';
+import PaymentIcon from '@mui/icons-material/Payment';
 
 dayjs.locale('de');
 
@@ -51,7 +52,7 @@ type BookingFull = {
   _id: string
   user: string | User
   staff?: StaffLite
-  service?: { _id: string; title: string; duration?: number }
+  service?: { _id: string; title: string; duration?: number, price?: number }
   serviceId?: string
   dateTime: string
   status: 'confirmed' | 'paid' | 'cancelled';
@@ -120,11 +121,16 @@ function AdminPage() {
   const [users, setUsers] = useState<User[]>([])
   const [openEvent, setOpenEvent] = useState(false)
   const [activeBooking, setActiveBooking] = useState<BookingFull | null>(null)
-  const [editMode, setEditMode] = useState(false); // KORREKTUR: Neuer State für den Bearbeitungsmodus
+  const [editMode, setEditMode] = useState(false);
   const [edit, setEdit] = useState<{dateTime: string; serviceId: string; staffId: string}>({
     dateTime: '', serviceId: '', staffId: ''
   })
   const [currentDate, setCurrentDate] = useState<Date>(new Date())
+
+  // States für den Bezahl-Dialog
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [amountGiven, setAmountGiven] = useState('');
+  const [toast, setToast] = useState<{open:boolean; msg:string; sev:'success'|'error'}>({open:false,msg:'',sev:'success'})
 
   const staffUsers = useMemo(() => users.filter(u => u.role === 'staff'), [users]);
 
@@ -136,36 +142,6 @@ function AdminPage() {
     });
     return colorMap;
   }, [staffUsers]);
-
-  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-    const [amountGiven, setAmountGiven] = useState('');
-    
-    const servicePrice = (activeBooking?.service as any)?.price || 0;
-    const change = parseFloat(amountGiven) >= servicePrice ? parseFloat(amountGiven) - servicePrice : 0;
-
-    const handleOpenPaymentDialog = () => {
-        setAmountGiven(String(servicePrice)); // Standardmäßig den exakten Betrag eintragen
-        setPaymentDialogOpen(true);
-    };
-
-    const handleClosePaymentDialog = () => {
-        setPaymentDialogOpen(false);
-        setAmountGiven('');
-    };
-
-    const handlePaymentSubmit = async () => {
-        if (!activeBooking || !token) return;
-        try {
-            await markBookingAsPaid(activeBooking._id, 'cash', parseFloat(amountGiven), token);
-            const updatedBookings = await getAllBookings(token);
-            setBookings(updatedBookings);
-            handleClosePaymentDialog();
-            closeDialog(); // Schließt den Haupt-Dialog
-        } catch (err) {
-            console.error(err);
-            alert('Fehler beim Bezahlen.');
-        }
-    };
 
 
   useEffect(() => {
@@ -201,13 +177,13 @@ function AdminPage() {
       serviceId: b.service?._id || b.serviceId || '',
       staffId: b.staff?._id || ''
     })
-    setEditMode(false); // KORREKTUR: Bearbeitungsmodus zurücksetzen
+    setEditMode(false);
     setOpenEvent(true)
   }
   const closeDialog = () => { 
     setOpenEvent(false); 
     setActiveBooking(null);
-    setEditMode(false); // KORREKTUR: Bearbeitungsmodus zurücksetzen
+    setEditMode(false);
   }
 
   const calendarEvents = useMemo(() => {
@@ -268,6 +244,35 @@ function AdminPage() {
     }
   }
 
+  // --- Payment Dialog Logic ---
+  const servicePrice = activeBooking?.service?.price || 0;
+  const change = parseFloat(amountGiven) >= servicePrice ? parseFloat(amountGiven) - servicePrice : 0;
+
+  const handleOpenPaymentDialog = () => {
+    setAmountGiven(''); // KORREKTUR: Feld leer lassen
+    setPaymentDialogOpen(true);
+  };
+
+  const handleClosePaymentDialog = () => {
+    setPaymentDialogOpen(false);
+    setAmountGiven('');
+  };
+
+  const handlePaymentSubmit = async () => {
+    if (!activeBooking || !token) return;
+    try {
+      await markBookingAsPaid(activeBooking._id, 'cash', parseFloat(amountGiven), token);
+      const updatedBookings = await getAllBookings(token);
+      setBookings(updatedBookings);
+      handleClosePaymentDialog();
+      closeDialog();
+      setToast({ open: true, msg: 'Zahlung erfolgreich verbucht!', sev: 'success' }); // KORREKTUR: Erfolgsmeldung
+    } catch (err) {
+      console.error(err);
+      setToast({ open: true, msg: 'Fehler beim Speichern der Zahlung.', sev: 'error' });
+    }
+  };
+
   return (
     <Box sx={{ p: { xs: 2, md: 4 }, backgroundColor: 'background.default', minHeight: '100vh' }}>
         <Container maxWidth="xl">
@@ -304,8 +309,8 @@ function AdminPage() {
                     headerToolbar={false}
                     height="auto"
                     slotDuration="00:15:00"
-                    slotMinTime="08:00:00"
-                    slotMaxTime="20:00:00"
+                    slotMinTime="09:00:00"
+                    slotMaxTime="19:00:00"
                     slotLabelFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
                     eventTimeFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
                     nowIndicator={true}
@@ -332,59 +337,58 @@ function AdminPage() {
                 <DialogTitle>{editMode ? 'Buchung bearbeiten' : 'Buchungsdetails'}</DialogTitle>
                 <DialogContent sx={{ display:'flex', flexDirection:'column', gap:2, pt:2 }}>
                     {activeBooking && (
-                        editMode ? (
-                            <>
-                                <TextField
-                                    label="Datum & Uhrzeit"
-                                    type="datetime-local"
-                                    value={edit.dateTime}
-                                    onChange={(e)=> setEdit({...edit, dateTime: e.target.value})}
-                                    InputLabelProps={{ shrink:true }}
-                                />
-                                <TextField select label="Service" value={edit.serviceId} onChange={(e)=> setEdit({...edit, serviceId: e.target.value})}>
-                                    {services.map(s => <MenuItem key={s._id} value={s._id}>{s.title}</MenuItem>)}
-                                </TextField>
-                                <TextField select label="Mitarbeiter" value={edit.staffId} onChange={(e)=> setEdit({...edit, staffId: e.target.value})}>
-                                    {staffUsers
-                                    .filter(s => Array.isArray(s.skills) && s.skills.some((sk: any) => sk._id === edit.serviceId))
-                                    .map(s => <MenuItem key={s._id} value={s._id}>{s.name || `${s.firstName} ${s.lastName}`}</MenuItem>)}
-                                </TextField>
-                            </>
-                        ) : (
-                            <Typography variant="body1">
-                                Kunde: <strong>{(typeof activeBooking.user === 'object' && ((activeBooking.user as User).firstName || (activeBooking.user as User).name)) ? `${(activeBooking.user as User).firstName} ${(activeBooking.user as User).lastName}` : 'Unbekannt'}</strong>
-                            </Typography>
-                        )
+                       editMode ? (
+                        <>
+                            <TextField
+                                label="Datum & Uhrzeit"
+                                type="datetime-local"
+                                value={edit.dateTime}
+                                onChange={(e)=> setEdit({...edit, dateTime: e.target.value})}
+                                InputLabelProps={{ shrink:true }}
+                            />
+                            <TextField select label="Service" value={edit.serviceId} onChange={(e)=> setEdit({...edit, serviceId: e.target.value})}>
+                                {services.map(s => <MenuItem key={s._id} value={s._id}>{s.title}</MenuItem>)}
+                            </TextField>
+                            <TextField select label="Mitarbeiter" value={edit.staffId} onChange={(e)=> setEdit({...edit, staffId: e.target.value})}>
+                                {staffUsers
+                                .filter(s => Array.isArray(s.skills) && s.skills.some((sk: any) => sk._id === edit.serviceId))
+                                .map(s => <MenuItem key={s._id} value={s._id}>{s.name || `${s.firstName} ${s.lastName}`}</MenuItem>)}
+                            </TextField>
+                        </>
+                       ) : (
+                        <Typography variant="body1">
+                            Kunde: <strong>{(typeof activeBooking.user === 'object' && ((activeBooking.user as User).firstName || (activeBooking.user as User).name)) ? `${(activeBooking.user as User).firstName} ${(activeBooking.user as User).lastName}` : 'Unbekannt'}</strong>
+                        </Typography>
+                       )
                     )}
                 </DialogContent>
                 <DialogActions sx={{ p: '16px 24px', justifyContent: 'space-between' }}>
-                  <Box>
-                      <Button onClick={closeDialog}>Schließen</Button>
-                      <Button onClick={() => setEditMode(true)}>Bearbeiten</Button>
-                  </Box>
-                  <Box>
-                      {activeBooking?.status === 'paid' ? (
-                          <Button 
-                              variant="contained" 
-                              // KORREKTUR: Verwende die invoiceNumber für den Link
-                              onClick={() => router.push(`/invoice/${activeBooking.invoiceNumber}`)}
-                          >
-                              Rechnung ansehen
-                          </Button>
-                      ) : (
-                          <Button 
-                              variant="contained" 
-                              color="success"
-                              startIcon={<PaymentIcon />}
-                              onClick={handleOpenPaymentDialog}
-                          >
-                              Bezahlen
-                          </Button>
-                      )}
-                  </Box>
-              </DialogActions>
+                    <Box>
+                        <Button onClick={closeDialog}>Schließen</Button>
+                        <Button onClick={() => setEditMode(true)}>Bearbeiten</Button>
+                    </Box>
+                    <Box>
+                        {activeBooking?.status === 'paid' ? (
+                            <Button 
+                                variant="contained" 
+                                onClick={() => router.push(`/invoice/${activeBooking.invoiceNumber}`)}
+                            >
+                                Rechnung ansehen
+                            </Button>
+                        ) : (
+                            <Button 
+                                variant="contained" 
+                                color="success"
+                                startIcon={<PaymentIcon />}
+                                onClick={handleOpenPaymentDialog}
+                            >
+                                Bezahlen
+                            </Button>
+                        )}
+                    </Box>
+                </DialogActions>
             </Dialog>
-            {/* NEUER DIALOG für den Bezahlvorgang */}
+
             <Dialog open={paymentDialogOpen} onClose={handleClosePaymentDialog}>
                 <DialogTitle>Barzahlung</DialogTitle>
                 <DialogContent>
@@ -410,12 +414,18 @@ function AdminPage() {
                     <Button
                         variant="contained"
                         onClick={handlePaymentSubmit}
-                        disabled={parseFloat(amountGiven) < servicePrice}
+                        disabled={parseFloat(amountGiven) < servicePrice || isNaN(parseFloat(amountGiven))}
                     >
                         Zahlung bestätigen
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            <Snackbar open={toast.open} autoHideDuration={3000} onClose={() => setToast(p => ({...p, open: false}))}>
+                <Alert onClose={() => setToast(p => ({...p, open: false}))} severity={toast.sev} sx={{ width: '100%' }}>
+                    {toast.msg}
+                </Alert>
+            </Snackbar>
         </Container>
     </Box>
   )

@@ -6,7 +6,8 @@ import { useAuth } from '@/context/AuthContext'
 import { getUserBookings, deleteBooking, type Booking, type Service } from '@/services/api'
 import {
   Container, Typography, Card, CardContent, CardActions, Button, Box, Paper, Alert,
-  Stack
+  Stack,
+  CircularProgress
 } from '@mui/material'
 import Grid from '@mui/material/Grid'
 import { motion } from 'framer-motion'
@@ -17,32 +18,38 @@ import EventIcon from '@mui/icons-material/Event';
 import PersonIcon from '@mui/icons-material/Person';
 import CategoryIcon from '@mui/icons-material/Category';
 
-// Erweitere den Booking-Typ um Service-Details
 type BookingWithService = Booking & { service: Service };
 
 export default function DashboardPage() {
-  const { user, token, logout } = useAuth()
+  const { user, token, logout, loading } = useAuth()
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
   const [bookings, setBookings] = useState<BookingWithService[]>([])
+  const [dataLoading, setDataLoading] = useState(true);
 
   useEffect(() => {
-    const loadData = async () => {
-      if (!token) {
+    if (!loading) {
+      if (!user) {
         router.push('/login');
         return;
       }
-      try {
-        const userBookings = await getUserBookings(token);
-        setBookings(userBookings as BookingWithService[]); // Annahme: API gibt Service-Details zurück
-      } catch (error) {
-        console.error('Fehler beim Laden der Buchungen:', error)
-      } finally {
-        setLoading(false)
+      if (user.role === 'admin') {
+        router.push('/admin');
+        return;
       }
+
+      const loadData = async () => {
+        try {
+          const userBookings = await getUserBookings(token!);
+          setBookings(userBookings as BookingWithService[]);
+        } catch (error) {
+          console.error('Fehler beim Laden der Buchungen:', error)
+        } finally {
+          setDataLoading(false);
+        }
+      }
+      loadData();
     }
-    if (user) loadData()
-  }, [user, token, router])
+  }, [user, token, router, loading])
 
   const handleCancel = async (bookingId: string) => {
     try {
@@ -55,17 +62,19 @@ export default function DashboardPage() {
     }
   }
 
-  if (loading) return <Typography>Lade deine Buchungen...</Typography>
+  if (loading || dataLoading || !user || user.role === 'admin') {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" height="80vh">
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   const upcomingBookings = bookings.filter(b => dayjs(b.dateTime).isAfter(dayjs()));
   const pastBookings = bookings.filter(b => dayjs(b.dateTime).isBefore(dayjs()));
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-    >
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <Container maxWidth="lg" sx={{ py: 5 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
           <Typography variant="h4" fontWeight={800}>Willkommen zurück, {user?.email} 👋</Typography>
@@ -81,6 +90,7 @@ export default function DashboardPage() {
         ) : (
           <Grid container spacing={3}>
             {upcomingBookings.map((b) => (
+              // ⬇️ Grid v2: kein "item", stattdessen size={{ ... }}
               <Grid key={b._id} size={{ xs: 12, md: 6, lg: 4 }}>
                 <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                   <CardContent sx={{ flexGrow: 1 }}>
