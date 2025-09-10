@@ -5,6 +5,9 @@ import { createContext, useContext, useEffect, useState } from 'react'
 interface AuthUser {
   email: string
   role: 'user' | 'admin' | 'staff'
+  firstName?: string,
+  lastName?: string,
+  name?: string,
   _id?: string
 }
 

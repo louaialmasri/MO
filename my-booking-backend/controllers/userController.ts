@@ -11,14 +11,14 @@ export const getAllUsers = async (req: any, res: Response) => {
     const { role } = req.query as { role?: string };
     const sid = req.salonId;
 
-    // KORREKTUR: Wenn 'staff' als Rolle angefragt wird,
-    // ignoriere den Salon-Filter und gib alle Mitarbeiter zurück.
-    if (role === 'staff' || role == 'user') {
-      const users = await User.find({ role: 'staff' }).populate('skills').lean();
+    // KORREKTUR: Wenn 'staff' ODER 'user' als Rolle explizit angefragt wird,
+    // ignorieren wir den Salon-Filter, um eine vollständige Liste für die Admin-Funktionen zu erhalten.
+    if (role === 'staff' || role === 'user') {
+      const users = await User.find({ role }).populate('skills').lean();
       return res.json({ success: true, users });
     }
 
-    // Die bestehende Logik für andere Anfragen bleibt erhalten
+    // Die bestehende Logik für andere Anfragen (z.B. ohne Rollenfilter) bleibt erhalten
     if (!sid) return res.json({ success: true, users: [] });
 
     const q: any = { salon: sid };
