@@ -13,7 +13,7 @@ export const getAllUsers = async (req: any, res: Response) => {
 
     // KORREKTUR: Wenn 'staff' als Rolle angefragt wird,
     // ignoriere den Salon-Filter und gib alle Mitarbeiter zurück.
-    if (role === 'staff') {
+    if (role === 'staff' || role == 'user') {
       const users = await User.find({ role: 'staff' }).populate('skills').lean();
       return res.json({ success: true, users });
     }

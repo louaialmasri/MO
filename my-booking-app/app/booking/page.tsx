@@ -3,9 +3,16 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import {
     Container, Box, Stepper, Step, StepLabel, Button, Typography, CircularProgress,
-    Grid, Card, CardActionArea, CardContent, Avatar, Chip, Alert, TextField, MenuItem
+    Grid, Card, CardActionArea, CardContent, Avatar, Chip, Alert, TextField, MenuItem, Paper
 } from '@mui/material'
-import api, { fetchServices, fetchAllUsers, createBooking, fetchTimeslots, type Service, type User } from '@/services/api'
+import api, { 
+    fetchGlobalServices, // KORREKTUR: Wir nutzen explizit die globalen Services
+    fetchAllUsers, 
+    createBooking, 
+    fetchTimeslots, 
+    type Service, 
+    type User 
+} from '@/services/api'
 import { useAuth } from '@/context/AuthContext'
 import dayjs from 'dayjs'
 
@@ -24,7 +31,7 @@ export default function BookingPage() {
   
   const isAdminOrStaff = user?.role === 'admin' || user?.role === 'staff';
   
-  const [activeStep, setActiveStep] = useState(isAdminOrStaff ? 0 : 1); // Startet bei Schritt 0 für Admins, sonst bei 1
+  const [activeStep, setActiveStep] = useState(isAdminOrStaff ? 0 : 1);
 
   // Data states
   const [services, setServices] = useState<Service[]>([])
@@ -46,13 +53,15 @@ export default function BookingPage() {
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        const svc = await fetchServices(token);
+        // KORREKTUR: Rufe immer die globalen Services ab
+        const svc = await fetchGlobalServices();
         setServices(svc);
         setLoading(p => ({...p, services: false}));
 
         if (isAdminOrStaff && token) {
-            const allUsers = await fetchAllUsers(token);
-            setAllCustomers(allUsers.filter(u => u.role === 'user'));
+            // KORREKTUR: Rufe explizit alle 'user' ab
+            const customerUsers = await fetchAllUsers(token, 'user');
+            setAllCustomers(customerUsers);
             setLoading(p => ({...p, customers: false}));
         }
       } catch {
@@ -108,7 +117,6 @@ export default function BookingPage() {
           setError('Alle Angaben sind erforderlich.');
           return;
       }
-      // Wenn Admin bucht, muss ein Kunde ausgewählt sein. Sonst wird die eigene ID genommen.
       const targetUserId = isAdminOrStaff ? selectedCustomerId : user?._id;
       if (!targetUserId) {
           setError('Bitte wählen Sie einen Kunden aus.');
@@ -117,7 +125,7 @@ export default function BookingPage() {
 
       try {
           await createBooking(selectedService._id, selectedSlot, selectedStaff._id, token, targetUserId);
-          handleNext(); // Zum Bestätigungsschritt
+          handleNext();
       } catch (e: any) {
           setError(e?.response?.data?.message || 'Buchung fehlgeschlagen.');
       }
@@ -128,7 +136,7 @@ export default function BookingPage() {
 
   const renderStepContent = (step: number) => {
     switch (step) {
-      case 0: // Kunde wählen (nur für Admins/Staff)
+      case 0:
         return (
             <Box>
                 <Typography variant="h6" gutterBottom>Für wen wird der Termin gebucht?</Typography>
@@ -143,13 +151,14 @@ export default function BookingPage() {
                     >
                         {allCustomers.map(c => (
                             <MenuItem key={c._id} value={c._id}>
-                                {c.name || `${c.firstName} ${c.lastName}` || c.email}
+                                {`${c.firstName} ${c.lastName}` || c.name || c.email}
                             </MenuItem>
                         ))}
                     </TextField>
                 )}
             </Box>
         );
+      // ... (Fälle 1, 2, 3, 4 bleiben unverändert)
       case 1: // Service wählen
         return (
           <Grid container spacing={2}>
@@ -190,10 +199,9 @@ export default function BookingPage() {
         return (
             <Box>
                 <Typography variant="h6" gutterBottom>Wähle ein Datum</Typography>
-                {/* Hier würde man eine schöne Kalender-Komponente einfügen */}
-                <TextField type="date" value={dayjs(selectedDate).format('YYYY-MM-DD')} onChange={(e) => setSelectedDate(new Date(e.target.value))} fullWidth />
+                <TextField type="date" value={dayjs(selectedDate).format('YYYY-MM-DD')} onChange={(e) => setSelectedDate(new Date(e.target.value))} fullWidth sx={{ mb: 3 }} />
                 
-                <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>Wähle eine Uhrzeit</Typography>
+                <Typography variant="h6" gutterBottom>Wähle eine Uhrzeit</Typography>
                 {loading.slots ? <CircularProgress /> : (
                     <Stack direction="row" flexWrap="wrap" gap={1}>
                         {availableSlots.length > 0 ? availableSlots.map(slot => (
@@ -202,7 +210,7 @@ export default function BookingPage() {
                                 label={dayjs(slot).format('HH:mm')}
                                 onClick={() => setSelectedSlot(slot)}
                                 color={selectedSlot === slot ? 'primary' : 'default'}
-                                variant="outlined"
+                                variant={selectedSlot === slot ? 'filled' : 'outlined'}
                                 clickable
                             />
                         )) : <Typography color="text.secondary">Keine verfügbaren Zeiten an diesem Tag.</Typography>}
@@ -227,7 +235,9 @@ export default function BookingPage() {
                 <CheckCircleIcon color="success" sx={{ fontSize: 60, mb: 2 }} />
                 <Typography variant="h5">Termin erfolgreich gebucht!</Typography>
                 <Typography color="text.secondary">Der Kunde wurde per E-Mail benachrichtigt.</Typography>
-                <Button variant="contained" sx={{ mt: 3 }} onClick={() => router.push('/admin')}>Zurück zum Kalender</Button>
+                <Button variant="contained" sx={{ mt: 3 }} onClick={() => router.push(isAdminOrStaff ? '/admin' : '/dashboard')}>
+                    {isAdminOrStaff ? 'Zurück zum Kalender' : 'Zu meinen Terminen'}
+                </Button>
             </Box>
         )
       default:

@@ -117,6 +117,12 @@ api.interceptors.request.use((config) => {
 // SERVICE API
 export const fetchServices = async (token?: string | null) => {
   try {
+    const salonId = localStorage.getItem('activeSalonId');
+    // Wenn keine Salon-ID vorhanden ist, rufen wir die globalen Services ab.
+    if (!salonId) {
+        return fetchGlobalServices();
+    }
+    
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
     const res = await api.get('/services', { headers });
     
