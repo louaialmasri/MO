@@ -3,8 +3,6 @@ import { User } from '../models/User'
 import { generateToken } from '../utils/jwt'
 import bcrypt from 'bcrypt'
 
-
-
 export const login = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body as { email?: string; password?: string }
@@ -13,7 +11,6 @@ export const login = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: 'E-Mail und Passwort sind erforderlich' })
     }
 
-    // Wichtig: Passwort explizit selektieren
     const user = await User.findOne({ email }).select('+password')
     if (!user || typeof user.password !== 'string') {
       return res.status(401).json({ success: false, message: 'Ungültige Anmeldedaten' })
@@ -30,11 +27,10 @@ export const login = async (req: Request, res: Response) => {
       role: user.role
     })
     
-    // Passwort aus der Antwort entfernen
-    const userObject = user.toObject();
-    delete userObject.password;
+    const safeUser = { ...user.toObject() };
+    delete (safeUser as any).password;
 
-    return res.json({ success: true, token, user: userObject })
+    return res.json({ success: true, token, user: safeUser })
   } catch (err) {
     console.error('Login error:', err)
     return res.status(500).json({ success: false, message: 'Serverfehler beim Login' })

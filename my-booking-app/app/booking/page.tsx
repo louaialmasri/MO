@@ -151,7 +151,7 @@ export default function BookingPage() {
               >
                 {allCustomers.map(c => (
                   <MenuItem key={c._id} value={c._id}>
-                    {`${c.firstName} ${c.lastName}`.trim() || c.name || c.email}
+                    {`${c.firstName} ${c.lastName}`.trim() || c.email}
                   </MenuItem>
                 ))}
               </TextField>
@@ -267,7 +267,7 @@ export default function BookingPage() {
         return (
           <Paper sx={{ p: 3 }}>
             <Typography variant="h5" gutterBottom>Bitte bestätigen</Typography>
-            <Typography><strong>Kunde:</strong> {`${customer?.firstName} ${customer?.lastName}`.trim() || customer?.name || customer?.email}</Typography>
+            <Typography><strong>Kunde:</strong> {`${customer?.firstName} ${customer?.lastName}`.trim() || customer?.email}</Typography>
             <Typography><strong>Service:</strong> {selectedService?.title}</Typography>
             <Typography><strong>Mitarbeiter:</strong> {selectedStaff?.name || `${selectedStaff?.firstName} ${selectedStaff?.lastName}`}</Typography>
             <Typography><strong>Datum & Zeit:</strong> {dayjs(selectedSlot).format('dd, DD.MM.YYYY [um] HH:mm [Uhr]')}</Typography>

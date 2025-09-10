@@ -96,7 +96,7 @@ export default function AdminCatalogPage() {
 
   const leftList = useMemo(() => {
     if (tab === 'staff') {
-      return qLeft ? gStaff.filter(s => fuzzy(`${s.name||''} ${s.email}`, qLeft)) : gStaff
+      return qLeft ? gStaff.filter(s => fuzzy(`${s.firstName||''} ${s.lastName||''} ${s.email}`, qLeft)) : gStaff
     }
     if (tab === 'services') {
       return qLeft ? gServices.filter(s => fuzzy(`${s.title} ${s.description||''}`, qLeft)) : gServices
@@ -106,7 +106,7 @@ export default function AdminCatalogPage() {
 
   const rightList = useMemo(() => {
     if (tab === 'staff') {
-      return qRight ? assignedStaff.filter(s => fuzzy(`${s.name||''} ${s.email}`, qRight)) : assignedStaff
+      return qRight ? assignedStaff.filter(s => fuzzy(`${s.firstName||''} ${s.lastName||''} ${s.email}`, qRight)) : assignedStaff
     }
     if (tab === 'services') {
       return qRight ? assignedServices.filter(s => fuzzy(`${s.title} ${s.price}`, qRight)) : assignedServices
@@ -349,7 +349,7 @@ export default function AdminCatalogPage() {
                 <Divider sx={{ mb: 1 }} />
                 <List dense>
                   {(tab === 'staff'
-                    ? (qLeft ? gStaff.filter(s=>fuzzy(`${s.name||''} ${s.email}`, qLeft)) : gStaff)
+                    ? (qLeft ? gStaff.filter(s=>fuzzy(`${s.firstName||''}, ${s.lastName||''} ${s.email}`, qLeft)) : gStaff)
                     : (qLeft ? gServices.filter(s=>fuzzy(`${s.title} ${s.description||''}`, qLeft)) : gServices)
                   ).map(item => {
                     const id = (item as any)._id
@@ -404,7 +404,7 @@ export default function AdminCatalogPage() {
                           </Stack>
                         }>
                         <ListItemText
-                          primary={tab==='staff' ? ((item as GlobalStaff).name || (item as GlobalStaff).email) : (item as GlobalService).title}
+                          primary={(item as GlobalStaff).firstName ? `${(item as GlobalStaff).firstName} ${(item as GlobalStaff).lastName}` : (item as GlobalStaff).email}
                           secondary={
                             tab === 'staff'
                               ? `${(item as GlobalStaff).email} • Rolle: ${(item as GlobalStaff).role}`
@@ -427,7 +427,7 @@ export default function AdminCatalogPage() {
                 <Divider sx={{ mb: 1 }} />
                 <List dense>
                   {(tab === 'staff'
-                    ? (qRight ? assignedStaff.filter(s=>fuzzy(`${s.name||''} ${s.email}`, qRight)) : assignedStaff)
+                    ? (qRight ? assignedStaff.filter(s=>fuzzy(`${s.firstName||''} ${s.lastName||''} ${s.email}`, qRight)) : assignedStaff)
                     : (qRight ? assignedServices.filter(s=>fuzzy(`${s.title} ${s.price}`, qRight)) : assignedServices)
                   ).map(item => {
                     const id = (item as any)._id
@@ -455,10 +455,12 @@ export default function AdminCatalogPage() {
                           </Stack>
                         }>
                         <ListItemText
-                          primary={tab==='staff' ? ((item as GlobalStaff).name || (item as GlobalStaff).email) : (item as any).title}
-                          secondary={tab==='staff'
-                            ? (item as GlobalStaff).email
-                            : `${(item as any).price}€ • ${(item as any).duration} Min`}
+                          primary={(item as GlobalStaff).firstName ? `${(item as GlobalStaff).firstName} ${(item as GlobalStaff).lastName}` : (item as GlobalStaff).email}
+                          secondary={
+                            tab === 'staff'
+                              ? `${(item as GlobalStaff).email} • Rolle: ${(item as GlobalStaff).role}`
+                              : `${(item as GlobalService).price}€ • ${(item as GlobalService).duration} Min`
+                          }
                         />
                       </ListItem>
                     )
