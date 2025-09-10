@@ -1,3 +1,5 @@
+// my-booking-app/app/staff-dashboard/page.tsx
+
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -5,35 +7,18 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { getStaffBookings, register, StaffBooking, Service, fetchServices, updateBooking, User, fetchAllUsers } from '@/services/api'
 import {
-  Box,
-  Typography,
-  CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  TextField,
-  Tooltip,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Select
+  Box, Typography, CircularProgress, Dialog, DialogTitle, DialogContent,
+  DialogActions, Button, TextField, Tooltip, MenuItem, FormControl,
+  InputLabel, List, ListItem, ListItemIcon, ListItemText, Select,
+  Container, Paper, Stack // Neue Imports für das Layout
 } from '@mui/material'
-import { motion } from 'framer-motion'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import { deleteBooking } from '@/services/api'
-import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker'
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
-import { de } from 'date-fns/locale' 
+import 'dayjs/locale/de';
+import AdminBreadcrumbs from '@/components/AdminBreadcrumbs' // Wiederverwendung der Breadcrumbs
 
 export default function StaffDashboardPage() {
   const { user, token } = useAuth()
@@ -94,7 +79,6 @@ export default function StaffDashboardPage() {
     )
   }
 
-  // Kalender-Einträge vorbereiten
   const calendarEvents = bookings
     .filter(b => b.service && b.user)
     .map((b) => {
@@ -150,7 +134,6 @@ export default function StaffDashboardPage() {
     }
   }
 
-  // Wenn eine Buchung ausgewählt wird, Editier-Formular befüllen
   const handleBookingClick = (booking: StaffBooking) => {
     const localDate = new Date(booking.dateTime)
     const offset = localDate.getTimezoneOffset()
@@ -159,11 +142,10 @@ export default function StaffDashboardPage() {
     setSelectedBooking(booking)
     setEditForm({
       serviceId: booking.service._id,
-      dateTime: localDate.toISOString().slice(0, 16), // korrekt formatierte lokale Zeit
+      dateTime: localDate.toISOString().slice(0, 16),
     })
     setEditMode(false)
   }
-
 
   const handleEditSave = async () => {
     if (!selectedBooking) return
@@ -189,45 +171,58 @@ export default function StaffDashboardPage() {
       alert('Fehler beim Speichern der Änderungen.')
     }
   }
-  // Gefilterte User-Liste
+  
   const filteredUsers = userRoleFilter === 'all'
     ? users
     : users.filter(u => u.role === userRoleFilter)
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.3 }}
-    >
-      <Box maxWidth="900px" margin="auto" mt={5} p={2}>
-        <Typography variant="h4" gutterBottom>
-          Kalender – Deine Buchungen
-        </Typography>
+    <Box sx={{ p: { xs: 2, md: 4 }, backgroundColor: 'background.default', minHeight: '100vh' }}>
+      <Container maxWidth="xl">
+        <AdminBreadcrumbs items={[{ label: 'Mein Dashboard', href: '/staff-dashboard' }, { label: 'Kalender' }]} />
+        
+        <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3, mt: 2 }}>
+            <Typography variant="h4" fontWeight={800} sx={{ flexGrow: 1 }}>
+                Dein Kalender
+            </Typography>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleOpenDialog}
+            >
+              Neuen Kunden anlegen
+            </Button>
+            <Button
+              variant="outlined"
+              color="secondary"
+              onClick={() => setShowUserDialog(true)}
+            >
+              Nutzer anzeigen
+            </Button>
+        </Stack>
 
-        <FullCalendar
-          plugins={[timeGridPlugin, dayGridPlugin, interactionPlugin]}
-          initialView="timeGridWeek"
-          locale="de"
-          headerToolbar={{
-            start: 'prev,next today',
-            center: 'title',
-            end: 'timeGridDay,timeGridWeek,dayGridMonth'
-          }}
-          allDaySlot={false}
-          slotMinTime="09:00:00"
-          slotMaxTime="20:00:00"
-          slotMinWidth={100}
-          events={calendarEvents}
-          height="auto"
-          eventClick={(info) => {
-            const clickedBooking = bookings.find(b => b._id === info.event.id)
-            if (clickedBooking) handleBookingClick(clickedBooking)
-          }}
-        />
+        <Paper sx={{ p: { xs: 1, md: 2 } }}>
+            <FullCalendar
+                plugins={[timeGridPlugin, dayGridPlugin, interactionPlugin]}
+                initialView="timeGridWeek"
+                locale="de"
+                headerToolbar={{
+                    start: 'prev,next today',
+                    center: 'title',
+                    end: 'timeGridDay,timeGridWeek,dayGridMonth'
+                }}
+                allDaySlot={false}
+                slotMinTime="09:00:00"
+                slotMaxTime="20:00:00"
+                events={calendarEvents}
+                height="auto"
+                eventClick={(info) => {
+                    const clickedBooking = bookings.find(b => b._id === info.event.id)
+                    if (clickedBooking) handleBookingClick(clickedBooking)
+                }}
+            />
+        </Paper>
 
-        {/* Buchungsdetails- und Bearbeiten-Dialog */}
         <Dialog open={!!selectedBooking} onClose={() => { setSelectedBooking(null); setEditMode(false) }}>
           <DialogTitle>
             {editMode ? 'Buchung bearbeiten' : 'Buchungsdetails'}
@@ -310,27 +305,9 @@ export default function StaffDashboardPage() {
             )}
           </DialogActions>
         </Dialog>
-
-        {/* Benutzer anlegen Button */}
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleOpenDialog}
-          sx={{ mt: 3, mb: 2, mr: 2 }}
-        >
-          Benutzer anlegen
-        </Button>
-        {/* Nutzer anzeigen Button */}
-        <Button
-          variant="contained"
-          color="secondary"
-          onClick={() => setShowUserDialog(true)}
-          sx={{ mt: 3, mb: 2 }}
-        >
-          Nutzer anzeigen
-        </Button>
-      </Box>
-      {/* Nutzerliste im Dialog */}
+        
+      </Container>
+      
       <Dialog open={showUserDialog} onClose={() => setShowUserDialog(false)} maxWidth="md" fullWidth>
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           Nutzerliste
@@ -369,13 +346,12 @@ export default function StaffDashboardPage() {
                     </Typography>
                   }
                 />
-                {/* Beispiel: Staff kann keine Rollen ändern, daher kein Button */}
               </ListItem>
             ))}
           </List>
         </DialogContent>
       </Dialog>
-      {/* Dialog zum Anlegen eines neuen Benutzers */}
+      
       <Dialog open={openDialog} onClose={handleCloseDialog}>
         <DialogTitle>Neuen Benutzer anlegen</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
@@ -384,7 +360,6 @@ export default function StaffDashboardPage() {
           <TextField label="Telefonnummer" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
           <TextField label="E-Mail" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
           <TextField label="Passwort" type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
-          {/* Rolle anzeigen, aber nicht editierbar */}
           <TextField label="Rolle" value="user" InputProps={{ readOnly: true }} />
         </DialogContent>
         <DialogActions>
@@ -392,6 +367,6 @@ export default function StaffDashboardPage() {
           <Button variant="contained" onClick={handleCreateUser}>Erstellen</Button>
         </DialogActions>
       </Dialog>
-    </motion.div>
+    </Box>
   )
 }

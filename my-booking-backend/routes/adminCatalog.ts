@@ -1,3 +1,5 @@
+// my-booking-backend/routes/adminCatalog.ts
+
 // routes/adminCatalog.ts
 import express from 'express'
 import { verifyToken } from '../middlewares/authMiddleware'
@@ -7,22 +9,19 @@ import { Service } from '../models/Service'
 import bcrypt from 'bcrypt';
 
 const router = express.Router()
-router.use(verifyToken, verifyAdmin)
+// KORREKTUR: Middleware wird jetzt pro Route angewendet
+router.use(verifyToken);
 
-// Globale Staff-Liste (nur role=staff)
-router.get('/staff-all', async (_, res) => {
-  // KORREKTUR: Leerer Filter {} holt ALLE Benutzer aus der Datenbank.
+// Globale Staff-Liste (nur Admins)
+router.get('/staff-all', verifyAdmin, async (_, res) => {
   const users = await User.find({}).lean() 
   res.json({ success:true, users })
 })
-// in routes/adminCatalog.ts
 
-router.post('/staff', async (req, res) => {
+router.post('/staff', verifyAdmin, async (req, res) => {
   try {
-    // Hol dir alle benötigten Daten aus dem Request Body
     const { email, password, firstName, lastName } = req.body;
 
-    // Validierung
     if (!email || !password || !firstName || !lastName) {
       return res.status(400).json({ message: 'Alle Felder sind erforderlich' });
     }
@@ -33,8 +32,8 @@ router.post('/staff', async (req, res) => {
     const newStaff = await User.create({
       email,
       password: hashedPassword,
-      firstName, // Feld übergeben
-      lastName,  // Feld übergeben
+      firstName,
+      lastName,
       role: 'staff',
     });
 
@@ -45,33 +44,36 @@ router.post('/staff', async (req, res) => {
   }
 });
 
-router.delete('/users/:id', async (req, res) => {
+router.delete('/users/:id', verifyAdmin, async (req, res) => {
   await User.findByIdAndDelete(req.params.id)
   res.json({ success:true })
 })
 
-// Globale Services
+// Globale Services (alle eingeloggten Benutzer)
 router.get('/services-all', async (_, res) => {
   const services = await Service.find({}).lean()
   res.json({ success:true, services })
 })
-router.post('/services', async (req, res) => {
+
+// Admin-spezifische Service-Endpunkte
+router.post('/services', verifyAdmin, async (req, res) => {
   const { title, description, price, duration } = req.body
   const service = await Service.create({ title, description, price, duration, salon: null }) // GLOBAL
   res.status(201).json({ success:true, service })
 })
-router.delete('/services/:id', async (req, res) => {
+
+router.delete('/services/:id', verifyAdmin, async (req, res) => {
   await Service.findByIdAndDelete(req.params.id)
   res.json({ success:true })
 })
 
-router.patch('/services/:id', async (req, res) => {
+router.patch('/services/:id', verifyAdmin, async (req, res) => {
   try {
     const { title, description, price, duration } = req.body;
     const updatedService = await Service.findByIdAndUpdate(
       req.params.id,
       { title, description, price, duration },
-      { new: true, runValidators: true } // new:true gibt das aktualisierte Dokument zurück
+      { new: true, runValidators: true }
     );
     if (!updatedService) {
       return res.status(404).json({ success: false, message: 'Service nicht gefunden' });

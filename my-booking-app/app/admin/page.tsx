@@ -1,8 +1,10 @@
+// my-booking-app/app/admin/page.tsx
+
 'use client'
 
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef, useLayoutEffect } from 'react' // useLayoutEffect hinzufügen
 import {
   fetchServices,
   getAllBookings,
@@ -18,10 +20,10 @@ import {
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
-import resourceTimeGridPlugin from '@fullcalendar/resource-timegrid'; // WICHTIG: Neues Plugin
+import resourceTimeGridPlugin from '@fullcalendar/resource-timegrid';
 import type { Service } from '@/services/api'
 import dayjs from 'dayjs'
-import 'dayjs/locale/de'; // Deutsche Lokalisierung
+import 'dayjs/locale/de';
 import AdminBreadcrumbs from '@/components/AdminBreadcrumbs'
 
 // Icons
@@ -29,7 +31,7 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import TodayIcon from '@mui/icons-material/Today';
 
-dayjs.locale('de'); // Setzt Day.js auf Deutsch
+dayjs.locale('de');
 
 type User = {
   _id: string
@@ -52,8 +54,79 @@ type BookingFull = {
   dateTime: string
 }
 
-// Hilfsfunktion zur Generierung von Avatarnamen
 const getInitials = (name = '') => name.split(' ').map(n => n[0]).join('').toUpperCase();
+
+
+// NEUE KOMPONENTE für den Event-Inhalt
+interface CalendarEventContentProps {
+  arg: any; // FullCalendar eventContent argument
+}
+
+const CalendarEventContent: React.FC<CalendarEventContentProps> = ({ arg }) => {
+  const eventRef = useRef<HTMLDivElement>(null);
+  const [eventHeight, setEventHeight] = useState(0);
+
+  // Misst die Höhe des Events nach dem Rendern
+  useLayoutEffect(() => {
+    if (eventRef.current) {
+      setEventHeight(eventRef.current.offsetHeight);
+    }
+  }, [arg.event.start, arg.event.end]); // Abhängigkeiten, die bei Änderung die Höhe neu berechnen lassen
+
+  // Logik zur Anpassung der Schriftgrößen basierend auf der Höhe
+  const isCompact = eventHeight < 60; // Beispiel-Schwellenwert, kann angepasst werden
+  const isSuperCompact = eventHeight < 40; // Für sehr kurze Termine
+
+  let timeFontSize = '0.75rem'; // caption
+  let customerFontSize = '0.875rem'; // body2
+  let serviceFontSize = '0.75rem'; // caption
+
+  if (isSuperCompact) {
+    timeFontSize = '0.65rem';
+    customerFontSize = '0.75rem';
+    serviceFontSize = '0.65rem';
+  } else if (isCompact) {
+    timeFontSize = '0.7rem';
+    customerFontSize = '0.8rem';
+    serviceFontSize = '0.7rem';
+  }
+
+  // Bestimmt die Reihenfolge und Sichtbarkeit der Elemente
+  // Bei sehr kurzen Terminen könnte man z.B. den Service-Titel weglassen
+  const showTime = eventHeight > 20; // Nur Zeit anzeigen, wenn genug Platz ist
+  const showService = eventHeight > 35; // Service anzeigen, wenn etwas mehr Platz ist
+
+  return (
+    <Box
+      ref={eventRef} // Referenz für die Höhenmessung
+      sx={{
+        px: 1,
+        py: '2px',
+        overflow: 'hidden',
+        height: '100%',
+        color: 'white',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'flex-start', // Startet oben, flex-end für unten, space-between für Verteilung
+        // Hier können weitere dynamische Styles für den gesamten Container hinzugefügt werden
+      }}
+    >
+      {showTime && (
+        <Typography noWrap sx={{ lineHeight: 1.1, fontWeight: 'bold', fontSize: timeFontSize }}>
+          {dayjs(arg.event.start).format('HH:mm')} - {dayjs(arg.event.end).format('HH:mm')}
+        </Typography>
+      )}
+      <Typography noWrap sx={{ lineHeight: 1.1, fontWeight: 'bold', fontSize: customerFontSize }}>
+        {arg.event.extendedProps.customer}
+      </Typography>
+      {showService && (
+        <Typography noWrap sx={{ lineHeight: 1.1, opacity: 0.9, fontSize: serviceFontSize }}>
+          {arg.event.title}
+        </Typography>
+      )}
+    </Box>
+  );
+};
 
 
 function AdminPage() {
@@ -61,7 +134,7 @@ function AdminPage() {
   const router = useRouter()
   const [bookings, setBookings] = useState<BookingFull[]>([])
   const [services, setServices] = useState<Service[]>([])
-  const [users, setUsers] = useState<User[]>([]) // Enthält alle User, wir filtern für Staff
+  const [users, setUsers] = useState<User[]>([])
   const [openEvent, setOpenEvent] = useState(false)
   const [activeBooking, setActiveBooking] = useState<BookingFull | null>(null)
   const [edit, setEdit] = useState<{dateTime: string; serviceId: string; staffId: string}>({
@@ -71,7 +144,6 @@ function AdminPage() {
 
   const staffUsers = useMemo(() => users.filter(u => u.role === 'staff'), [users]);
 
-  // Farbpalette für Mitarbeiter-Avatare
   const staffColors = useMemo(() => {
     const palette = ['#A1887F', '#FFAB40', '#4DB6AC', '#BA68C8', '#7986CB', '#4FC3F7', '#F06292', '#AED581'];
     const colorMap = new Map<string, string>();
@@ -81,10 +153,8 @@ function AdminPage() {
     return colorMap;
   }, [staffUsers]);
 
-
   useEffect(() => {
     if (!user || user.role !== 'admin') {
-      //router.push('/login')
       return
     }
     if (!token) return
@@ -105,7 +175,6 @@ function AdminPage() {
     }
     fetchData()
   }, [user, token, router])
-
 
   const openDialogFor = (bookingId: string) => {
     const b = bookings.find(x => x._id === bookingId)
@@ -155,7 +224,6 @@ function AdminPage() {
     }));
   }, [staffUsers]);
 
-
   const handleEventDrop = async (info: any) => {
     const { event } = info;
     const original = bookings.find(b => b._id === event.id);
@@ -167,7 +235,6 @@ function AdminPage() {
             staffId: event.getResources()[0]?.id || original.staff?._id,
         };
         await updateBooking(event.id, payload, token!);
-        // Optimistisches Update im State
         setBookings(prev => prev.map(b => 
             b._id === event.id 
                 ? { ...b, dateTime: payload.dateTime, staff: users.find(u => u._id === payload.staffId) } 
@@ -214,6 +281,7 @@ function AdminPage() {
                     allDaySlot={false}
                     headerToolbar={false}
                     height="auto"
+                    slotDuration="00:15:00"
                     slotMinTime="08:00:00"
                     slotMaxTime="20:00:00"
                     slotLabelFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
@@ -234,12 +302,7 @@ function AdminPage() {
                            <Typography variant="body1" fontWeight={600}>{arg.resource.title}</Typography>
                         </Stack>
                     )}
-                    eventContent={(arg) => (
-                        <Box sx={{ p: 1, overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column' }}>
-                            <Typography variant="body2" fontWeight="bold" noWrap>{arg.event.title}</Typography>
-                            <Typography variant="caption" color="inherit" noWrap sx={{ opacity: 0.8 }}>{arg.event.extendedProps.customer}</Typography>
-                        </Box>
-                    )}
+                    eventContent={(arg) => <CalendarEventContent arg={arg} />}
                 />
             </Paper>
 

@@ -1,3 +1,5 @@
+// my-booking-app/app/admin/availability/page.tsx
+
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
@@ -141,6 +143,7 @@ export default function AdminAvailabilityPage() {
   const grouped = useMemo(() => {
     const m: Record<string, { staff:User; items:Availability[] }> = {}
     for (const a of items) {
+      if (!a.staff) continue; // KORREKTUR: Überspringt Einträge ohne gültigen Mitarbeiter
       const sid = typeof a.staff === 'string' ? a.staff : a.staff._id
       const staff = staffUsers.find(s => s._id === sid)
       if (!staff) continue

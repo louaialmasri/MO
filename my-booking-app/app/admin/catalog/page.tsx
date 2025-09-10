@@ -1,3 +1,5 @@
+// my-booking-app/app/admin/catalog/page.tsx
+
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
@@ -348,10 +350,7 @@ export default function AdminCatalogPage() {
                 </Stack>
                 <Divider sx={{ mb: 1 }} />
                 <List dense>
-                  {(tab === 'staff'
-                    ? (qLeft ? gStaff.filter(s=>fuzzy(`${s.firstName||''}, ${s.lastName||''} ${s.email}`, qLeft)) : gStaff)
-                    : (qLeft ? gServices.filter(s=>fuzzy(`${s.title} ${s.description||''}`, qLeft)) : gServices)
-                  ).map(item => {
+                  {(leftList as Array<GlobalStaff | GlobalService>).map(item => {
                     const id = (item as any)._id
                     const already = tab === 'staff'
                       ? assignedStaff.some(s => s._id === id)
@@ -361,7 +360,6 @@ export default function AdminCatalogPage() {
                         secondaryAction={
                           <Stack direction="row" spacing={0.5} alignItems="center">
                             
-                            {/* JETZT NUR ANZEIGEN, WENN DER STAFF-TAB AKTIV IST */}
                             {tab === 'staff' && (
                               <FormControl size="small" sx={{ minWidth: 100 }}>
                                 <Select
@@ -375,18 +373,17 @@ export default function AdminCatalogPage() {
                               </FormControl>
                             )}
 
-                            {/* NEU: Bearbeiten-Icon nur für Services */}
                             {tab === 'services' && (
                               <Tooltip title="Service bearbeiten">
                                 <IconButton onClick={() => {
                                   const serviceToEdit = gServices.find(s => s._id === id);
                                   if (serviceToEdit) {
                                     setEditingServiceId(id);
-                                    setFormService(serviceToEdit); // Formular mit vorhandenen Daten füllen
+                                    setFormService(serviceToEdit);
                                     setDlgServiceOpen(true);
                                   }
                                 }}>
-                                  <TuneIcon /> {/* Oder z.B. <EditIcon /> */}
+                                  <TuneIcon />
                                 </IconButton>
                               </Tooltip>
                             )}
@@ -404,7 +401,7 @@ export default function AdminCatalogPage() {
                           </Stack>
                         }>
                         <ListItemText
-                          primary={(item as GlobalStaff).firstName ? `${(item as GlobalStaff).lastName}` : (item as GlobalStaff).email}
+                          primary={tab === 'staff' ? `${(item as GlobalStaff).firstName} ${(item as GlobalStaff).lastName}` : (item as GlobalService).title}
                           secondary={
                             tab === 'staff'
                               ? `${(item as GlobalStaff).email} • Rolle: ${(item as GlobalStaff).role}`
@@ -426,10 +423,7 @@ export default function AdminCatalogPage() {
                 </Stack>
                 <Divider sx={{ mb: 1 }} />
                 <List dense>
-                  {(tab === 'staff'
-                    ? (qRight ? assignedStaff.filter(s=>fuzzy(`${s.firstName||''} ${s.lastName||''} ${s.email}`, qRight)) : assignedStaff)
-                    : (qRight ? assignedServices.filter(s=>fuzzy(`${s.title} ${s.price}`, qRight)) : assignedServices)
-                  ).map(item => {
+                  {(rightList as Array<GlobalStaff | GlobalService>).map(item => {
                     const id = (item as any)._id
                     return (
                       <ListItem key={id}
@@ -455,7 +449,7 @@ export default function AdminCatalogPage() {
                           </Stack>
                         }>
                         <ListItemText
-                          primary={(item as GlobalStaff).firstName ? ` ${(item as GlobalStaff).lastName}` : (item as GlobalStaff).email}
+                          primary={tab === 'staff' ? `${(item as GlobalStaff).firstName} ${(item as GlobalStaff).lastName}` : (item as GlobalService).title}
                           secondary={
                             tab === 'staff'
                               ? `${(item as GlobalStaff).email} • Rolle: ${(item as GlobalStaff).role}`
