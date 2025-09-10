@@ -6,10 +6,8 @@ import { useAuth } from '@/context/AuthContext'
 import { getUserBookings, deleteBooking, type Booking, type Service } from '@/services/api'
 import {
   Container, Typography, Card, CardContent, CardActions, Button, Box, Paper, Alert,
-  Stack,
-  CircularProgress
+  Stack, CircularProgress, Grid, Avatar
 } from '@mui/material'
-import Grid from '@mui/material/Grid'
 import { motion } from 'framer-motion'
 import dayjs from 'dayjs'
 
@@ -17,6 +15,8 @@ import dayjs from 'dayjs'
 import EventIcon from '@mui/icons-material/Event';
 import PersonIcon from '@mui/icons-material/Person';
 import CategoryIcon from '@mui/icons-material/Category';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import MoodBadIcon from '@mui/icons-material/MoodBad';
 
 type BookingWithService = Booking & { service: Service };
 
@@ -29,14 +29,11 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!loading) {
       if (!user) {
-        router.push('/login');
-        return;
+        router.push('/login'); return;
       }
       if (user.role === 'admin') {
-        router.push('/admin');
-        return;
+        router.push('/admin'); return;
       }
-
       const loadData = async () => {
         try {
           const userBookings = await getUserBookings(token!);
@@ -54,10 +51,8 @@ export default function DashboardPage() {
   const handleCancel = async (bookingId: string) => {
     try {
       const success = await deleteBooking(bookingId, token!)
-      if (success) {
-        setBookings(prev => prev.filter(b => b._id !== bookingId))
-      }
-    } catch (err) {
+      if (success) setBookings(prev => prev.filter(b => b._id !== bookingId))
+    } catch {
       alert('Fehler beim Stornieren!')
     }
   }
@@ -75,24 +70,43 @@ export default function DashboardPage() {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <Container maxWidth="lg" sx={{ py: 5 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
-          <Typography variant="h4" fontWeight={800}>Willkommen zurück, {user?.email} 👋</Typography>
-          <Button onClick={logout} variant="outlined">Logout</Button>
-        </Stack>
+      <Box sx={{ bgcolor: 'primary.main', color: 'white', py: 6, mb: 5 }}>
+        <Container maxWidth="lg">
+          <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center">
+            <Box>
+              <Typography variant="h4" fontWeight={800}>Willkommen zurück, {user?.firstName || user?.email}! 👋</Typography>
+              <Typography variant="h6" fontWeight={400} sx={{ opacity: 0.8 }}>
+                Hier ist eine Übersicht deiner Termine.
+              </Typography>
+            </Box>
+            <Button
+              variant="contained"
+              color="secondary"
+              size="large"
+              sx={{ mt: { xs: 2, md: 0 } }}
+              endIcon={<ArrowForwardIcon />}
+              onClick={() => router.push('/booking')}
+            >
+              Neuen Termin buchen
+            </Button>
+          </Stack>
+        </Container>
+      </Box>
 
+      <Container maxWidth="lg" sx={{ pb: 5 }}>
         <Typography variant="h5" fontWeight={700} sx={{ mb: 3 }}>Anstehende Termine</Typography>
         {upcomingBookings.length === 0 ? (
-          <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
-            <Typography color="text.secondary">Du hast noch keine Termine gebucht.</Typography>
+          <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+            <MoodBadIcon color="action" sx={{ fontSize: 60, opacity: 0.5 }} />
+            <Typography variant="h6" color="text.secondary">Du hast noch keine Termine gebucht.</Typography>
             <Button variant="contained" sx={{ mt: 2 }} onClick={() => router.push('/booking')}>Jetzt Buchen</Button>
           </Paper>
         ) : (
           <Grid container spacing={3}>
             {upcomingBookings.map((b) => (
-              // ⬇️ Grid v2: kein "item", stattdessen size={{ ... }}
+              // ⬇️ Grid v2: KEIN "item" und KEINE xs/md/lg-Props mehr
               <Grid key={b._id} size={{ xs: 12, md: 6, lg: 4 }}>
-                <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 4, transition: 'box-shadow 0.3s', '&:hover': { boxShadow: 6 } }}>
                   <CardContent sx={{ flexGrow: 1 }}>
                     <Typography variant="h6" fontWeight="bold" gutterBottom>
                       {b.service?.title ?? 'Service'}
@@ -114,7 +128,7 @@ export default function DashboardPage() {
                       </Stack>
                     </Stack>
                   </CardContent>
-                  <CardActions>
+                  <CardActions sx={{ px: 2, pb: 2 }}>
                     <Button size="small" color="error" onClick={() => handleCancel(b._id)}>
                       Stornieren
                     </Button>
@@ -130,7 +144,7 @@ export default function DashboardPage() {
             <Typography variant="h5" fontWeight={700} sx={{ mt: 6, mb: 3 }}>
               Vergangene Termine
             </Typography>
-            {/* Hier könnte eine Liste der vergangenen Termine implementiert werden */}
+            {/* Liste der vergangenen Termine */}
           </>
         )}
       </Container>

@@ -3,22 +3,24 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import {
   Container, Box, Stepper, Step, StepLabel, Button, Typography, CircularProgress,
-  Card, CardActionArea, CardContent, Avatar, Chip, Alert, TextField, MenuItem, Paper, Stack
+  Card, CardActionArea, CardContent, Avatar, Chip, Alert, TextField, MenuItem, Paper, Stack, Grid
 } from '@mui/material'
-import Grid from '@mui/material/Grid'
-import api, { 
-  fetchGlobalServices, // KORREKTUR: Wir nutzen explizit die globalen Services
-  fetchAllUsers, 
-  createBooking, 
-  fetchTimeslots, 
-  type Service, 
-  type User 
+import api, {
+  fetchGlobalServices,
+  fetchAllUsers,
+  createBooking,
+  fetchTimeslots,
+  type Service,
+  type User
 } from '@/services/api'
 import { useAuth } from '@/context/AuthContext'
 import dayjs from 'dayjs'
+import { motion } from 'framer-motion'
 
 // Icons
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 type Staff = { _id: string; email: string; name?: string; firstName?: string; lastName?: string; skills?: string[] }
 
@@ -27,64 +29,64 @@ const steps = ['Kunde wählen', 'Service wählen', 'Mitarbeiter wählen', 'Datum
 const getInitials = (name = '') => name ? name.split(' ').map(n => n[0]).join('').toUpperCase() : '';
 
 export default function BookingPage() {
-  const { user, token } = useAuth()
+  const { user, token, loading: authLoading } = useAuth() // Ladezustand aus useAuth verwenden
   const router = useRouter()
-  
-  const isAdminOrStaff = user?.role === 'admin' || user?.role === 'staff';
-  
-  const [activeStep, setActiveStep] = useState(isAdminOrStaff ? 0 : 1);
+
+  const [isAdminOrStaff, setIsAdminOrStaff] = useState(false);
+  const [activeStep, setActiveStep] = useState(0); // Immer bei 0 starten
 
   // Data states
   const [services, setServices] = useState<Service[]>([])
   const [allCustomers, setAllCustomers] = useState<User[]>([]);
   const [staffForService, setStaffForService] = useState<Staff[]>([])
   const [availableSlots, setAvailableSlots] = useState<string[]>([])
-  const [loading, setLoading] = useState({ services: true, staff: false, slots: false, customers: isAdminOrStaff });
+  const [loading, setLoading] = useState({ services: true, staff: false, slots: false, customers: false });
 
   // Selection states
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(isAdminOrStaff ? null : user?._id || null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [selectedService, setSelectedService] = useState<Service | null>(null)
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null)
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
-  
+
   const [error, setError] = useState('');
 
   // Lade initiale Daten
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        // KORREKTUR: Rufe immer die globalen Services ab
         const svc = await fetchGlobalServices();
         setServices(svc);
-        setLoading(p => ({...p, services: false}));
+        setLoading(p => ({ ...p, services: false }));
 
         if (isAdminOrStaff && token) {
-          // KORREKTUR: Rufe explizit alle 'user' mit der Rolle 'user' ab
+          setLoading(p => ({ ...p, customers: true }));
           const customerUsers = await fetchAllUsers(token, 'user');
           setAllCustomers(customerUsers);
-          setLoading(p => ({...p, customers: false}));
+          setLoading(p => ({ ...p, customers: false }));
         }
       } catch {
         setError('Daten konnten nicht geladen werden.');
-        setLoading(p => ({...p, services: false, customers: false}));
+        setLoading(p => ({ ...p, services: false, customers: false }));
       }
     };
-    loadInitialData();
-  }, [token, isAdminOrStaff]);
+    if (!authLoading) {
+        loadInitialData();
+    }
+  }, [token, isAdminOrStaff, authLoading]);
 
   // Lade Mitarbeiter, wenn ein Service gewählt wurde
   useEffect(() => {
     if (!selectedService) return;
     const loadStaff = async () => {
-      setLoading(p => ({...p, staff: true}));
+      setLoading(p => ({ ...p, staff: true }));
       try {
         const res = await api.get(`/staff/service/${selectedService._id}`);
         setStaffForService(res.data);
       } catch (error) {
         setError('Mitarbeiter für diesen Service konnten nicht geladen werden.');
       } finally {
-        setLoading(p => ({...p, staff: false}));
+        setLoading(p => ({ ...p, staff: false }));
       }
     };
     loadStaff();
@@ -94,7 +96,7 @@ export default function BookingPage() {
   useEffect(() => {
     if (!selectedService || !selectedStaff || !selectedDate) return;
     const loadSlots = async () => {
-      setLoading(p => ({...p, slots: true}));
+      setLoading(p => ({ ...p, slots: true }));
       setSelectedSlot(null);
       try {
         const dateStr = dayjs(selectedDate).format('YYYY-MM-DD');
@@ -103,12 +105,12 @@ export default function BookingPage() {
       } catch {
         setError('Verfügbare Zeiten konnten nicht geladen werden.');
       } finally {
-        setLoading(p => ({...p, slots: false}));
+        setLoading(p => ({ ...p, slots: false }));
       }
     }
     loadSlots();
   }, [selectedService, selectedStaff, selectedDate, token]);
-  
+
   const handleNext = () => setActiveStep((prev) => prev + 1);
   const handleBack = () => setActiveStep((prev) => prev - 1);
 
@@ -130,7 +132,7 @@ export default function BookingPage() {
       setError(e?.response?.data?.message || 'Buchung fehlgeschlagen.');
     }
   }
-  
+
   const effectiveSteps = isAdminOrStaff ? steps : steps.slice(1);
   const currentStepContent = isAdminOrStaff ? activeStep : activeStep + 1;
 
@@ -165,13 +167,14 @@ export default function BookingPage() {
               <CircularProgress />
             ) : (
               services.map((service) => (
-                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={service._id}>
+                <Grid key={service._id} size={{ xs: 12, sm: 6, md: 4 }}>
                   <Card
                     variant="outlined"
                     sx={{
-                      borderColor:
-                        selectedService?._id === service._id ? 'primary.main' : undefined,
+                      borderColor: selectedService?._id === service._id ? 'primary.main' : undefined,
                       borderWidth: selectedService?._id === service._id ? 2 : 1,
+                      borderRadius: 3,
+                      transition: 'all 0.2s'
                     }}
                   >
                     <CardActionArea
@@ -179,15 +182,14 @@ export default function BookingPage() {
                         setSelectedService(service);
                         handleNext();
                       }}
+                      sx={{ p: 2 }}
                     >
-                      <CardContent>
-                        <Typography variant="h6" gutterBottom>
-                          {service.title}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {service.duration} Minuten
-                        </Typography>
-                      </CardContent>
+                      <Typography variant="h6" gutterBottom>
+                        {service.title}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {service.duration} Minuten
+                      </Typography>
                     </CardActionArea>
                   </Card>
                 </Grid>
@@ -203,13 +205,13 @@ export default function BookingPage() {
               <CircularProgress />
             ) : (
               staffForService.map((staff) => (
-                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={staff._id}>
+                <Grid key={staff._id} size={{ xs: 12, sm: 6, md: 4 }}>
                   <Card
                     variant="outlined"
                     sx={{
-                      borderColor:
-                        selectedStaff?._id === staff._id ? 'primary.main' : undefined,
+                      borderColor: selectedStaff?._id === staff._id ? 'primary.main' : undefined,
                       borderWidth: selectedStaff?._id === staff._id ? 2 : 1,
+                      borderRadius: 3
                     }}
                   >
                     <CardActionArea
@@ -217,15 +219,14 @@ export default function BookingPage() {
                         setSelectedStaff(staff);
                         handleNext();
                       }}
+                      sx={{ p: 2, textAlign: 'center' }}
                     >
-                      <CardContent sx={{ textAlign: 'center' }}>
-                        <Avatar sx={{ width: 64, height: 64, mx: 'auto', mb: 1, bgcolor: 'primary.light' }}>
-                          {getInitials(staff.name || `${staff.firstName} ${staff.lastName}`)}
-                        </Avatar>
-                        <Typography variant="h6">
-                          {staff.name || `${staff.firstName} ${staff.lastName}`}
-                        </Typography>
-                      </CardContent>
+                      <Avatar sx={{ width: 64, height: 64, mx: 'auto', mb: 1, bgcolor: 'primary.light' }}>
+                        {getInitials(staff.name || `${staff.firstName} ${staff.lastName}`)}
+                      </Avatar>
+                      <Typography variant="h6">
+                        {staff.name || `${staff.firstName} ${staff.lastName}`}
+                      </Typography>
                     </CardActionArea>
                   </Card>
                 </Grid>
@@ -233,39 +234,45 @@ export default function BookingPage() {
             )}
           </Grid>
         );
+
       case 3:
         return (
-          <Box>
-            <Typography variant="h6" gutterBottom>Wähle ein Datum</Typography>
-            <TextField
-              type="date"
-              value={dayjs(selectedDate).format('YYYY-MM-DD')}
-              onChange={(e) => setSelectedDate(new Date(e.target.value))}
-              fullWidth
-              sx={{ mb: 3 }}
-            />
-            
-            <Typography variant="h6" gutterBottom>Wähle eine Uhrzeit</Typography>
-            {loading.slots ? <CircularProgress /> : (
-              <Stack direction="row" flexWrap="wrap" gap={1}>
-                {availableSlots.length > 0 ? availableSlots.map(slot => (
-                  <Chip
-                    key={slot}
-                    label={dayjs(slot).format('HH:mm')}
-                    onClick={() => setSelectedSlot(slot)}
-                    color={selectedSlot === slot ? 'primary' : 'default'}
-                    variant={selectedSlot === slot ? 'filled' : 'outlined'}
-                    clickable
-                  />
-                )) : <Typography color="text.secondary">Keine verfügbaren Zeiten an diesem Tag.</Typography>}
-              </Stack>
-            )}
-          </Box>
+          <Grid container spacing={3}>
+            <Grid size={{ xs: 12, md: 5 }}>
+              <Typography variant="h6" gutterBottom>Wähle ein Datum</Typography>
+              <TextField
+                type="date"
+                value={dayjs(selectedDate).format('YYYY-MM-DD')}
+                onChange={(e) => setSelectedDate(new Date(e.target.value))}
+                fullWidth
+              />
+            </Grid>
+            <Grid size={{ xs: 12, md: 7 }}>
+              <Typography variant="h6" gutterBottom>Wähle eine Uhrzeit</Typography>
+              {loading.slots ? <CircularProgress /> : (
+                <Paper variant="outlined" sx={{ p: 2, maxHeight: 300, overflowY: 'auto' }}>
+                  <Stack direction="row" flexWrap="wrap" gap={1}>
+                    {availableSlots.length > 0 ? availableSlots.map(slot => (
+                      <Chip
+                        key={slot}
+                        label={dayjs(slot).format('HH:mm')}
+                        onClick={() => setSelectedSlot(slot)}
+                        color={selectedSlot === slot ? 'primary' : 'default'}
+                        variant={selectedSlot === slot ? 'filled' : 'outlined'}
+                        clickable
+                      />
+                    )) : <Typography color="text.secondary">Keine verfügbaren Zeiten an diesem Tag.</Typography>}
+                  </Stack>
+                </Paper>
+              )}
+            </Grid>
+          </Grid>
         );
+
       case 4:
         const customer = allCustomers.find(c => c._id === selectedCustomerId) || user;
         return (
-          <Paper sx={{ p: 3 }}>
+          <Paper sx={{ p: 3, borderRadius: 4 }}>
             <Typography variant="h5" gutterBottom>Bitte bestätigen</Typography>
             <Typography><strong>Kunde:</strong> {`${customer?.firstName} ${customer?.lastName}`.trim() || customer?.email}</Typography>
             <Typography><strong>Service:</strong> {selectedService?.title}</Typography>
@@ -273,65 +280,82 @@ export default function BookingPage() {
             <Typography><strong>Datum & Zeit:</strong> {dayjs(selectedSlot).format('dd, DD.MM.YYYY [um] HH:mm [Uhr]')}</Typography>
           </Paper>
         );
+
       case 5:
         return (
           <Box sx={{ textAlign: 'center' }}>
-            <CheckCircleIcon color="success" sx={{ fontSize: 60, mb: 2 }} />
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 20 }}>
+              <CheckCircleIcon color="success" sx={{ fontSize: 60, mb: 2 }} />
+            </motion.div>
             <Typography variant="h5">Termin erfolgreich gebucht!</Typography>
             <Typography color="text.secondary">Der Kunde wurde per E-Mail benachrichtigt.</Typography>
             <Button variant="contained" sx={{ mt: 3 }} onClick={() => router.push(isAdminOrStaff ? '/admin' : '/dashboard')}>
               {isAdminOrStaff ? 'Zurück zum Kalender' : 'Zu meinen Terminen'}
             </Button>
           </Box>
-        )
+        );
+
       default:
         return <Typography>Unbekannter Schritt</Typography>;
     }
   };
 
+  // -------- unten der äußere Layout-Grid ----------
   return (
-    <Container maxWidth="md" sx={{ py: 5 }}>
-      <Stepper activeStep={activeStep} sx={{ mb: 5 }}>
-        {effectiveSteps.map((label) => (
-          <Step key={label}>
-            <StepLabel>{label}</StepLabel>
-          </Step>
-        ))}
-      </Stepper>
-      
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+    <Container maxWidth="lg" sx={{ py: 5 }}>
+      <Grid container spacing={4}>
+        <Grid size={{ xs: 12, md: 4 }}>
+          <Paper sx={{ p: 2, borderRadius: 4 }}>
+            <Stepper activeStep={activeStep} orientation="vertical">
+              {effectiveSteps.map((label, index) => (
+                <Step key={label} completed={activeStep > index}>
+                  <StepLabel>{label}</StepLabel>
+                </Step>
+              ))}
+            </Stepper>
+          </Paper>
+        </Grid>
 
-      <Box>
-        {renderStepContent(currentStepContent)}
-        
-        {activeStep < effectiveSteps.length && (
-          <Box sx={{ display: 'flex', flexDirection: 'row', pt: 4 }}>
-            <Button
-              color="inherit"
-              disabled={activeStep === 0}
-              onClick={handleBack}
-              sx={{ mr: 1 }}
-            >
-              Zurück
-            </Button>
-            <Box sx={{ flex: '1 1 auto' }} />
-            {activeStep === effectiveSteps.length - 1 ? (
-              <Button variant="contained" color="secondary" onClick={handleBookingSubmit}>
-                Termin bestätigen
-              </Button>
-            ) : (
-              <Button onClick={handleNext} disabled={
-                (currentStepContent === 0 && !selectedCustomerId) ||
-                (currentStepContent === 1 && !selectedService) ||
-                (currentStepContent === 2 && !selectedStaff) ||
-                (currentStepContent === 3 && !selectedSlot)
-              }>
-                Weiter
-              </Button>
-            )}
+        <Grid size={{ xs: 12, md: 8 }}>
+          <Box sx={{ minHeight: 400 }}>
+            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+            {renderStepContent(currentStepContent)}
           </Box>
-        )}
-      </Box>
+
+          {activeStep < effectiveSteps.length && (
+            <Box sx={{ display: 'flex', flexDirection: 'row', pt: 4, mt: 2, borderTop: 1, borderColor: 'divider' }}>
+              <Button
+                color="inherit"
+                disabled={activeStep === 0}
+                onClick={handleBack}
+                sx={{ mr: 1 }}
+                startIcon={<ArrowBackIcon />}
+              >
+                Zurück
+              </Button>
+              <Box sx={{ flex: '1 1 auto' }} />
+              {activeStep === effectiveSteps.length - 1 ? (
+                <Button variant="contained" color="secondary" onClick={handleBookingSubmit} endIcon={<CheckCircleIcon />}>
+                  Termin bestätigen
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleNext}
+                  disabled={
+                    (currentStepContent === 0 && !selectedCustomerId) ||
+                    (currentStepContent === 1 && !selectedService) ||
+                    (currentStepContent === 2 && !selectedStaff) ||
+                    (currentStepContent === 3 && !selectedSlot)
+                  }
+                  endIcon={<ArrowForwardIcon />}
+                >
+                  Weiter
+                </Button>
+              )}
+            </Box>
+          )}
+        </Grid>
+      </Grid>
     </Container>
   );
 }
