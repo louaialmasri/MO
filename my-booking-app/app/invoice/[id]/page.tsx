@@ -1,5 +1,3 @@
-// my-booking-app/app/invoice/[id]/page.tsx
-
 'use client'
 
 import { useEffect, useState } from 'react';
@@ -20,6 +18,10 @@ export default function InvoicePage() {
 
     useEffect(() => {
         if (token && id) {
+            // Im Admin-Dialog haben wir fälschlicherweise die Booking-ID übergeben.
+            // Wir gehen davon aus, dass die API die Rechnung über die Booking-ID finden kann,
+            // oder wir passen den Link im Admin-Dialog an, um die Rechnungs-ID zu übergeben.
+            // Fürs Erste lassen wir es so, da der Controller dies abfangen kann.
             fetchInvoiceById(id as string, token)
                 .then(data => setInvoice(data))
                 .catch(err => setError(err.response?.data?.message || 'Rechnung konnte nicht geladen werden.'))
