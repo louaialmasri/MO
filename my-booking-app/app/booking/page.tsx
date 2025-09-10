@@ -269,7 +269,7 @@ export default function BookingPage() {
             <Typography variant="h5" gutterBottom>Bitte bestätigen</Typography>
             <Typography><strong>Kunde:</strong> {`${customer?.firstName} ${customer?.lastName}`.trim() || customer?.email}</Typography>
             <Typography><strong>Service:</strong> {selectedService?.title}</Typography>
-            <Typography><strong>Mitarbeiter:</strong> {selectedStaff?.name || `${selectedStaff?.firstName} ${selectedStaff?.lastName}`}</Typography>
+            <Typography><strong>Mitarbeiter:</strong> {`${selectedStaff?.firstName} ${selectedStaff?.lastName}`.trim() || selectedStaff?.email}</Typography>
             <Typography><strong>Datum & Zeit:</strong> {dayjs(selectedSlot).format('dd, DD.MM.YYYY [um] HH:mm [Uhr]')}</Typography>
           </Paper>
         );

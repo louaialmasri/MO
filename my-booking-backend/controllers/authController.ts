@@ -27,10 +27,11 @@ export const login = async (req: Request, res: Response) => {
       role: user.role
     })
     
-    const safeUser = { ...user.toObject() };
-    delete (safeUser as any).password;
+    // KORREKTUR: Typsicheres Entfernen des Passworts
+    const userObject = user.toObject();
+    delete (userObject as any).password;
 
-    return res.json({ success: true, token, user: safeUser })
+    return res.json({ success: true, token, user: userObject })
   } catch (err) {
     console.error('Login error:', err)
     return res.status(500).json({ success: false, message: 'Serverfehler beim Login' })
@@ -64,6 +65,7 @@ export const register = async (req: Request, res: Response) => {
 
     await newUser.save();
 
+    // KORREKTUR: Typsicheres Entfernen des Passworts
     const safeUser = { ...newUser.toObject() };
     delete (safeUser as any).password;
 
@@ -73,6 +75,10 @@ export const register = async (req: Request, res: Response) => {
     console.error('Registration error:', err);
     if (err.code === 11000) {
       return res.status(409).json({ message: 'Diese E-Mail-Adresse ist bereits vergeben.' });
+    }
+    // Detailliertere Fehlermeldung bei Validierungsfehlern
+    if (err.name === 'ValidationError') {
+        return res.status(400).json({ message: 'Validierungsfehler', details: err.errors });
     }
     return res.status(500).json({ message: 'Serverfehler bei der Registrierung' });
   }

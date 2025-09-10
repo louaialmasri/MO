@@ -404,7 +404,7 @@ export default function AdminCatalogPage() {
                           </Stack>
                         }>
                         <ListItemText
-                          primary={(item as GlobalStaff).firstName ? `${(item as GlobalStaff).firstName} ${(item as GlobalStaff).lastName}` : (item as GlobalStaff).email}
+                          primary={(item as GlobalStaff).firstName ? `${(item as GlobalStaff).lastName}` : (item as GlobalStaff).email}
                           secondary={
                             tab === 'staff'
                               ? `${(item as GlobalStaff).email} • Rolle: ${(item as GlobalStaff).role}`
@@ -455,7 +455,7 @@ export default function AdminCatalogPage() {
                           </Stack>
                         }>
                         <ListItemText
-                          primary={(item as GlobalStaff).firstName ? `${(item as GlobalStaff).firstName} ${(item as GlobalStaff).lastName}` : (item as GlobalStaff).email}
+                          primary={(item as GlobalStaff).firstName ? ` ${(item as GlobalStaff).lastName}` : (item as GlobalStaff).email}
                           secondary={
                             tab === 'staff'
                               ? `${(item as GlobalStaff).email} • Rolle: ${(item as GlobalStaff).role}`

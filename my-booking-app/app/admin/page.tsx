@@ -122,13 +122,16 @@ function AdminPage() {
 
   const calendarEvents = useMemo(() => {
     return bookings
-    .filter(b => b.staff?._id)
+    .filter(b => b.staff?._id && b.user && typeof b.user === 'object')
     .map((b) => {
         const service = services.find(s => s._id === (b.service?._id || b.serviceId));
         const start = new Date(b.dateTime);
         const duration = service?.duration ?? 30;
         const end = new Date(start.getTime() + duration * 60000);
         const staffId = b.staff?._id;
+
+        const customerUser = b.user as User;
+        const customerName = `${customerUser.firstName} ${customerUser.lastName}`.trim() || customerUser.email || 'Kunde';
 
         return {
             id: b._id,
@@ -137,7 +140,7 @@ function AdminPage() {
             end: end.toISOString(),
             resourceId: staffId,
             extendedProps: {
-                customer: (typeof b.user === 'object' && ((b.user as User).firstName || (b.user as User).name)) ? `${(b.user as User).firstName} ${(b.user as User).lastName}` : 'Kunde',
+                customer: customerName,
             },
             backgroundColor: staffColors.get(staffId!) || '#8D6E63',
             borderColor: staffColors.get(staffId!) || '#8D6E63',
