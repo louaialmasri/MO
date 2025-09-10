@@ -28,6 +28,7 @@ export type Booking = {
   serviceId: string
   dateTime: string
   service: Service; // Hinzugefügt für das Dashboard
+  staff: User;
 }
 
 export type StaffBooking  = {

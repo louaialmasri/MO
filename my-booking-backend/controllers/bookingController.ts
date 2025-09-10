@@ -81,8 +81,8 @@ export const getUserBookings = async (req: AuthRequest, res: Response) => {
     }
 
     const bookings = await Booking.find({ user: userId })
-      .populate('service', 'name duration')
-      .populate('staff', 'email name')
+      .populate('service', 'title duration')
+      .populate('staff', 'firstName lastName email') // Geändert: firstName und lastName werden jetzt geladen
 
     res.status(200).json({ success: true, bookings })
   } catch (error) {
