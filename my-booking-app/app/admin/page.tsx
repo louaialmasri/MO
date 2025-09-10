@@ -4,13 +4,14 @@
 
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState, useRef, useLayoutEffect } from 'react' // useLayoutEffect hinzufügen
+import { useEffect, useMemo, useState, useRef, useLayoutEffect } from 'react'
 import {
   fetchServices,
   getAllBookings,
   deleteBooking,
   fetchAllUsers,
   updateBooking,
+  markBookingAsPaid,
 } from '@/services/api'
 import dynamic from 'next/dynamic'
 import {
@@ -52,63 +53,45 @@ type BookingFull = {
   service?: { _id: string; title: string; duration?: number }
   serviceId?: string
   dateTime: string
+  status: 'confirmed' | 'paid' | 'cancelled';
+  invoiceNumber?: string;
 }
 
 const getInitials = (name = '') => name.split(' ').map(n => n[0]).join('').toUpperCase();
 
-
-// NEUE KOMPONENTE für den Event-Inhalt
-interface CalendarEventContentProps {
-  arg: any; // FullCalendar eventContent argument
-}
-
-const CalendarEventContent: React.FC<CalendarEventContentProps> = ({ arg }) => {
+const CalendarEventContent: React.FC<{ arg: any }> = ({ arg }) => {
   const eventRef = useRef<HTMLDivElement>(null);
   const [eventHeight, setEventHeight] = useState(0);
 
-  // Misst die Höhe des Events nach dem Rendern
   useLayoutEffect(() => {
     if (eventRef.current) {
       setEventHeight(eventRef.current.offsetHeight);
     }
-  }, [arg.event.start, arg.event.end]); // Abhängigkeiten, die bei Änderung die Höhe neu berechnen lassen
+  }, [arg.event.start, arg.event.end]);
 
-  // Logik zur Anpassung der Schriftgrößen basierend auf der Höhe
-  const isCompact = eventHeight < 60; // Beispiel-Schwellenwert, kann angepasst werden
-  const isSuperCompact = eventHeight < 40; // Für sehr kurze Termine
+  const showTime = eventHeight > 20;
+  const showService = eventHeight > 35;
 
-  let timeFontSize = '0.75rem'; // caption
-  let customerFontSize = '0.875rem'; // body2
-  let serviceFontSize = '0.75rem'; // caption
+  let timeFontSize = '0.75rem';
+  let customerFontSize = '0.875rem';
+  let serviceFontSize = '0.75rem';
 
-  if (isSuperCompact) {
+  if (eventHeight < 40) {
     timeFontSize = '0.65rem';
     customerFontSize = '0.75rem';
     serviceFontSize = '0.65rem';
-  } else if (isCompact) {
+  } else if (eventHeight < 60) {
     timeFontSize = '0.7rem';
     customerFontSize = '0.8rem';
     serviceFontSize = '0.7rem';
   }
 
-  // Bestimmt die Reihenfolge und Sichtbarkeit der Elemente
-  // Bei sehr kurzen Terminen könnte man z.B. den Service-Titel weglassen
-  const showTime = eventHeight > 20; // Nur Zeit anzeigen, wenn genug Platz ist
-  const showService = eventHeight > 35; // Service anzeigen, wenn etwas mehr Platz ist
-
   return (
     <Box
-      ref={eventRef} // Referenz für die Höhenmessung
+      ref={eventRef}
       sx={{
-        px: 1,
-        py: '2px',
-        overflow: 'hidden',
-        height: '100%',
-        color: 'white',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'flex-start', // Startet oben, flex-end für unten, space-between für Verteilung
-        // Hier können weitere dynamische Styles für den gesamten Container hinzugefügt werden
+        px: 1, py: '2px', overflow: 'hidden', height: '100%', color: 'white',
+        display: 'flex', flexDirection: 'column',
       }}
     >
       {showTime && (
@@ -128,7 +111,6 @@ const CalendarEventContent: React.FC<CalendarEventContentProps> = ({ arg }) => {
   );
 };
 
-
 function AdminPage() {
   const { user, token } = useAuth()
   const router = useRouter()
@@ -137,6 +119,7 @@ function AdminPage() {
   const [users, setUsers] = useState<User[]>([])
   const [openEvent, setOpenEvent] = useState(false)
   const [activeBooking, setActiveBooking] = useState<BookingFull | null>(null)
+  const [editMode, setEditMode] = useState(false); // KORREKTUR: Neuer State für den Bearbeitungsmodus
   const [edit, setEdit] = useState<{dateTime: string; serviceId: string; staffId: string}>({
     dateTime: '', serviceId: '', staffId: ''
   })
@@ -152,6 +135,7 @@ function AdminPage() {
     });
     return colorMap;
   }, [staffUsers]);
+
 
   useEffect(() => {
     if (!user || user.role !== 'admin') {
@@ -176,6 +160,7 @@ function AdminPage() {
     fetchData()
   }, [user, token, router])
 
+
   const openDialogFor = (bookingId: string) => {
     const b = bookings.find(x => x._id === bookingId)
     if (!b) return
@@ -185,9 +170,14 @@ function AdminPage() {
       serviceId: b.service?._id || b.serviceId || '',
       staffId: b.staff?._id || ''
     })
+    setEditMode(false); // KORREKTUR: Bearbeitungsmodus zurücksetzen
     setOpenEvent(true)
   }
-  const closeDialog = () => { setOpenEvent(false); setActiveBooking(null) }
+  const closeDialog = () => { 
+    setOpenEvent(false); 
+    setActiveBooking(null);
+    setEditMode(false); // KORREKTUR: Bearbeitungsmodus zurücksetzen
+  }
 
   const calendarEvents = useMemo(() => {
     return bookings
@@ -223,6 +213,7 @@ function AdminPage() {
       title: `${s.firstName} ${s.lastName}` || s.name || s.email,
     }));
   }, [staffUsers]);
+
 
   const handleEventDrop = async (info: any) => {
     const { event } = info;
@@ -307,47 +298,38 @@ function AdminPage() {
             </Paper>
 
             <Dialog open={openEvent} onClose={closeDialog} fullWidth maxWidth="xs">
-                <DialogTitle>Buchung bearbeiten</DialogTitle>
+                <DialogTitle>{editMode ? 'Buchung bearbeiten' : 'Buchungsdetails'}</DialogTitle>
                 <DialogContent sx={{ display:'flex', flexDirection:'column', gap:2, pt:2 }}>
                     {activeBooking && (
-                        <>
+                        editMode ? (
+                            <>
+                                <TextField
+                                    label="Datum & Uhrzeit"
+                                    type="datetime-local"
+                                    value={edit.dateTime}
+                                    onChange={(e)=> setEdit({...edit, dateTime: e.target.value})}
+                                    InputLabelProps={{ shrink:true }}
+                                />
+                                <TextField select label="Service" value={edit.serviceId} onChange={(e)=> setEdit({...edit, serviceId: e.target.value})}>
+                                    {services.map(s => <MenuItem key={s._id} value={s._id}>{s.title}</MenuItem>)}
+                                </TextField>
+                                <TextField select label="Mitarbeiter" value={edit.staffId} onChange={(e)=> setEdit({...edit, staffId: e.target.value})}>
+                                    {staffUsers
+                                    .filter(s => Array.isArray(s.skills) && s.skills.some((sk: any) => sk._id === edit.serviceId))
+                                    .map(s => <MenuItem key={s._id} value={s._id}>{s.name || `${s.firstName} ${s.lastName}`}</MenuItem>)}
+                                </TextField>
+                            </>
+                        ) : (
                             <Typography variant="body1">
                                 Kunde: <strong>{(typeof activeBooking.user === 'object' && ((activeBooking.user as User).firstName || (activeBooking.user as User).name)) ? `${(activeBooking.user as User).firstName} ${(activeBooking.user as User).lastName}` : 'Unbekannt'}</strong>
                             </Typography>
-
-                            <TextField
-                                label="Datum & Uhrzeit"
-                                type="datetime-local"
-                                value={edit.dateTime}
-                                onChange={(e)=> setEdit({...edit, dateTime: e.target.value})}
-                                InputLabelProps={{ shrink:true }}
-                            />
-                            <TextField select label="Service" value={edit.serviceId} onChange={(e)=> setEdit({...edit, serviceId: e.target.value})}>
-                                {services.map(s => <MenuItem key={s._id} value={s._id}>{s.title}</MenuItem>)}
-                            </TextField>
-                            <TextField select label="Mitarbeiter" value={edit.staffId} onChange={(e)=> setEdit({...edit, staffId: e.target.value})}>
-                                {staffUsers
-                                .filter(s => Array.isArray(s.skills) && s.skills.some((sk: any) => sk._id === edit.serviceId))
-                                .map(s => <MenuItem key={s._id} value={s._id}>{s.name || `${s.firstName} ${s.lastName}`}</MenuItem>)}
-                            </TextField>
-                        </>
+                        )
                     )}
                 </DialogContent>
                 <DialogActions sx={{ p: '16px 24px' }}>
-                    <Button onClick={closeDialog}>Abbrechen</Button>
-                    {activeBooking && (
+                    {editMode ? (
                         <>
-                            <Button
-                                color="error"
-                                onClick={async () => {
-                                    if (!activeBooking) return;
-                                    await deleteBooking(activeBooking._id, token!);
-                                    setBookings(prev => prev.filter(b => b._id !== activeBooking._id));
-                                    closeDialog();
-                                }}
-                            >
-                                Löschen
-                            </Button>
+                            <Button onClick={() => setEditMode(false)}>Abbrechen</Button>
                             <Button
                                 variant="contained"
                                 onClick={async ()=> {
@@ -365,6 +347,38 @@ function AdminPage() {
                                 Speichern
                             </Button>
                         </>
+                    ) : (
+                       <>
+                         <Button onClick={closeDialog}>Schließen</Button>
+                         <Button onClick={() => setEditMode(true)}>Bearbeiten</Button>
+                         {activeBooking?.status === 'paid' ? (
+                             <Button 
+                                 variant="contained" 
+                                 onClick={() => router.push(`/invoice/${activeBooking._id}`)}
+                             >
+                                 Rechnung ansehen
+                             </Button>
+                         ) : (
+                             <Button 
+                                 variant="contained" 
+                                 color="success"
+                                 onClick={async () => {
+                                     if (!activeBooking || !token) return;
+                                     try {
+                                         await markBookingAsPaid(activeBooking._id, 'cash', token);
+                                         const updatedBookings = await getAllBookings(token!);
+                                         setBookings(updatedBookings);
+                                         closeDialog();
+                                     } catch (err) {
+                                         console.error(err);
+                                         alert('Fehler beim Bezahlen.');
+                                     }
+                                 }}
+                             >
+                                 Bar bezahlt
+                             </Button>
+                         )}
+                       </>
                     )}
                 </DialogActions>
             </Dialog>

@@ -17,6 +17,7 @@ import assignmentRoutes from './routes/assignments'
 import adminCatalogRoutes from './routes/adminCatalog'
 import availabilityTemplateRoutes from './routes/availabilityTemplates'
 import staffRoutes from './routes/staff';
+import invoiceRoutes from './routes/invoice';
 
 
 const app = express()
@@ -51,6 +52,7 @@ app.use('/api/assignments', activeSalon, assignmentRoutes)
 app.use('/api/admin', adminCatalogRoutes)
 app.use('/api/availability-templates', availabilityTemplateRoutes)
 app.use('/api/staff', staffRoutes);
+app.use('/api/invoices', activeSalon, invoiceRoutes);
 
 app.listen(PORT, () => {
   console.log(`🚀 Backend läuft auf http://localhost:${PORT}`)

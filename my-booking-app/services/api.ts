@@ -52,6 +52,19 @@ export type Availability = {
   note?: string
 }
 
+export type Invoice = {
+  _id: string;
+  invoiceNumber: string;
+  date: string;
+  amount: number;
+  paymentMethod: 'cash' | 'card';
+  customer: { firstName: string; lastName: string; email: string; };
+  service: { title: string; price: number; duration: number; };
+  staff: { firstName: string; lastName: string; };
+  salon: { name: string; address?: string; phone?: string; email?: string; };
+  booking: string;
+};
+
 // --- Global Types ---
 export type Salon = { _id: string; name: string; logoUrl?: string }
 
@@ -520,6 +533,27 @@ export async function deleteTemplateApi(id: string) {
 export async function applyTemplateApi(payload: { templateId: string; weekStart: string; weeks?: number; replace?: boolean }) {
   const res = await api.post(`/availability-templates/apply`, payload)
   return res.data as { success: boolean; created: number; replaced: number }
+}
+
+export async function markBookingAsPaid(bookingId: string, paymentMethod: 'cash', token: string) {
+  const res = await api.post(`/bookings/${bookingId}/pay`, { paymentMethod }, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data;
+}
+
+export async function fetchInvoiceById(invoiceId: string, token: string): Promise<Invoice> {
+  const res = await api.get(`/invoices/${invoiceId}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data;
+}
+
+export async function fetchUserInvoices(token: string): Promise<Invoice[]> {
+  const res = await api.get('/invoices/user', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data;
 }
 
 export default api

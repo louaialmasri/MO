@@ -8,6 +8,8 @@ import { Availability } from '../models/Availability'
 import { StaffSalon } from '../models/StaffSalon'
 import { ServiceSalon } from '../models/ServiceSalon'
 import { SalonRequest } from '../middlewares/activeSalon'
+import { Invoice } from '../models/Invoice';
+import dayjs from 'dayjs'
 
 // Booking erstellen
 export const createBooking = async (req: AuthRequest & SalonRequest, res: Response) => {
@@ -381,3 +383,58 @@ async function ensureNoConflicts(staffId: string, startISO: string, serviceId: s
 
   return { ok: true }
 }
+
+// Buchung als bezahlt markieren und Rechnung erstellen
+export const markAsPaid = async (req: AuthRequest & SalonRequest, res: Response) => {
+    const { id } = req.params;
+    const { paymentMethod } = req.body;
+
+    if (paymentMethod !== 'cash') {
+        return res.status(400).json({ message: 'Nur Barzahlung ist derzeit implementiert.' });
+    }
+
+    try {
+        const booking = await Booking.findById(id).populate('service');
+        if (!booking) {
+            return res.status(404).json({ message: 'Buchung nicht gefunden' });
+        }
+
+        if (booking.status === 'paid') {
+            return res.status(400).json({ message: 'Diese Buchung wurde bereits bezahlt.' });
+        }
+
+        // Einfache Rechnungsnummer generieren (z.B. 20250910-1)
+        const today = new Date();
+        const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+        const countToday = await Invoice.countDocuments({ date: { $gte: dayjs(today).startOf('day').toDate() } });
+        const invoiceNumber = `${dateStr}-${countToday + 1}`;
+
+        // Service-Preis aus der Buchung übernehmen
+        const servicePrice = (booking.service as any).price;
+
+        const newInvoice = new Invoice({
+            invoiceNumber,
+            booking: booking._id,
+            customer: booking.user,
+            service: booking.service,
+            staff: booking.staff,
+            salon: req.salonId, // Salon-ID aus der Middleware
+            amount: servicePrice,
+            paymentMethod,
+        });
+
+        await newInvoice.save();
+
+        // Buchung aktualisieren
+        booking.status = 'paid';
+        booking.paymentMethod = paymentMethod;
+        booking.invoiceNumber = invoiceNumber;
+        await booking.save();
+
+        res.json({ message: 'Buchung als bezahlt markiert und Rechnung erstellt.', booking, invoice: newInvoice });
+
+    } catch (error) {
+        console.error("Fehler beim Markieren als bezahlt:", error);
+        res.status(500).json({ message: 'Serverfehler' });
+    }
+};

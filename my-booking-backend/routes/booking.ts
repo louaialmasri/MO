@@ -12,6 +12,7 @@ import {
 import { getStaffBookings } from '../controllers/bookingController'
 import { verifyStaff } from '../middlewares/staffMiddleware'
 import { activeSalon } from '../middlewares/activeSalon'
+import { markAsPaid } from '../controllers/bookingController';
 
 
 const router = express.Router()
@@ -25,6 +26,8 @@ router.get('/all', verifyToken, getAllBookings)
 router.get('/user', verifyToken, getUserBookings)
 router.get('/', getAllBookings)
 router.get('/staff', verifyToken, verifyStaff, getStaffBookings)
+
+router.post('/:id/pay', verifyToken, verifyAdmin, markAsPaid);
 
 router.patch('/bookings/:id', verifyToken, updateBooking)
 
