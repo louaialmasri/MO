@@ -3,15 +3,14 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { register as registerRequest } from '@/services/api'
-import { Box, Button, TextField, Typography } from '@mui/material'
+import { Box, Button, TextField, Typography, Stack } from '@mui/material'
 import { motion } from 'framer-motion'
 
 export default function RegisterPage() {
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [name, setName] = useState('')
-  const [address, setAddress] = useState('')
-  const [phone, setPhone] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const router = useRouter()
@@ -20,9 +19,14 @@ export default function RegisterPage() {
     setError('')
     setSuccess(false)
 
+    if (!firstName || !lastName) {
+      setError('Bitte Vor- und Nachnamen eingeben.');
+      return;
+    }
+
     try {
-      const res = await registerRequest(email, password, name, address, phone)
-      if (res.success || res.message === 'Benutzer erfolgreich erstellt') {
+      const res = await registerRequest(email, password, firstName, lastName) // Angepasst an die neue API-Funktion
+      if (res.user) {
         setSuccess(true)
         setTimeout(() => {
           router.push('/login')
@@ -36,34 +40,30 @@ export default function RegisterPage() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.3 }}
-    >
-      <Box display="flex" flexDirection="column" maxWidth={400} margin="auto" gap={3} mt={10}>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <Box display="flex" flexDirection="column" maxWidth={400} margin="auto" gap={2} mt={10} p={2}>
         <Typography variant="h5">Registrieren</Typography>
 
-        <TextField
-          label="Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-        />
-        <TextField
-          label="Adresse"
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          required
-        />
-        <TextField
-          label="Telefonnummer"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-        />
+        <Stack direction="row" spacing={2}>
+          <TextField
+            label="Vorname"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            required
+            fullWidth
+          />
+          <TextField
+            label="Nachname"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            required
+            fullWidth
+          />
+        </Stack>
+        
         <TextField
           label="E-Mail"
+          type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
@@ -77,13 +77,13 @@ export default function RegisterPage() {
         />
 
         {error && <Typography color="error">{error}</Typography>}
-        {success && <Typography color="primary">✅ Erfolgreich registriert</Typography>}
+        {success && <Typography color="primary">✅ Erfolgreich registriert. Du wirst weitergeleitet...</Typography>}
 
         <Button variant="contained" onClick={handleRegister}>
-          Registrieren
+          Konto erstellen
         </Button>
 
-        <Button variant="outlined" onClick={() => router.push('/login')}>
+        <Button variant="text" onClick={() => router.push('/login')}>
           Schon einen Account? Einloggen
         </Button>
       </Box>

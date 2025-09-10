@@ -6,9 +6,11 @@ export type User = {
   _id: string
   email: string
   role: 'user' | 'admin' | 'staff'
-  name?: string;
   firstName?: string;
   lastName?: string;
+  address?: string; // Hinzugefügt
+  phone?: string;   // Hinzugefügt
+  skills?: { _id: string; title?: string }[];
 }
 
 export type Service = {
@@ -53,12 +55,10 @@ export type Availability = {
 // --- Global Types ---
 export type Salon = { _id: string; name: string; logoUrl?: string }
 
-// KORREKTUR: Auch der GlobalStaff-Typ wird vervollständigt.
 export type GlobalStaff = {
   _id: string
   email: string
   role: 'user' | 'staff' | 'admin'
-  name?: string
   firstName?: string;
   lastName?: string;
   skills?: Array<string | { _id: string; title?: string }>
@@ -220,7 +220,8 @@ export async function login(email: string, password: string) {
 export async function register(
   email: string,
   password: string,
-  name?: string,
+  firstName: string,
+  lastName: string,
   address?: string,
   phone?: string,
   role: 'user' | 'staff' | 'admin' = 'user'
@@ -228,7 +229,8 @@ export async function register(
   const res = await api.post('/register', {
     email,
     password,
-    name,
+    firstName,
+    lastName,
     address,
     phone,
     role,
