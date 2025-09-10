@@ -18,10 +18,6 @@ export default function InvoicePage() {
 
     useEffect(() => {
         if (token && id) {
-            // Im Admin-Dialog haben wir fälschlicherweise die Booking-ID übergeben.
-            // Wir gehen davon aus, dass die API die Rechnung über die Booking-ID finden kann,
-            // oder wir passen den Link im Admin-Dialog an, um die Rechnungs-ID zu übergeben.
-            // Fürs Erste lassen wir es so, da der Controller dies abfangen kann.
             fetchInvoiceById(id as string, token)
                 .then(data => setInvoice(data))
                 .catch(err => setError(err.response?.data?.message || 'Rechnung konnte nicht geladen werden.'))
@@ -52,15 +48,16 @@ export default function InvoicePage() {
                         <Typography variant="h5" color="text.secondary">Rechnung</Typography>
                     </Box>
 
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 4 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', mt: 3 }}>
                         <Box>
-                            <Typography fontWeight="bold">Rechnung an:</Typography>
-                            <Typography>{invoice.customer.firstName} {invoice.customer.lastName}</Typography>
-                            <Typography>{invoice.customer.email}</Typography>
+                            <Typography variant="body2">Zahlungsmethode: {invoice.paymentMethod === 'cash' ? 'Barzahlung' : 'Karte'}</Typography>
                         </Box>
                         <Box sx={{ textAlign: 'right' }}>
-                            <Typography><strong>Rechnungsnr.:</strong> {invoice.invoiceNumber}</Typography>
-                            <Typography><strong>Datum:</strong> {dayjs(invoice.date).format('DD.MM.YYYY')}</Typography>
+                            <Typography>Betrag: {invoice.amount.toFixed(2)} €</Typography>
+                            <Typography>Gegeben: {invoice.amountGiven?.toFixed(2) ?? invoice.amount.toFixed(2)} €</Typography>
+                            <Typography>Rückgeld: {invoice.change?.toFixed(2) ?? '0.00'} €</Typography>
+                            <Divider sx={{ my: 1 }}/>
+                            <Typography variant="h6"><strong>Gesamt: {invoice.amount.toFixed(2)} €</strong></Typography>
                         </Box>
                     </Box>
 

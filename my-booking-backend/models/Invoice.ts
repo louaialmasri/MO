@@ -1,5 +1,3 @@
-// my-booking-backend/models/Invoice.ts
-
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IInvoice extends Document {
@@ -11,6 +9,8 @@ export interface IInvoice extends Document {
   salon: mongoose.Types.ObjectId;
   date: Date;
   amount: number;
+  amountGiven?: number; // NEU
+  change?: number;      // NEU
   paymentMethod: 'cash' | 'card';
 }
 
@@ -23,6 +23,8 @@ const invoiceSchema = new Schema({
   salon: { type: Schema.Types.ObjectId, ref: 'Salon' },
   date: { type: Date, default: Date.now },
   amount: { type: Number, required: true },
+  amountGiven: { type: Number }, // NEU
+  change: { type: Number },      // NEU
   paymentMethod: { type: String, enum: ['cash', 'card'], required: true },
 }, { timestamps: true });
 

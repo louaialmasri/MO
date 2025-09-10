@@ -26,6 +26,7 @@ import type { Service } from '@/services/api'
 import dayjs from 'dayjs'
 import 'dayjs/locale/de';
 import AdminBreadcrumbs from '@/components/AdminBreadcrumbs'
+import PaymentIcon from '@mui/icons-material/Payment';
 
 // Icons
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
@@ -135,6 +136,36 @@ function AdminPage() {
     });
     return colorMap;
   }, [staffUsers]);
+
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+    const [amountGiven, setAmountGiven] = useState('');
+    
+    const servicePrice = (activeBooking?.service as any)?.price || 0;
+    const change = parseFloat(amountGiven) >= servicePrice ? parseFloat(amountGiven) - servicePrice : 0;
+
+    const handleOpenPaymentDialog = () => {
+        setAmountGiven(String(servicePrice)); // Standardmäßig den exakten Betrag eintragen
+        setPaymentDialogOpen(true);
+    };
+
+    const handleClosePaymentDialog = () => {
+        setPaymentDialogOpen(false);
+        setAmountGiven('');
+    };
+
+    const handlePaymentSubmit = async () => {
+        if (!activeBooking || !token) return;
+        try {
+            await markBookingAsPaid(activeBooking._id, 'cash', parseFloat(amountGiven), token);
+            const updatedBookings = await getAllBookings(token);
+            setBookings(updatedBookings);
+            handleClosePaymentDialog();
+            closeDialog(); // Schließt den Haupt-Dialog
+        } catch (err) {
+            console.error(err);
+            alert('Fehler beim Bezahlen.');
+        }
+    };
 
 
   useEffect(() => {
@@ -326,60 +357,62 @@ function AdminPage() {
                         )
                     )}
                 </DialogContent>
-                <DialogActions sx={{ p: '16px 24px' }}>
-                    {editMode ? (
-                        <>
-                            <Button onClick={() => setEditMode(false)}>Abbrechen</Button>
-                            <Button
-                                variant="contained"
-                                onClick={async ()=> {
-                                if (!activeBooking) return;
-                                await updateBooking(activeBooking._id, {
-                                    dateTime: new Date(edit.dateTime).toISOString(),
-                                    serviceId: edit.serviceId,
-                                    staffId: edit.staffId,
-                                }, token!);
-                                const updatedBookings = await getAllBookings(token!);
-                                setBookings(updatedBookings);
-                                closeDialog();
-                                }}
-                            >
-                                Speichern
-                            </Button>
-                        </>
-                    ) : (
-                       <>
-                         <Button onClick={closeDialog}>Schließen</Button>
-                         <Button onClick={() => setEditMode(true)}>Bearbeiten</Button>
-                         {activeBooking?.status === 'paid' ? (
-                             <Button 
-                                 variant="contained" 
-                                 onClick={() => router.push(`/invoice/${activeBooking._id}`)}
-                             >
-                                 Rechnung ansehen
-                             </Button>
-                         ) : (
-                             <Button 
-                                 variant="contained" 
-                                 color="success"
-                                 onClick={async () => {
-                                     if (!activeBooking || !token) return;
-                                     try {
-                                         await markBookingAsPaid(activeBooking._id, 'cash', token);
-                                         const updatedBookings = await getAllBookings(token!);
-                                         setBookings(updatedBookings);
-                                         closeDialog();
-                                     } catch (err) {
-                                         console.error(err);
-                                         alert('Fehler beim Bezahlen.');
-                                     }
-                                 }}
-                             >
-                                 Bar bezahlt
-                             </Button>
-                         )}
-                       </>
-                    )}
+                <DialogActions sx={{ p: '16px 24px', justifyContent: 'space-between' }}>
+                  <Box>
+                      <Button onClick={closeDialog}>Schließen</Button>
+                      <Button onClick={() => setEditMode(true)}>Bearbeiten</Button>
+                  </Box>
+                  <Box>
+                      {activeBooking?.status === 'paid' ? (
+                          <Button 
+                              variant="contained" 
+                              onClick={() => router.push(`/invoice/${activeBooking.invoiceNumber}`)} // WICHTIG: Auf Rechnungsnummer geändert
+                          >
+                              Rechnung ansehen
+                          </Button>
+                      ) : (
+                          <Button 
+                              variant="contained" 
+                              color="success"
+                              startIcon={<PaymentIcon />}
+                              onClick={handleOpenPaymentDialog}
+                          >
+                              Bezahlen
+                          </Button>
+                      )}
+                  </Box>
+              </DialogActions>
+            </Dialog>
+            {/* NEUER DIALOG für den Bezahlvorgang */}
+            <Dialog open={paymentDialogOpen} onClose={handleClosePaymentDialog}>
+                <DialogTitle>Barzahlung</DialogTitle>
+                <DialogContent>
+                    <Stack spacing={2} sx={{ mt: 1, minWidth: '300px' }}>
+                        <Typography variant="h6">
+                            Zu zahlen: <strong>{servicePrice.toFixed(2)} €</strong>
+                        </Typography>
+                        <TextField
+                            label="Gegeben"
+                            type="number"
+                            value={amountGiven}
+                            onChange={(e) => setAmountGiven(e.target.value)}
+                            InputProps={{ endAdornment: '€' }}
+                            autoFocus
+                        />
+                        <Typography variant="h6" color={change > 0 ? 'primary' : 'text.secondary'}>
+                            Rückgeld: <strong>{change.toFixed(2)} €</strong>
+                        </Typography>
+                    </Stack>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleClosePaymentDialog}>Abbrechen</Button>
+                    <Button
+                        variant="contained"
+                        onClick={handlePaymentSubmit}
+                        disabled={parseFloat(amountGiven) < servicePrice}
+                    >
+                        Zahlung bestätigen
+                    </Button>
                 </DialogActions>
             </Dialog>
         </Container>

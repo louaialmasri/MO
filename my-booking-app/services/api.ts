@@ -63,6 +63,8 @@ export type Invoice = {
   staff: { firstName: string; lastName: string; };
   salon: { name: string; address?: string; phone?: string; email?: string; };
   booking: string;
+  amountGiven?: number;
+  change?: number;
 };
 
 // --- Global Types ---
@@ -535,8 +537,8 @@ export async function applyTemplateApi(payload: { templateId: string; weekStart:
   return res.data as { success: boolean; created: number; replaced: number }
 }
 
-export async function markBookingAsPaid(bookingId: string, paymentMethod: 'cash', token: string) {
-  const res = await api.post(`/bookings/${bookingId}/pay`, { paymentMethod }, {
+export async function markBookingAsPaid(bookingId: string, paymentMethod: 'cash', amountGiven: number, token: string) {
+  const res = await api.post(`/bookings/${bookingId}/pay`, { paymentMethod, amountGiven }, {
     headers: { Authorization: `Bearer ${token}` }
   });
   return res.data;

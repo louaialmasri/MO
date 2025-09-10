@@ -387,7 +387,7 @@ async function ensureNoConflicts(staffId: string, startISO: string, serviceId: s
 // Buchung als bezahlt markieren und Rechnung erstellen
 export const markAsPaid = async (req: AuthRequest & SalonRequest, res: Response) => {
     const { id } = req.params;
-    const { paymentMethod } = req.body;
+    const { paymentMethod, amountGiven } = req.body;
 
     if (paymentMethod !== 'cash') {
         return res.status(400).json({ message: 'Nur Barzahlung ist derzeit implementiert.' });
@@ -403,14 +403,19 @@ export const markAsPaid = async (req: AuthRequest & SalonRequest, res: Response)
             return res.status(400).json({ message: 'Diese Buchung wurde bereits bezahlt.' });
         }
 
-        // Einfache Rechnungsnummer generieren (z.B. 20250910-1)
         const today = new Date();
         const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
         const countToday = await Invoice.countDocuments({ date: { $gte: dayjs(today).startOf('day').toDate() } });
         const invoiceNumber = `${dateStr}-${countToday + 1}`;
 
-        // Service-Preis aus der Buchung übernehmen
         const servicePrice = (booking.service as any).price;
+
+        // KORREKTUR: Rückgeld berechnen
+        const given = amountGiven ? Number(amountGiven) : servicePrice;
+        if (given < servicePrice) {
+            return res.status(400).json({ message: 'Der gegebene Betrag ist geringer als der Rechnungsbetrag.' });
+        }
+        const change = given - servicePrice;
 
         const newInvoice = new Invoice({
             invoiceNumber,
@@ -418,14 +423,15 @@ export const markAsPaid = async (req: AuthRequest & SalonRequest, res: Response)
             customer: booking.user,
             service: booking.service,
             staff: booking.staff,
-            salon: req.salonId, // Salon-ID aus der Middleware
+            salon: req.salonId,
             amount: servicePrice,
             paymentMethod,
+            amountGiven: given, // NEU
+            change: change,     // NEU
         });
 
         await newInvoice.save();
 
-        // Buchung aktualisieren
         booking.status = 'paid';
         booking.paymentMethod = paymentMethod;
         booking.invoiceNumber = invoiceNumber;
