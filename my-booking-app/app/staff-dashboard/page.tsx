@@ -2,179 +2,176 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { getStaffBookings, register, StaffBooking, Service, fetchServices, updateBooking, User, fetchAllUsers } from '@/services/api'
+import { getStaffBookings, register, StaffBooking, Service, fetchServices, updateBooking, User, fetchAllUsers, deleteBooking } from '@/services/api'
 import {
-  Box, Typography, CircularProgress, Dialog, DialogTitle, DialogContent,
-  DialogActions, Button, TextField, Tooltip, MenuItem, FormControl,
-  InputLabel, List, ListItem, ListItemIcon, ListItemText, Select,
-  Container, Paper, Stack // Neue Imports für das Layout
+  Box,
+  Typography,
+  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
+  Tooltip,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Select,
+  Container, 
+  Paper, 
+  Stack,
+  IconButton,
+  Avatar
 } from '@mui/material'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
+import resourceTimeGridPlugin from '@fullcalendar/resource-timegrid'
 import dayGridPlugin from '@fullcalendar/daygrid'
-import { deleteBooking } from '@/services/api'
-import 'dayjs/locale/de';
-import AdminBreadcrumbs from '@/components/AdminBreadcrumbs' // Wiederverwendung der Breadcrumbs
+import dayjs from 'dayjs'
+import 'dayjs/locale/de'
+import AdminBreadcrumbs from '@/components/AdminBreadcrumbs'
+
+// Icons
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
+import ChevronRightIcon from '@mui/icons-material/ChevronRight'
+import TodayIcon from '@mui/icons-material/Today'
+
+dayjs.locale('de');
+
+const getInitials = (name = '') => name.split(' ').map(n => n[0]).join('').toUpperCase();
 
 export default function StaffDashboardPage() {
   const { user, token } = useAuth()
   const router = useRouter()
   const [bookings, setBookings] = useState<StaffBooking[]>([])
   const [services, setServices] = useState<Service[]>([])
-  const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedBooking, setSelectedBooking] = useState<StaffBooking | null>(null)
   const [editMode, setEditMode] = useState(false)
   const [editForm, setEditForm] = useState({ serviceId: '', dateTime: '' })
-  const [openDialog, setOpenDialog] = useState(false)
-  const [formData, setFormData] = useState({
-    name: '',
-    address: '',
-    phone: '',
-    email: '',
-    password: '',
-    role: 'user',
-  })
-  const [showUserDialog, setShowUserDialog] = useState(false)
-  const [userRoleFilter, setUserRoleFilter] = useState<'all' | 'user' | 'staff' | 'admin'>('all')
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+
 
   useEffect(() => {
-    if (!user) return
-
+    if (!user) {
+      router.push('/login');
+      return;
+    }
     if (user.role !== 'staff') {
-      router.push('/login')
-      return
+      router.push('/'); // Redirect non-staff users
+      return;
     }
 
     const loadData = async () => {
       try {
-        const [bookingsData, servicesData, usersData] = await Promise.all([
+        const [bookingsData, servicesData] = await Promise.all([
           getStaffBookings(token!),
-          fetchServices(),
-          fetchAllUsers(token!)
+          fetchServices(token!),
         ])
         setBookings(bookingsData)
         setServices(servicesData)
-        setUsers(usersData)
       } catch (err) {
-        console.error('Fehler beim Laden der Buchungen oder Services:', err)
+        console.error('Fehler beim Laden der Daten:', err)
       } finally {
         setLoading(false)
       }
     }
 
-    loadData()
+    if (token) {
+      loadData()
+    }
   }, [user, token, router])
 
-  if (!user || loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
-        <CircularProgress />
-        <Typography ml={2}>Lade Buchungen...</Typography>
-      </Box>
-    )
-  }
 
-  const calendarEvents = bookings
-    .filter(b => b.service && b.user)
-    .map((b) => {
-      const duration = b.service!.duration ?? 30
-      const start = new Date(b.dateTime)
-      const end = new Date(start.getTime() + duration * 60000)
+  const calendarEvents = useMemo(() => {
+    return bookings
+      .filter(b => b.service && b.user)
+      .map((b) => {
+        const duration = b.service!.duration ?? 30
+        const start = new Date(b.dateTime)
+        const end = new Date(start.getTime() + duration * 60000)
 
-      return {
-        id: b._id,
-        title: `${b.service!.title} – ${b.user!.email}`,
-        start: start.toISOString(),
-        end: end.toISOString(),
-      }
-    })
+        return {
+          id: b._id,
+          title: b.service!.title,
+          start: start.toISOString(),
+          end: end.toISOString(),
+          resourceId: user?._id, // Assign to the logged-in staff member
+          extendedProps: {
+            customer: b.user!.email,
+          },
+          backgroundColor: '#A1887F', // Single color for staff view
+          borderColor: '#A1887F',
+        }
+      })
+  }, [bookings, user]);
 
-  const isCancellable = (dateTime: string) => {
-    if (user?.role === 'staff' || user?.role === 'admin') return true
+  const calendarResources = useMemo(() => {
+    if (!user) return [];
+    return [{
+      id: user._id,
+      title: `${user.firstName} ${user.lastName}`.trim() || user.email,
+    }];
+  }, [user]);
+  
+  const handleBookingClick = (info: any) => {
+    const clickedBooking = bookings.find(b => b._id === info.event.id)
+    if (clickedBooking) {
+        const localDate = new Date(clickedBooking.dateTime)
+        const offset = localDate.getTimezoneOffset()
+        localDate.setMinutes(localDate.getMinutes() - offset)
 
-    const now = new Date()
-    const bookingDate = new Date(dateTime)
-    const diffHours = (bookingDate.getTime() - now.getTime()) / (1000 * 60 * 60)
-    return diffHours >= 24
-  }
-
-  const handleOpenDialog = () => setOpenDialog(true)
-  const handleCloseDialog = () => {
-    setOpenDialog(false)
-    setFormData({
-      name: '',
-      address: '',
-      phone: '',
-      email: '',
-      password: '',
-      role: 'user',
-    })
-  }
-
-  const handleCreateUser = async () => {
-    try {
-      await register(
-        formData.email,
-        formData.password,
-        formData.name,
-        formData.address,
-        formData.phone,
-        'user'
-      )
-      alert('Benutzer erfolgreich erstellt!')
-      handleCloseDialog()
-    } catch (err) {
-      console.error('Fehler beim Erstellen des Benutzers:', err)
-      alert('Fehler beim Erstellen des Benutzers.')
+        setSelectedBooking(clickedBooking)
+        setEditForm({
+            serviceId: clickedBooking.service._id,
+            dateTime: localDate.toISOString().slice(0, 16),
+        })
+        setEditMode(false)
     }
   }
 
-  const handleBookingClick = (booking: StaffBooking) => {
-    const localDate = new Date(booking.dateTime)
-    const offset = localDate.getTimezoneOffset()
-    localDate.setMinutes(localDate.getMinutes() - offset)
-
-    setSelectedBooking(booking)
-    setEditForm({
-      serviceId: booking.service._id,
-      dateTime: localDate.toISOString().slice(0, 16),
-    })
-    setEditMode(false)
-  }
-
   const handleEditSave = async () => {
-    if (!selectedBooking) return
+    if (!selectedBooking || !token) return;
     try {
       await updateBooking(selectedBooking._id, {
         serviceId: editForm.serviceId,
         dateTime: editForm.dateTime,
-      }, token!)
-      setBookings(prev =>
-        prev.map(b =>
-          b._id === selectedBooking._id
-            ? {
-                ...b,
-                service: services.find(s => s._id === editForm.serviceId)!,
-                dateTime: editForm.dateTime,
-              }
-            : b
-        )
-      )
-      setSelectedBooking(null)
-      setEditMode(false)
+      }, token);
+      
+      const updatedBookings = await getStaffBookings(token);
+      setBookings(updatedBookings);
+      setSelectedBooking(null);
+      setEditMode(false);
     } catch (err) {
-      alert('Fehler beim Speichern der Änderungen.')
+      alert('Fehler beim Speichern der Änderungen.');
     }
   }
-  
-  const filteredUsers = userRoleFilter === 'all'
-    ? users
-    : users.filter(u => u.role === userRoleFilter)
+
+  // KORREKTUR: Fehlende Funktion wieder hinzugefügt
+  const isCancellable = (dateTime: string) => {
+    if (user?.role === 'staff' || user?.role === 'admin') return true;
+    const now = new Date();
+    const bookingDate = new Date(dateTime);
+    const diffHours = (bookingDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+    return diffHours >= 24;
+  };
+
+  if (loading || !user) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
+        <CircularProgress />
+      </Box>
+    )
+  }
 
   return (
     <Box sx={{ p: { xs: 2, md: 4 }, backgroundColor: 'background.default', minHeight: '100vh' }}>
@@ -185,41 +182,73 @@ export default function StaffDashboardPage() {
             <Typography variant="h4" fontWeight={800} sx={{ flexGrow: 1 }}>
                 Dein Kalender
             </Typography>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={handleOpenDialog}
-            >
-              Neuen Kunden anlegen
-            </Button>
-            <Button
-              variant="outlined"
-              color="secondary"
-              onClick={() => setShowUserDialog(true)}
-            >
-              Nutzer anzeigen
-            </Button>
+            <Stack direction="row" spacing={1} component={Paper} elevation={0} sx={{ p: 0.5, borderRadius: '12px' }}>
+                <Tooltip title="Vorheriger Tag">
+                    <IconButton onClick={() => setCurrentDate(dayjs(currentDate).subtract(1, 'day').toDate())}><ChevronLeftIcon /></IconButton>
+                </Tooltip>
+                <Button variant="outlined" startIcon={<TodayIcon />} onClick={() => setCurrentDate(new Date())}>
+                    Heute
+                </Button>
+                <Tooltip title="Nächster Tag">
+                    <IconButton onClick={() => setCurrentDate(dayjs(currentDate).add(1, 'day').toDate())}><ChevronRightIcon /></IconButton>
+                </Tooltip>
+            </Stack>
+            <Typography variant="h6" sx={{ minWidth: {md: '280px'}, textAlign: 'right', fontWeight: 500 }}>
+                {dayjs(currentDate).format('dddd, DD. MMMM YYYY')}
+            </Typography>
         </Stack>
 
         <Paper sx={{ p: { xs: 1, md: 2 } }}>
             <FullCalendar
-                plugins={[timeGridPlugin, dayGridPlugin, interactionPlugin]}
-                initialView="timeGridWeek"
+                key={currentDate.toISOString()}
+                plugins={[resourceTimeGridPlugin, interactionPlugin]}
+                initialView="resourceTimeGridDay"
+                initialDate={currentDate}
                 locale="de"
-                headerToolbar={{
-                    start: 'prev,next today',
-                    center: 'title',
-                    end: 'timeGridDay,timeGridWeek,dayGridMonth'
-                }}
                 allDaySlot={false}
-                slotMinTime="09:00:00"
-                slotMaxTime="20:00:00"
-                events={calendarEvents}
+                headerToolbar={false}
                 height="auto"
-                eventClick={(info) => {
-                    const clickedBooking = bookings.find(b => b._id === info.event.id)
-                    if (clickedBooking) handleBookingClick(clickedBooking)
-                }}
+                slotDuration="00:15:00"
+                slotMinTime="08:00:00"
+                slotMaxTime="20:00:00"
+                slotLabelFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
+                eventTimeFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
+                nowIndicator={true}
+                editable={true}
+                droppable={true}
+                resources={calendarResources}
+                events={calendarEvents}
+                eventClick={handleBookingClick}
+                resourceAreaHeaderContent="Mitarbeiter"
+                resourceLabelContent={(arg) => (
+                    <Stack direction="row" spacing={1.5} alignItems="center" sx={{ py: 1.5, px: 1 }}>
+                       <Avatar sx={{ bgcolor: '#A1887F', width: 40, height: 40, fontSize: '1rem' }}>
+                            {getInitials(arg.resource.title)}
+                       </Avatar>
+                       <Typography variant="body1" fontWeight={600}>{arg.resource.title}</Typography>
+                    </Stack>
+                )}
+                eventContent={(arg) => (
+                    <Box sx={{
+                        px: 1,
+                        py: '2px',
+                        overflow: 'hidden',
+                        height: '100%',
+                        color: 'white',
+                        display: 'flex',
+                        flexDirection: 'column',
+                    }}>
+                        <Typography variant="caption" noWrap sx={{ lineHeight: 1.2, fontWeight: 'bold' }}>
+                            {dayjs(arg.event.start).format('HH:mm')} - {dayjs(arg.event.end).format('HH:mm')}
+                        </Typography>
+                        <Typography variant="body2" noWrap sx={{ lineHeight: 1.2, fontWeight: 'bold' }}>
+                            {arg.event.extendedProps.customer}
+                        </Typography>
+                        <Typography variant="caption" noWrap sx={{ lineHeight: 1.2, opacity: 0.9 }}>
+                            {arg.event.title}
+                        </Typography>
+                    </Box>
+                )}
             />
         </Paper>
 
@@ -227,7 +256,7 @@ export default function StaffDashboardPage() {
           <DialogTitle>
             {editMode ? 'Buchung bearbeiten' : 'Buchungsdetails'}
           </DialogTitle>
-          <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
             {editMode ? (
               <>
                 <TextField
@@ -275,10 +304,10 @@ export default function StaffDashboardPage() {
                 {selectedBooking && isCancellable(selectedBooking.dateTime) ? (
                   <Button
                     onClick={() => {
-                      if (!selectedBooking) return
-                      deleteBooking(selectedBooking._id, token!)
+                      if (!selectedBooking || !token) return
+                      deleteBooking(selectedBooking._id, token)
                         .then(() => {
-                          setBookings(prev => prev.filter(b => b._id !== selectedBooking._id))
+                          setBookings(prev => prev.filter(b => b._id !== selectedBooking!._id))
                           setSelectedBooking(null)
                         })
                         .catch(err => {
@@ -305,68 +334,7 @@ export default function StaffDashboardPage() {
             )}
           </DialogActions>
         </Dialog>
-        
       </Container>
-      
-      <Dialog open={showUserDialog} onClose={() => setShowUserDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          Nutzerliste
-          <Button onClick={() => setShowUserDialog(false)} sx={{ color: '#1976d2' }}>
-            SCHLIESSEN
-          </Button>
-        </DialogTitle>
-        <DialogContent dividers sx={{ backgroundColor: '#fafafa' }}>
-          <FormControl fullWidth sx={{ mb: 3 }}>
-            <InputLabel id="role-filter-label" sx={{ color: '#222' }}>Nach Rolle filtern</InputLabel>
-            <Select
-              labelId="role-filter-label"
-              label="Nach Rolle filtern"
-              value={userRoleFilter}
-              onChange={(e) => setUserRoleFilter(e.target.value as any)}
-              sx={{
-                backgroundColor: '#fff',
-                color: '#222',
-                '& .MuiSelect-icon': { color: '#222' },
-              }}
-            >
-              <MenuItem value="all">Alle</MenuItem>
-              <MenuItem value="user">User</MenuItem>
-              <MenuItem value="staff">Staff</MenuItem>
-              <MenuItem value="admin">Admin</MenuItem>
-            </Select>
-          </FormControl>
-          <List>
-            {filteredUsers.map((u) => (
-              <ListItem key={u._id} disableGutters sx={{ alignItems: 'flex-start' }}>
-                <ListItemIcon sx={{ minWidth: '30px' }}>📧</ListItemIcon>
-                <ListItemText
-                  primary={
-                    <Typography sx={{ fontWeight: 500 }}>
-                      {u.email || '—'} — Rolle: {u.role}
-                    </Typography>
-                  }
-                />
-              </ListItem>
-            ))}
-          </List>
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={openDialog} onClose={handleCloseDialog}>
-        <DialogTitle>Neuen Benutzer anlegen</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-          <TextField label="Name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
-          <TextField label="Adresse" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} />
-          <TextField label="Telefonnummer" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
-          <TextField label="E-Mail" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
-          <TextField label="Passwort" type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
-          <TextField label="Rolle" value="user" InputProps={{ readOnly: true }} />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>Abbrechen</Button>
-          <Button variant="contained" onClick={handleCreateUser}>Erstellen</Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   )
 }
