@@ -2,6 +2,13 @@ import axios from 'axios'
 
 // --- Types ---
 
+export type OpeningHours = {
+  weekday: number;
+  isOpen: boolean;
+  open: string;
+  close: string;
+}
+
 export type User = {
   _id: string
   email: string
@@ -69,7 +76,7 @@ export type Invoice = {
 };
 
 // --- Global Types ---
-export type Salon = { _id: string; name: string; logoUrl?: string }
+export type Salon = { _id: string; name: string; logoUrl?: string; openingHours: OpeningHours[]; }
 
 export type GlobalStaff = {
   _id: string
@@ -557,6 +564,11 @@ export async function fetchUserInvoices(token: string): Promise<Invoice[]> {
     headers: { Authorization: `Bearer ${token}` }
   });
   return res.data;
+}
+
+export async function updateSalon(id: string, data: Partial<Salon>) {
+  const res = await api.patch(`/salons/${id}`, data);
+  return res.data.salon as Salon;
 }
 
 export default api

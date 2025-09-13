@@ -180,3 +180,32 @@ export const listSalonGuards = async (req: AuthRequest, res: Response) => {
     return res.status(500).json({ success:false, message:'Serverfehler' })
   }
 }
+
+export const updateSalon = async (req: AuthRequest, res: Response) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ success: false, message: 'Nur Admin' });
+  }
+  try {
+    const { id } = req.params;
+    const { name, address, phone, email, openingHours } = req.body;
+
+    const salon = await Salon.findById(id);
+    if (!salon) {
+      return res.status(404).json({ success: false, message: 'Salon nicht gefunden' });
+    }
+
+    // Update fields if they are provided
+    if (name) salon.name = name;
+    if (address) salon.address = address;
+    if (phone) salon.phone = phone;
+    if (email) salon.email = email;
+    if (openingHours) salon.openingHours = openingHours;
+
+    await salon.save();
+
+    res.json({ success: true, salon });
+  } catch (e) {
+    console.error('Update Salon Error:', e);
+    res.status(500).json({ success: false, message: 'Fehler beim Aktualisieren des Salons' });
+  }
+};
