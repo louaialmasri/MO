@@ -75,6 +75,16 @@ export type Invoice = {
   change?: number;
 };
 
+export type InvoiceListItem = {
+  _id: string;
+  invoiceNumber: string;
+  date: string;
+  amount: number;
+  customer: { firstName: string; lastName: string; email: string; };
+  service: { title: string; };
+  salon: { name: string; };
+}
+
 // --- Global Types ---
 export type Salon = { _id: string; name: string; logoUrl?: string; openingHours: OpeningHours[]; }
 
@@ -570,5 +580,13 @@ export async function updateSalon(id: string, data: Partial<Salon>) {
   const res = await api.patch(`/salons/${id}`, data);
   return res.data.salon as Salon;
 }
+
+export async function fetchAllInvoices(token: string): Promise<InvoiceListItem[]> {
+  const res = await api.get('/invoices/all', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data;
+}
+
 
 export default api

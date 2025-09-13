@@ -1,5 +1,3 @@
-// my-booking-backend/controllers/invoiceController.ts
-
 import { Response } from 'express';
 import mongoose from 'mongoose';
 import { AuthRequest } from '../middlewares/authMiddleware';
@@ -42,5 +40,20 @@ export const getUserInvoices = async (req: AuthRequest, res: Response) => {
         res.json(invoices);
     } catch (error) {
         res.status(500).json({ message: 'Serverfehler beim Abrufen der Rechnungen' });
+    }
+};
+
+// NEU: Alle Rechnungen für den Admin abrufen
+export const getAllInvoices = async (req: AuthRequest, res: Response) => {
+    try {
+        const invoices = await Invoice.find({})
+            .populate('customer', 'firstName lastName email')
+            .populate('service', 'title')
+            .populate('salon', 'name')
+            .sort({ date: -1 });
+
+        res.json(invoices);
+    } catch (error) {
+        res.status(500).json({ message: 'Serverfehler beim Abrufen aller Rechnungen' });
     }
 };
