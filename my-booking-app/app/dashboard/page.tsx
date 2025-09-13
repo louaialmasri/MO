@@ -9,7 +9,9 @@ import {
   Stack,
   CircularProgress,
   Grid,
-  Tooltip
+  Tooltip,
+  // ⬇️ NEU:
+  Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions
 } from '@mui/material'
 import { motion } from 'framer-motion'
 import dayjs from 'dayjs'
@@ -38,6 +40,11 @@ export default function DashboardPage() {
   const [bookings, setBookings] = useState<BookingWithService[]>([])
   const [dataLoading, setDataLoading] = useState(true);
 
+  // ⬇️ NEU: State für Bestätigungsdialog
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [bookingToCancel, setBookingToCancel] = useState<BookingWithService | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   useEffect(() => {
     if (!loading) {
       if (!user) {
@@ -63,17 +70,37 @@ export default function DashboardPage() {
     }
   }, [user, token, router, loading])
 
-  const handleCancel = async (bookingId: string) => {
+  // ⬇️ NEU: Öffnet den Dialog und merkt sich den Termin
+  const openCancelDialog = (booking: BookingWithService) => {
+    setBookingToCancel(booking);
+    setConfirmOpen(true);
+  };
+
+  // ⬇️ NEU: Schließt den Dialog ohne zu löschen
+  const closeCancelDialog = () => {
+    setConfirmOpen(false);
+    setBookingToCancel(null);
+  };
+
+  // ⬇️ Anpassung: tatsächliches Löschen erst nach Bestätigung
+  const confirmCancel = async () => {
+    if (!bookingToCancel) return;
     try {
-      const success = await deleteBooking(bookingId, token!)
+      setDeletingId(bookingToCancel._id);
+      const success = await deleteBooking(bookingToCancel._id, token!)
       if (success) {
-        setBookings(prev => prev.filter(b => b._id !== bookingId))
+        setBookings(prev => prev.filter(b => b._id !== bookingToCancel._id))
+      } else {
+        alert('Fehler beim Stornieren!')
       }
     } catch (err) {
       alert('Fehler beim Stornieren!')
+    } finally {
+      setDeletingId(null);
+      closeCancelDialog();
     }
   }
-  
+
   // Funktion zur Prüfung, ob ein Termin stornierbar ist
   const isCancellable = (dateTime: string) => {
     const now = dayjs();
@@ -169,8 +196,13 @@ export default function DashboardPage() {
 
                   <CardActions sx={{ px: 2, pb: 2 }}>
                     {isCancellable(b.dateTime) ? (
-                      <Button size="small" color="error" onClick={() => handleCancel(b._id)}>
-                        Stornieren
+                      <Button
+                        size="small"
+                        color="error"
+                        onClick={() => openCancelDialog(b)}
+                        disabled={deletingId === b._id}
+                      >
+                        {deletingId === b._id ? 'Wird storniert...' : 'Stornieren'}
                       </Button>
                     ) : (
                       <Tooltip title="Stornierung nicht mehr möglich (weniger als 24h)">
@@ -181,13 +213,11 @@ export default function DashboardPage() {
                         </span>
                       </Tooltip>
                     )}
-                    <Button size="small" sx={{ ml: 'auto' }}>Details</Button>
                   </CardActions>
                 </Card>
               </Grid>
             ))}
           </Grid>
-
         )}
 
         {pastBookings.length > 0 && (
@@ -199,6 +229,37 @@ export default function DashboardPage() {
           </>
         )}
       </Container>
+
+      {/* ⬇️ NEU: Bestätigungsdialog */}
+      <Dialog
+        open={confirmOpen}
+        onClose={closeCancelDialog}
+        aria-labelledby="confirm-cancel-title"
+      >
+        <DialogTitle id="confirm-cancel-title">Termin wirklich stornieren?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {bookingToCancel
+              ? `Möchtest du den Termin „${bookingToCancel.service?.title ?? 'Service'}“ am ${dayjs(bookingToCancel.dateTime).format('DD.MM.YYYY [um] HH:mm [Uhr]')} wirklich stornieren?`
+              : 'Möchtest du diesen Termin wirklich stornieren?'}
+          </DialogContentText>
+          <DialogContentText sx={{ mt: 1 }} color="error">
+            Hinweis: Stornierungen sind nur bis 24 Stunden vor dem Termin möglich.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeCancelDialog}>Abbrechen</Button>
+          <Button
+            onClick={confirmCancel}
+            color="error"
+            variant="contained"
+            autoFocus
+            disabled={!!deletingId}
+          >
+            {deletingId ? 'Storniere…' : 'Ja, stornieren'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </motion.div>
   )
 }
