@@ -33,7 +33,7 @@ export default function BookingPage() {
   const router = useRouter()
 
   const [isAdminOrStaff, setIsAdminOrStaff] = useState(false);
-  const [activeStep, setActiveStep] = useState(0); // Immer bei 0 starten
+  const [activeStep, setActiveStep] = useState(0);
 
   // Data states
   const [services, setServices] = useState<Service[]>([])
@@ -50,6 +50,15 @@ export default function BookingPage() {
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
 
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      const isAdmin = user.role === 'admin';
+      const isStaff = user.role === 'staff';
+      setIsAdminOrStaff(isAdmin || isStaff);
+      setActiveStep(isAdmin || isStaff ? 0 : 1);
+    }
+  }, [user]);
 
   // Lade initiale Daten
   useEffect(() => {
@@ -247,27 +256,37 @@ export default function BookingPage() {
                 fullWidth
               />
             </Grid>
+
             <Grid size={{ xs: 12, md: 7 }}>
               <Typography variant="h6" gutterBottom>Wähle eine Uhrzeit</Typography>
-              {loading.slots ? <CircularProgress /> : (
+              {loading.slots ? (
+                <CircularProgress />
+              ) : (
                 <Paper variant="outlined" sx={{ p: 2, maxHeight: 300, overflowY: 'auto' }}>
                   <Stack direction="row" flexWrap="wrap" gap={1}>
-                    {availableSlots.length > 0 ? availableSlots.map(slot => (
-                      <Chip
-                        key={slot}
-                        label={dayjs(slot).format('HH:mm')}
-                        onClick={() => setSelectedSlot(slot)}
-                        color={selectedSlot === slot ? 'primary' : 'default'}
-                        variant={selectedSlot === slot ? 'filled' : 'outlined'}
-                        clickable
-                      />
-                    )) : <Typography color="text.secondary">Keine verfügbaren Zeiten an diesem Tag.</Typography>}
+                    {availableSlots.length > 0 ? (
+                      availableSlots.map((slot) => (
+                        <Chip
+                          key={slot}
+                          label={dayjs(slot).format('HH:mm')}
+                          onClick={() => setSelectedSlot(slot)}
+                          color={selectedSlot === slot ? 'primary' : 'default'}
+                          variant={selectedSlot === slot ? 'filled' : 'outlined'}
+                          clickable
+                        />
+                      ))
+                    ) : (
+                      <Typography color="text.secondary">
+                        Keine verfügbaren Zeiten an diesem Tag.
+                      </Typography>
+                    )}
                   </Stack>
                 </Paper>
               )}
             </Grid>
           </Grid>
         );
+
 
       case 4:
         const customer = allCustomers.find(c => c._id === selectedCustomerId) || user;

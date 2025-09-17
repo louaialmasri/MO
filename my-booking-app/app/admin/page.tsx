@@ -18,7 +18,7 @@ import dynamic from 'next/dynamic'
 import {
   Box, Button, Chip, Stack, Dialog, DialogTitle, DialogContent,
   DialogActions, TextField, MenuItem, Typography, Avatar, Tooltip, IconButton, Container, Paper,
-  Snackbar, Alert // Snackbar und Alert importieren
+  Snackbar, Alert
 } from '@mui/material'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
@@ -34,7 +34,8 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import TodayIcon from '@mui/icons-material/Today';
 import PaymentIcon from '@mui/icons-material/Payment';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import DeleteIcon from '@mui/icons-material/Delete';
+
 
 dayjs.locale('de');
 
@@ -130,6 +131,8 @@ function AdminPage() {
     dateTime: '', serviceId: '', staffId: ''
   })
   const [currentDate, setCurrentDate] = useState<Date>(new Date())
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
 
   // States für den Bezahl-Dialog
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -147,7 +150,15 @@ function AdminPage() {
     return colorMap;
   }, [staffUsers]);
 
-  const loadBookings = async () => { /* ... lädt die Buchungen ... */ };
+  const loadBookings = async () => {
+    if (!token) return;
+    try {
+      const bookingsData = await getAllBookings(token);
+      setBookings(bookingsData);
+    } catch (error) {
+      console.error("Failed to fetch bookings:", error);
+    }
+  };
     
     useEffect(() => {
         loadBookings();
@@ -275,6 +286,19 @@ function AdminPage() {
     }
   }
 
+  const handleDeleteBooking = async () => {
+    if (!activeBooking || !token) return;
+    try {
+        await deleteBooking(activeBooking._id, token);
+        setBookings(prev => prev.filter(b => b._id !== activeBooking._id));
+        setToast({ open: true, msg: 'Termin gelöscht', sev: 'success' });
+        closeDialog(); // Close main dialog
+        setDeleteConfirmOpen(false); // Close confirmation dialog
+    } catch (err) {
+        setToast({ open: true, msg: 'Fehler beim Löschen', sev: 'error' });
+    }
+  };
+
   // --- Payment Dialog Logic ---
   const servicePrice = activeBooking?.service?.price || 0;
   const change = parseFloat(amountGiven) >= servicePrice ? parseFloat(amountGiven) - servicePrice : 0;
@@ -395,6 +419,11 @@ function AdminPage() {
                 </DialogContent>
                 <DialogActions sx={{ p: '16px 24px', justifyContent: 'space-between' }}>
                     <Box>
+                         <Tooltip title="Termin löschen">
+                            <IconButton onClick={() => setDeleteConfirmOpen(true)} color="error">
+                                <DeleteIcon />
+                            </IconButton>
+                        </Tooltip>
                         <Button onClick={closeDialog}>Schließen</Button>
                         <Button onClick={() => setEditMode(true)}>Bearbeiten</Button>
                     </Box>
@@ -417,6 +446,24 @@ function AdminPage() {
                             </Button>
                         )}
                     </Box>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog
+                open={deleteConfirmOpen}
+                onClose={() => setDeleteConfirmOpen(false)}
+            >
+                <DialogTitle>Termin wirklich löschen?</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        Möchten Sie diesen Termin wirklich endgültig löschen? Diese Aktion kann nicht rückgängig gemacht werden.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDeleteConfirmOpen(false)}>Abbrechen</Button>
+                    <Button onClick={handleDeleteBooking} color="error" variant="contained">
+                        Ja, löschen
+                    </Button>
                 </DialogActions>
             </Dialog>
 

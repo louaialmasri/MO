@@ -52,7 +52,7 @@ app.use('/api/salons', activeSalon, salonRoutes)
 app.use('/api/assignments', activeSalon, assignmentRoutes)
 app.use('/api/admin', adminCatalogRoutes)
 app.use('/api/availability-templates', availabilityTemplateRoutes)
-app.use('/api/staff', staffRoutes);
+app.use('/api/staff', activeSalon, staffRoutes);
 app.use('/api/invoices', activeSalon, invoiceRoutes);
 app.use('/api/cash-closing', cashClosingRoutes);
 
