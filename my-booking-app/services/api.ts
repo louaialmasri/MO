@@ -85,6 +85,15 @@ export type InvoiceListItem = {
   salon: { name: string; };
 }
 
+export type CashClosing = {
+  _id: string;
+  closingDate: string;
+  employee: { firstName: string; lastName: string; };
+  cashSales: number;
+  actualCashOnHand: number;
+  difference: number;
+}
+
 // --- Global Types ---
 export type Salon = { _id: string; name: string; logoUrl?: string; openingHours: OpeningHours[]; }
 
@@ -588,5 +597,25 @@ export async function fetchAllInvoices(token: string): Promise<InvoiceListItem[]
   return res.data;
 }
 
+export async function getCashClosingPreCalculation(token: string) {
+  const res = await api.get('/cash-closing/pre-calculation', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data;
+}
+
+export async function createCashClosing(token: string, data: any) {
+  const res = await api.post('/cash-closing', data, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data;
+}
+
+export async function fetchAllCashClosings(token: string): Promise<CashClosing[]> {
+  const res = await api.get('/cash-closing', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data.closings;
+}
 
 export default api

@@ -34,6 +34,7 @@ import CategoryIcon from '@mui/icons-material/Category';
 
 import { fetchSalons, type Salon } from '@/services/api'
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
 
 
 export default function Navbar() {
@@ -122,6 +123,7 @@ export default function Navbar() {
         <MenuItem onClick={() => { setAdminMenuAnchor(null); router.push('/admin/availability') }}><ScheduleIcon sx={{ mr: 1.5 }}/> Arbeitszeiten</MenuItem>
         <MenuItem onClick={() => { setAdminMenuAnchor(null); router.push('/admin/availability/templates') }}><ScheduleIcon sx={{ mr: 1.5 }}/> Zeit-Vorlagen</MenuItem>
         <MenuItem onClick={() => { setAdminMenuAnchor(null); router.push('/admin/invoices') }}><ReceiptLongIcon sx={{ mr: 1.5 }}/> Rechnungen</MenuItem>
+        <MenuItem onClick={() => { setAdminMenuAnchor(null); router.push('/admin/cash-closing') }}><PointOfSaleIcon sx={{ mr: 1.5 }}/> Kassenabschluss</MenuItem>
       </Menu>
 
       <Button
