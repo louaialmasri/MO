@@ -21,11 +21,13 @@ import {
 import {
   Container, Paper, Tabs, Tab, Divider, Stack, Box, Typography, TextField, MenuItem,
   Button, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, List, ListItem,
-  ListItemText, Tooltip, Snackbar, Alert, Select, FormControl, InputLabel, FormGroup, FormControlLabel, Checkbox
+  ListItemText, Tooltip, Snackbar, Alert, Select, FormControl, InputLabel, FormGroup, FormControlLabel, Checkbox,
+  Chip
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import TuneIcon from '@mui/icons-material/Tune'
+import EditIcon from '@mui/icons-material/Edit';
 import AdminBreadcrumbs from '@/components/AdminBreadcrumbs'
 
 function fuzzy(txt: string, q: string) { return txt.toLowerCase().includes(q.toLowerCase()) }
@@ -46,12 +48,15 @@ export default function AdminCatalogPage() {
   const [assignedStaff, setAssignedStaff] = useState<GlobalStaff[]>([])
   const [assignedServices, setAssignedServices] = useState<(GlobalService & { price:number; duration:number })[]>([])
 
-  // search
+  // search and filter
   const [qLeft, setQLeft] = useState('')
   const [qRight, setQRight] = useState('')
+  const [staffFilter, setStaffFilter] = useState<'all' | 'admin' | 'staff' | 'user'>('all');
+
 
   // dialogs
   const [dlgStaffOpen, setDlgStaffOpen] = useState(false)
+  const [dlgEditStaffOpen, setDlgEditStaffOpen] = useState(false);
   const [dlgServiceOpen, setDlgServiceOpen] = useState(false)
   const [dlgSalonOpen, setDlgSalonOpen] = useState(false)
   const [ovrOpen, setOvrOpen] = useState(false)
@@ -64,6 +69,7 @@ export default function AdminCatalogPage() {
 
   // forms
   const [formStaff, setFormStaff] = useState({ email: '', password: '', firstName: '', lastName: '' })
+  const [formEditStaff, setFormEditStaff] = useState<GlobalStaff | null>(null);
   const [formService, setFormService] = useState({ title: '', description: '', price: '', duration: '' } as any)
   const [formSalon, setFormSalon] = useState({ name: '', logoUrl: '' })
 
@@ -101,14 +107,26 @@ export default function AdminCatalogPage() {
   }, [salonId, tab])
 
   const leftList = useMemo(() => {
+    const roleOrder = { admin: 1, staff: 2, user: 3 };
+
     if (tab === 'staff') {
-      return qLeft ? gStaff.filter(s => fuzzy(`${s.firstName||''} ${s.lastName||''} ${s.email}`, qLeft)) : gStaff
+        let filteredStaff = gStaff;
+
+        if (staffFilter !== 'all') {
+            filteredStaff = filteredStaff.filter(s => s.role === staffFilter);
+        }
+
+        if (qLeft) {
+            filteredStaff = filteredStaff.filter(s => fuzzy(`${s.firstName || ''} ${s.lastName || ''} ${s.email}`, qLeft));
+        }
+
+        return filteredStaff.sort((a, b) => (roleOrder[a.role] || 4) - (roleOrder[b.role] || 4));
     }
     if (tab === 'services') {
       return qLeft ? gServices.filter(s => fuzzy(`${s.title} ${s.description||''}`, qLeft)) : gServices
     }
     return salons
-  }, [tab, qLeft, gStaff, gServices, salons])
+  }, [tab, qLeft, gStaff, gServices, salons, staffFilter])
 
   const rightList = useMemo(() => {
     if (tab === 'staff') {
@@ -159,18 +177,6 @@ export default function AdminCatalogPage() {
       setToast({open:true,msg:'Service entfernt',sev:'success'})
     }
   }
-
-  const handleRoleChange = async (userId: string, newRole: string) => {
-  try {
-    const token = localStorage.getItem('token') || ''
-    await updateUserRole(userId, newRole, token);
-    setGStaff(await fetchGlobalStaff()); // Wichtig: Liste neu laden, um die Änderung zu sehen
-    setToast({ open: true, msg: 'Benutzerrolle erfolgreich aktualisiert', sev: 'success' });
-  } catch (e: any) {
-    const errorMsg = e?.response?.data?.message || 'Fehler beim Aktualisieren der Rolle.';
-    setToast({ open: true, msg: errorMsg, sev: 'error' });
-  }
-};
 
   // create global
   const createStaff = async () => {
@@ -288,7 +294,7 @@ export default function AdminCatalogPage() {
         setGStaff(prevStaff =>
             prevStaff.map(s =>
                 s._id === currentStaff._id
-                    ? { ...s, skills: skillsArray }
+                    ? { ...s, skills: skillsArray.map(id => ({ _id: id })) }
                     : s
             )
         );
@@ -314,6 +320,23 @@ export default function AdminCatalogPage() {
     const guards = await fetchSalonsWithGuards()
     setSalonGuards(Object.fromEntries(guards.map(g => [g._id, g])))
   }
+
+  const handleOpenEditStaff = (staff: GlobalStaff) => {
+    setFormEditStaff(staff);
+    setDlgEditStaffOpen(true);
+  };
+
+  const handleUpdateStaff = async () => {
+      if (!formEditStaff || !token) return;
+      try {
+          await updateUserRole(formEditStaff._id, formEditStaff.role, token);
+          setGStaff(await fetchGlobalStaff());
+          setDlgEditStaffOpen(false);
+          setToast({ open: true, msg: 'Benutzer aktualisiert', sev: 'success' });
+      } catch (error) {
+          setToast({ open: true, msg: 'Fehler beim Aktualisieren', sev: 'error' });
+      }
+  };
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -378,6 +401,21 @@ export default function AdminCatalogPage() {
               <Paper variant="outlined" sx={{ p:2, flex:1, borderRadius:2 }}>
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                   <TextField size="small" placeholder="Suchen…" value={qLeft} onChange={(e)=> setQLeft(e.target.value)} />
+                   {tab === 'staff' && (
+                        <FormControl size="small" sx={{ minWidth: 120 }}>
+                            <InputLabel>Rolle</InputLabel>
+                            <Select
+                                value={staffFilter}
+                                label="Rolle"
+                                onChange={(e) => setStaffFilter(e.target.value as any)}
+                            >
+                                <MenuItem value="all">Alle</MenuItem>
+                                <MenuItem value="admin">Admin</MenuItem>
+                                <MenuItem value="staff">Staff</MenuItem>
+                                <MenuItem value="user">User</MenuItem>
+                            </Select>
+                        </FormControl>
+                    )}
                   <Box sx={{ flex:1 }} />
                   {tab === 'staff' ? (
                     <Button variant="contained" startIcon={<AddIcon />} onClick={()=> setDlgStaffOpen(true)}>Staff anlegen</Button>
@@ -404,23 +442,18 @@ export default function AdminCatalogPage() {
                           <Stack direction="row" spacing={0.5} alignItems="center">
                             
                             {tab === 'staff' && (
-                              <>
-                                <Tooltip title="Fähigkeiten bearbeiten">
-                                    <IconButton onClick={() => openSkillDialog(item as GlobalStaff)}>
-                                        <TuneIcon />
-                                    </IconButton>
-                                </Tooltip>
-                                <FormControl size="small" sx={{ minWidth: 100 }}>
-                                    <Select
-                                    value={(item as GlobalStaff).role}
-                                    onChange={(e) => handleRoleChange(id, e.target.value)}
-                                    >
-                                    <MenuItem value="user">user</MenuItem>
-                                    <MenuItem value="staff">staff</MenuItem>
-                                    <MenuItem value="admin">admin</MenuItem>
-                                    </Select>
-                                </FormControl>
-                              </>
+                                <>
+                                    <Tooltip title="Fähigkeiten bearbeiten">
+                                        <IconButton onClick={() => openSkillDialog(item as GlobalStaff)}>
+                                            <TuneIcon />
+                                        </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Benutzer bearbeiten">
+                                        <IconButton onClick={() => handleOpenEditStaff(item as GlobalStaff)}>
+                                            <EditIcon />
+                                        </IconButton>
+                                    </Tooltip>
+                                </>
                             )}
 
                             {tab === 'services' && (
@@ -452,11 +485,14 @@ export default function AdminCatalogPage() {
                         }>
                         <ListItemText
                           primary={tab === 'staff' ? `${(item as GlobalStaff).firstName} ${(item as GlobalStaff).lastName}` : (item as GlobalService).title}
-                          secondary={
-                            tab === 'staff'
-                              ? `${(item as GlobalStaff).email} • Rolle: ${(item as GlobalStaff).role}`
-                              : `${(item as GlobalService).price}€ • ${(item as GlobalService).duration} Min`
-                          }
+                           secondary={
+                              tab === 'staff' 
+                                ? <Chip label={(item as GlobalStaff).role} size="small" color={
+                                    (item as GlobalStaff).role === 'admin' ? 'secondary' : (item as GlobalStaff).role === 'staff' ? 'primary' : 'default'
+                                  } />
+                                : `${(item as GlobalService).price}€ • ${(item as GlobalService).duration} Min`
+                            }
+                            secondaryTypographyProps={{ component: 'div' }}
                         />
                       </ListItem>
                     )
@@ -500,11 +536,14 @@ export default function AdminCatalogPage() {
                         }>
                         <ListItemText
                           primary={tab === 'staff' ? `${(item as GlobalStaff).firstName} ${(item as GlobalStaff).lastName}` : (item as GlobalService).title}
-                          secondary={
-                            tab === 'staff'
-                              ? `${(item as GlobalStaff).email} • Rolle: ${(item as GlobalStaff).role}`
-                              : `${(item as any).price}€ • ${(item as any).duration} Min`
-                          }
+                           secondary={
+                              tab === 'staff' 
+                                ? <Chip label={(item as GlobalStaff).role} size="small" color={
+                                    (item as GlobalStaff).role === 'admin' ? 'secondary' : (item as GlobalStaff).role === 'staff' ? 'primary' : 'default'
+                                  } />
+                                : `${(item as any).price}€ • ${(item as any).duration} Min`
+                            }
+                            secondaryTypographyProps={{ component: 'div' }}
                         />
                       </ListItem>
                     )
@@ -531,6 +570,41 @@ export default function AdminCatalogPage() {
           <Button variant="contained" onClick={createStaff}>Anlegen</Button>
         </DialogActions>
       </Dialog>
+        <Dialog open={dlgEditStaffOpen} onClose={() => setDlgEditStaffOpen(false)} fullWidth maxWidth="sm">
+            <DialogTitle>Benutzer bearbeiten</DialogTitle>
+            <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+                <TextField 
+                    label="Vorname" 
+                    value={formEditStaff?.firstName || ''} 
+                    onChange={e => setFormEditStaff(p => p ? { ...p, firstName: e.target.value } : null)} 
+                />
+                <TextField 
+                    label="Nachname" 
+                    value={formEditStaff?.lastName || ''} 
+                    onChange={e => setFormEditStaff(p => p ? { ...p, lastName: e.target.value } : null)} 
+                />
+                <TextField 
+                    label="E-Mail" 
+                    type="email" 
+                    value={formEditStaff?.email || ''} 
+                    onChange={e => setFormEditStaff(p => p ? { ...p, email: e.target.value } : null)} 
+                />
+                <TextField 
+                    select 
+                    label="Rolle" 
+                    value={formEditStaff?.role || 'user'} 
+                    onChange={e => setFormEditStaff(p => p ? { ...p, role: e.target.value as any } : null)}
+                >
+                    <MenuItem value="user">User</MenuItem>
+                    <MenuItem value="staff">Staff</MenuItem>
+                    <MenuItem value="admin">Admin</MenuItem>
+                </TextField>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={() => setDlgEditStaffOpen(false)}>Abbrechen</Button>
+                <Button variant="contained" onClick={handleUpdateStaff}>Speichern</Button>
+            </DialogActions>
+        </Dialog>
       <Dialog open={skillDlgOpen} onClose={() => setSkillDlgOpen(false)} fullWidth maxWidth="xs">
         <DialogTitle>Fähigkeiten für {currentStaff?.firstName} {currentStaff?.lastName}</DialogTitle>
         <DialogContent>
