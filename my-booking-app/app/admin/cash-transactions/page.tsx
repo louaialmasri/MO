@@ -1,3 +1,4 @@
+// my-booking-app/app/admin/cash-transactions/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react';
@@ -70,10 +71,11 @@ export default function CashTransactionsPage() {
                   primary={`Rechnung #${invoice.invoiceNumber} - ${invoice.service.title}`}
                   secondary={
                     <Stack direction="row" spacing={2} alignItems="center" sx={{ mt: 0.5 }}>
-                      <Typography variant="body2">
+                      <Typography variant="body2" component="span">
                         Kunde: <strong>{`${invoice.customer.firstName} ${invoice.customer.lastName}`}</strong>
                       </Typography>
-                      <Typography variant="body2" color="text.secondary">
+                      {/* KORREKTUR HIER: Sicherstellen, dass invoice.staff existiert */}
+                      <Typography variant="body2" color="text.secondary" component="span">
                         Mitarbeiter: {invoice.staff ? `${invoice.staff.firstName} ${invoice.staff.lastName}` : 'N/A'}
                       </Typography>
                     </Stack>

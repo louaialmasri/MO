@@ -382,47 +382,6 @@ async function ensureNoConflicts(staffId: string, startISO: string, serviceId: s
   }
 
   return { ok: true }
-}
-
-export const payBooking = async (req: AuthRequest, res: Response) => {
-    try {
-        const { bookingId, paymentMethod } = req.body;
-        // Die Abfrage nach einem Kassierer wird entfernt
-        if (!bookingId) {
-            return res.status(400).json({ success: false, message: 'BookingID ist erforderlich.' });
-        }
-
-        const booking = await Booking.findById(bookingId).populate('service');
-        if (!booking) return res.status(404).json({ success: false, message: 'Buchung nicht gefunden' });
-        
-        // Status der Buchung auf "abgeschlossen" setzen
-        booking.status = 'completed';
-        await booking.save();
-        
-        const service = booking.service as any;
-
-        // Rechnung erstellen oder aktualisieren.
-        // Der 'staff' wird direkt aus der Buchung übernommen.
-        const invoice = await Invoice.findOneAndUpdate(
-            { booking: bookingId },
-            {
-                customer: booking.user,
-                service: booking.service,
-                staff: booking.staff, // Diese Zeile stellt die Nachverfolgung sicher
-                salon: booking.salon,
-                amount: service.price,
-                date: new Date(),
-                paymentMethod: paymentMethod || 'cash',
-                status: 'paid',
-            },
-            { upsert: true, new: true } // Erstellt die Rechnung, falls sie nicht existiert
-        );
-
-        res.json({ success: true, message: 'Buchung bezahlt', invoice });
-    } catch (e) {
-        console.error('payBooking Error:', e);
-        res.status(500).json({ success: false, message: 'Serverfehler' });
-    }
 };
 
 // Buchung als bezahlt markieren und Rechnung erstellen

@@ -83,6 +83,7 @@ export type InvoiceListItem = {
   customer: { firstName: string; lastName: string; email: string; };
   service: { title: string; };
   salon: { name: string; };
+  staff: { firstName: string; lastName: string; };
 }
 
 export type CashClosing = {
