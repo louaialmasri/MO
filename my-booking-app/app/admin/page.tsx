@@ -12,6 +12,7 @@ import {
   fetchAllUsers,
   updateBooking,
   markBookingAsPaid,
+  payBooking,
 } from '@/services/api'
 import dynamic from 'next/dynamic'
 import {
@@ -33,6 +34,7 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import TodayIcon from '@mui/icons-material/Today';
 import PaymentIcon from '@mui/icons-material/Payment';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 
 dayjs.locale('de');
 
@@ -117,6 +119,8 @@ function AdminPage() {
   const { user, token } = useAuth()
   const router = useRouter()
   const [bookings, setBookings] = useState<BookingFull[]>([])
+  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [popoverAnchor, setPopoverAnchor] = useState<null | HTMLElement>(null);
   const [services, setServices] = useState<Service[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [openEvent, setOpenEvent] = useState(false)
@@ -142,6 +146,33 @@ function AdminPage() {
     });
     return colorMap;
   }, [staffUsers]);
+
+  const loadBookings = async () => { /* ... lädt die Buchungen ... */ };
+    
+    useEffect(() => {
+        loadBookings();
+    }, []);
+
+    const handleEventClick = (event: any) => {
+        const booking = bookings.find(b => b._id === event.id);
+        if (booking) {
+            setSelectedEvent(booking);
+            setPopoverAnchor(event.jsEvent.currentTarget);
+        }
+    };
+
+    // Die neue, einfache Bezahlfunktion
+    const handlePay = async () => {
+        if (!selectedEvent || !token) return;
+        try {
+            await payBooking(token, selectedEvent._id);
+            setPopoverAnchor(null); // Popover schließen
+            loadBookings(); // Kalender aktualisieren
+        } catch (error) {
+            console.error("Fehler beim Bezahlen:", error);
+            alert("Der Termin konnte nicht als bezahlt markiert werden.");
+        }
+    };
 
 
   useEffect(() => {
@@ -266,7 +297,7 @@ function AdminPage() {
       setBookings(updatedBookings);
       handleClosePaymentDialog();
       closeDialog();
-      setToast({ open: true, msg: 'Zahlung erfolgreich verbucht!', sev: 'success' }); // KORREKTUR: Erfolgsmeldung
+      setToast({ open: true, msg: 'Zahlung erfolgreich verbucht!', sev: 'success' });
     } catch (err) {
       console.error(err);
       setToast({ open: true, msg: 'Fehler beim Speichern der Zahlung.', sev: 'error' });

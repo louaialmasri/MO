@@ -43,13 +43,14 @@ export const getUserInvoices = async (req: AuthRequest, res: Response) => {
     }
 };
 
-// NEU: Alle Rechnungen für den Admin abrufen
+// Alle Rechnungen für den Admin abrufen
 export const getAllInvoices = async (req: AuthRequest, res: Response) => {
     try {
         const invoices = await Invoice.find({})
             .populate('customer', 'firstName lastName email')
             .populate('service', 'title')
             .populate('salon', 'name')
+            .populate('staff', 'firstName lastName') // WICHTIG: Mitarbeiterdaten hinzufügen
             .sort({ date: -1 });
 
         res.json(invoices);

@@ -633,4 +633,14 @@ export async function fetchCashClosingById(token: string, id: string): Promise<C
   return res.data.closing;
 }
 
+export async function payBooking(token: string, bookingId: string) {
+  const res = await api.post('/bookings/pay', {
+    bookingId,
+    paymentMethod: 'cash',
+  }, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data;
+}
+
 export default api

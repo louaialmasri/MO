@@ -7,7 +7,7 @@ const bookingSchema = new mongoose.Schema({
   staff: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Mitarbeiter-Zuweisung
   dateTime: { type: Date, required: true },
   // NEUE FELDER
-  status: { type: String, enum: ['confirmed', 'paid', 'cancelled'], default: 'confirmed' },
+  status: { type: String, enum: ['confirmed', 'paid', 'cancelled', 'completed'], default: 'confirmed' },
   paymentMethod: { type: String, enum: ['cash', 'card'], default: null },
   invoiceNumber: { type: String, default: null }
 })

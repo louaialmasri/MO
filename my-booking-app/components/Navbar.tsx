@@ -35,6 +35,7 @@ import CategoryIcon from '@mui/icons-material/Category';
 import { fetchSalons, type Salon } from '@/services/api'
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 
 
 export default function Navbar() {
@@ -43,6 +44,8 @@ export default function Navbar() {
   const { user, logout } = useAuth()
   const isMobile = useMediaQuery('(max-width:999px)', { noSsr: true })
   const [hydrated, setHydrated] = useState(false)
+
+  const [cashMenuAnchor, setCashMenuAnchor] = useState<null | HTMLElement>(null);
 
   const [mobileMenuAnchor, setMobileMenuAnchor] = useState<null | HTMLElement>(null)
   const [salonMenuAnchor, setSalonMenuAnchor] = useState<null | HTMLElement>(null)
@@ -119,6 +122,15 @@ export default function Navbar() {
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
       >
+        <Button color="inherit" onClick={(e) => setCashMenuAnchor(e.currentTarget)}>Kasse</Button>
+                        <Menu
+                            anchorEl={cashMenuAnchor}
+                            open={Boolean(cashMenuAnchor)}
+                            onClose={() => setCashMenuAnchor(null)}
+                        >
+                            <MenuItem onClick={() => { setCashMenuAnchor(null); router.push('/admin/cash-transactions') }}><AttachMoneyIcon sx={{ mr: 1.5 }}/> Kassenbewegungen</MenuItem>
+                            <MenuItem onClick={() => { setCashMenuAnchor(null); router.push('/admin/cash-closing') }}><PointOfSaleIcon sx={{ mr: 1.5 }}/> Kassenabschluss</MenuItem>
+                        </Menu>
         <MenuItem onClick={() => { setAdminMenuAnchor(null); router.push('/admin/catalog') }}><CategoryIcon sx={{ mr: 1.5 }}/> Katalog & Salons</MenuItem>
         <MenuItem onClick={() => { setAdminMenuAnchor(null); router.push('/admin/availability') }}><ScheduleIcon sx={{ mr: 1.5 }}/> Arbeitszeiten</MenuItem>
         <MenuItem onClick={() => { setAdminMenuAnchor(null); router.push('/admin/availability/templates') }}><ScheduleIcon sx={{ mr: 1.5 }}/> Zeit-Vorlagen</MenuItem>
