@@ -88,10 +88,18 @@ export type InvoiceListItem = {
 export type CashClosing = {
   _id: string;
   closingDate: string;
+  startPeriod: string;
+  endPeriod: string;
   employee: { firstName: string; lastName: string; };
   cashSales: number;
+  cashDeposit: number;
+  bankWithdrawal: number;
+  tipsWithdrawal: number;
+  otherWithdrawal: number;
+  calculatedCashOnHand: number;
   actualCashOnHand: number;
   difference: number;
+  notes?: string;
 }
 
 // --- Global Types ---
@@ -616,6 +624,13 @@ export async function fetchAllCashClosings(token: string): Promise<CashClosing[]
     headers: { Authorization: `Bearer ${token}` }
   });
   return res.data.closings;
+}
+
+export async function fetchCashClosingById(token: string, id: string): Promise<CashClosing> {
+  const res = await api.get(`/cash-closing/${id}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data.closing;
 }
 
 export default api

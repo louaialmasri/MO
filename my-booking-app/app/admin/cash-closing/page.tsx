@@ -4,13 +4,16 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { fetchAllCashClosings, type CashClosing } from '@/services/api';
 import {
-  Container, Typography, Paper, Stack, Button, CircularProgress, Box, Divider, List, ListItem, ListItemText
+  Container, Typography, Paper, Stack, Button, CircularProgress, Box, Divider, List, ListItem, ListItemText,
+  ListItemButton
 } from '@mui/material';
 import AdminBreadcrumbs from '@/components/AdminBreadcrumbs';
 import dayjs from 'dayjs';
 import CashClosingDialog from '@/components/CashClosingDialog';
+import { useRouter } from 'next/navigation';
 
 export default function AdminCashClosingPage() {
+  const router = useRouter();
   const { token, loading: authLoading } = useAuth();
   const [closings, setClosings] = useState<CashClosing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,7 +63,7 @@ export default function AdminCashClosingPage() {
           <List>
             {closings.map((closing, index) => (
               <Box key={closing._id}>
-                <ListItem>
+                <ListItemButton onClick={() => router.push(`/admin/cash-closing/${closing._id}`)}>
                   <ListItemText
                     primary={`Abschluss vom ${dayjs(closing.closingDate).format('DD.MM.YYYY HH:mm')}`}
                     secondary={`Durchgeführt von: ${closing.employee.firstName} ${closing.employee.lastName}`}
@@ -71,7 +74,7 @@ export default function AdminCashClosingPage() {
                       Differenz: {closing.difference.toFixed(2)} €
                     </Typography>
                   </Stack>
-                </ListItem>
+                </ListItemButton>
                 {index < closings.length - 1 && <Divider />}
               </Box>
             ))}

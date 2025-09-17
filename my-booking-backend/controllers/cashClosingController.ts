@@ -3,18 +3,23 @@ import { AuthRequest } from '../middlewares/authMiddleware';
 import { SalonRequest } from '../middlewares/activeSalon';
 import { CashClosing } from '../models/CashClosing';
 import { Invoice } from '../models/Invoice';
+import mongoose from 'mongoose'; // Import Mongoose
 
 // Holt die Daten für die Vorschau im Dialog
 export const getPreCalculationData = async (req: SalonRequest, res: Response) => {
     try {
-        const lastClosing = await CashClosing.findOne({ salon: req.salonId }).sort({ closingDate: -1 });
+        if (!req.salonId) {
+            return res.status(400).json({ success: false, message: 'Kein Salon ausgewählt.' });
+        }
+
+        const lastClosing = await CashClosing.findOne({ salon: new mongoose.Types.ObjectId(req.salonId) }).sort({ closingDate: -1 });
         const startPeriod = lastClosing ? lastClosing.endPeriod : new Date(0); // Start from the last closing or from the beginning of time
         const endPeriod = new Date();
 
         const result = await Invoice.aggregate([
             {
                 $match: {
-                    salon: req.salonId,
+                    salon: new mongoose.Types.ObjectId(req.salonId),
                     paymentMethod: 'cash',
                     date: { $gte: startPeriod, $lt: endPeriod }
                 }
@@ -39,27 +44,33 @@ export const getPreCalculationData = async (req: SalonRequest, res: Response) =>
 // Speichert den neuen Kassenabschluss
 export const createCashClosing = async (req: SalonRequest, res: Response) => {
     try {
+        if (!req.salonId) {
+            return res.status(400).json({ success: false, message: 'Kein Salon ausgewählt.' });
+        }
         const {
             employee,
             cashDeposit,
-            cashWithdrawal,
+            // Neue Entnahme-Felder
+            bankWithdrawal,
+            tipsWithdrawal,
             otherWithdrawal,
             actualCashOnHand,
             notes
         } = req.body;
         
-        // Neuberechnung der Daten serverseitig zur Sicherheit
-        const lastClosing = await CashClosing.findOne({ salon: req.salonId }).sort({ closingDate: -1 });
+        const lastClosing = await CashClosing.findOne({ salon: new mongoose.Types.ObjectId(req.salonId) }).sort({ closingDate: -1 });
         const startPeriod = lastClosing ? lastClosing.endPeriod : new Date(0);
         const endPeriod = new Date();
 
         const result = await Invoice.aggregate([
-            { $match: { salon: req.salonId, paymentMethod: 'cash', date: { $gte: startPeriod, $lt: endPeriod } } },
+            { $match: { salon: new mongoose.Types.ObjectId(req.salonId), paymentMethod: 'cash', date: { $gte: startPeriod, $lt: endPeriod } } },
             { $group: { _id: null, total: { $sum: "$amount" } } }
         ]);
         const cashSales = result.length > 0 ? result[0].total : 0;
 
-        const calculatedCashOnHand = (cashDeposit + cashSales) - cashWithdrawal;
+        // Gesamte Entnahme berechnen
+        const totalWithdrawal = (bankWithdrawal || 0) + (tipsWithdrawal || 0) + (otherWithdrawal || 0);
+        const calculatedCashOnHand = (cashDeposit + cashSales) - totalWithdrawal;
         const difference = actualCashOnHand - calculatedCashOnHand;
 
         const newClosing = await CashClosing.create({
@@ -69,7 +80,8 @@ export const createCashClosing = async (req: SalonRequest, res: Response) => {
             endPeriod,
             cashSales,
             cashDeposit,
-            cashWithdrawal,
+            bankWithdrawal,
+            tipsWithdrawal,
             otherWithdrawal,
             actualCashOnHand,
             calculatedCashOnHand,
@@ -88,7 +100,10 @@ export const createCashClosing = async (req: SalonRequest, res: Response) => {
 // Listet alle bisherigen Abschlüsse auf
 export const listCashClosings = async (req: SalonRequest, res: Response) => {
     try {
-        const closings = await CashClosing.find({ salon: req.salonId })
+        if (!req.salonId) {
+            return res.status(400).json({ success: false, message: 'Kein Salon ausgewählt.' });
+        }
+        const closings = await CashClosing.find({ salon: new mongoose.Types.ObjectId(req.salonId) })
             .populate('employee', 'firstName lastName')
             .sort({ closingDate: -1 });
         res.json({ success: true, closings });
@@ -96,3 +111,20 @@ export const listCashClosings = async (req: SalonRequest, res: Response) => {
         res.status(500).json({ success: false, message: 'Fehler beim Laden der Abschlüsse.' });
     }
 };
+
+
+// Einzelnen Kassenabschluss abrufen
+export const getCashClosingById = async (req: SalonRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+        const closing = await CashClosing.findOne({ _id: id, salon: req.salonId })
+            .populate('employee', 'firstName lastName');
+
+        if (!closing) {
+            return res.status(404).json({ success: false, message: 'Kassenabschluss nicht gefunden.' });
+        }
+        res.json({ success: true, closing });
+    } catch (e) {
+        res.status(500).json({ success: false, message: 'Fehler beim Laden des Abschlusses.' });
+    }
+}

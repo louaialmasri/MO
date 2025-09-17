@@ -8,7 +8,8 @@ export interface ICashClosing extends Document {
   endPeriod: Date;
   cashSales: number;
   cashDeposit: number;
-  cashWithdrawal: number;
+  bankWithdrawal: number;
+  tipsWithdrawal: number;
   otherWithdrawal: number;
   calculatedCashOnHand: number;
   actualCashOnHand: number;
@@ -24,7 +25,8 @@ const cashClosingSchema = new Schema({
   endPeriod: { type: Date, required: true },
   cashSales: { type: Number, required: true, default: 0 },
   cashDeposit: { type: Number, required: true, default: 0 },
-  cashWithdrawal: { type: Number, required: true, default: 0 },
+  bankWithdrawal: { type: Number, required: true, default: 0 },
+  tipsWithdrawal: { type: Number, required: true, default: 0 },
   otherWithdrawal: { type: Number, required: true, default: 0 },
   calculatedCashOnHand: { type: Number, required: true },
   actualCashOnHand: { type: Number, required: true },
