@@ -11,16 +11,17 @@ import {
   fetchGlobalServices, createGlobalService, deleteGlobalService,
   listStaffAssignmentsForSalon, assignStaffToSalon, unassignStaffFromSalon,
   listServiceAssignmentsForSalon, assignServiceToSalon, unassignServiceFromSalon,
-  type Salon, type GlobalStaff, type GlobalService,
+  type Salon, type GlobalStaff, type GlobalService, type Service,
   SalonGuard,
   fetchSalonsWithGuards, updateUserRole, 
-  updateGlobalService
+  updateGlobalService,
+  updateUserSkills,
 } from '@/services/api'
 
 import {
   Container, Paper, Tabs, Tab, Divider, Stack, Box, Typography, TextField, MenuItem,
   Button, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, List, ListItem,
-  ListItemText, Tooltip, Snackbar, Alert, Select, FormControl, InputLabel
+  ListItemText, Tooltip, Snackbar, Alert, Select, FormControl, InputLabel, FormGroup, FormControlLabel, Checkbox
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
@@ -30,7 +31,7 @@ import AdminBreadcrumbs from '@/components/AdminBreadcrumbs'
 function fuzzy(txt: string, q: string) { return txt.toLowerCase().includes(q.toLowerCase()) }
 
 export default function AdminCatalogPage() {
-  const { user, loading } = useAuth()
+  const { user, loading, token } = useAuth()
   const router = useRouter()
 
   const [tab, setTab] = useState<'staff'|'services'|'salons'>('staff')
@@ -57,6 +58,9 @@ export default function AdminCatalogPage() {
   const [ovrSvc, setOvrSvc] = useState<GlobalService | null>(null)
   const [ovrPrice, setOvrPrice] = useState<number | ''>('')
   const [ovrDur, setOvrDur] = useState<number | ''>('')
+  const [skillDlgOpen, setSkillDlgOpen] = useState(false);
+  const [currentStaff, setCurrentStaff] = useState<GlobalStaff | null>(null);
+  const [selectedServices, setSelectedServices] = useState<Set<string>>(new Set());
 
   // forms
   const [formStaff, setFormStaff] = useState({ email: '', password: '', firstName: '', lastName: '' })
@@ -111,7 +115,7 @@ export default function AdminCatalogPage() {
       return qRight ? assignedStaff.filter(s => fuzzy(`${s.firstName||''} ${s.lastName||''} ${s.email}`, qRight)) : assignedStaff
     }
     if (tab === 'services') {
-      return qRight ? assignedServices.filter(s => fuzzy(`${s.title} ${s.price}`, qRight)) : assignedServices
+      return qRight ? assignedServices.filter(s => fuzzy(`${s.price}`, qRight)) : assignedServices
     }
     return [] // Salons-Tab hat keine rechte Spalte
   }, [tab, qRight, assignedStaff, assignedServices])
@@ -176,6 +180,7 @@ export default function AdminCatalogPage() {
     }
     try {
       await createGlobalStaff(formStaff) // sendet das ganze formStaff Objekt
+      setGStaff(await fetchGlobalStaff());
       setDlgStaffOpen(false)
       setToast({ open: true, msg: 'Mitarbeiter angelegt', sev: 'success' })
       await reloadGuards() // neu laden
@@ -257,6 +262,44 @@ export default function AdminCatalogPage() {
       await reloadGuards() // Status aktualisieren (falls sich was geändert hat)
     }
   }
+
+  const openSkillDialog = (staff: GlobalStaff) => {
+    setCurrentStaff(staff);
+    const staffSkillIds = new Set((staff.skills || []).map(skill => typeof skill === 'string' ? skill : skill._id));
+    setSelectedServices(staffSkillIds);
+    setSkillDlgOpen(true);
+  };
+
+  const handleSkillToggle = (serviceId: string) => {
+    const newSelection = new Set(selectedServices);
+    if (newSelection.has(serviceId)) {
+        newSelection.delete(serviceId);
+    } else {
+        newSelection.add(serviceId);
+    }
+    setSelectedServices(newSelection);
+  };
+
+  const handleSaveSkills = async () => {
+    if (!currentStaff || !token) return;
+    try {
+        const skillsArray = Array.from(selectedServices);
+        await updateUserSkills(currentStaff._id, skillsArray, token);
+        setGStaff(prevStaff =>
+            prevStaff.map(s =>
+                s._id === currentStaff._id
+                    ? { ...s, skills: skillsArray }
+                    : s
+            )
+        );
+        setSkillDlgOpen(false);
+        setToast({ open: true, msg: 'Fähigkeiten gespeichert', sev: 'success' });
+    } catch {
+        setToast({ open: true, msg: 'Fehler beim Speichern der Fähigkeiten', sev: 'error' });
+    }
+  };
+
+
   // Delete-Button letzter Salon
   const [salonGuards, setSalonGuards] = useState<Record<string, SalonGuard>>({})
   useEffect(() => {
@@ -361,16 +404,23 @@ export default function AdminCatalogPage() {
                           <Stack direction="row" spacing={0.5} alignItems="center">
                             
                             {tab === 'staff' && (
-                              <FormControl size="small" sx={{ minWidth: 100 }}>
-                                <Select
-                                  value={(item as GlobalStaff).role}
-                                  onChange={(e) => handleRoleChange(id, e.target.value)}
-                                >
-                                  <MenuItem value="user">user</MenuItem>
-                                  <MenuItem value="staff">staff</MenuItem>
-                                  <MenuItem value="admin">admin</MenuItem>
-                                </Select>
-                              </FormControl>
+                              <>
+                                <Tooltip title="Fähigkeiten bearbeiten">
+                                    <IconButton onClick={() => openSkillDialog(item as GlobalStaff)}>
+                                        <TuneIcon />
+                                    </IconButton>
+                                </Tooltip>
+                                <FormControl size="small" sx={{ minWidth: 100 }}>
+                                    <Select
+                                    value={(item as GlobalStaff).role}
+                                    onChange={(e) => handleRoleChange(id, e.target.value)}
+                                    >
+                                    <MenuItem value="user">user</MenuItem>
+                                    <MenuItem value="staff">staff</MenuItem>
+                                    <MenuItem value="admin">admin</MenuItem>
+                                    </Select>
+                                </FormControl>
+                              </>
                             )}
 
                             {tab === 'services' && (
@@ -453,7 +503,7 @@ export default function AdminCatalogPage() {
                           secondary={
                             tab === 'staff'
                               ? `${(item as GlobalStaff).email} • Rolle: ${(item as GlobalStaff).role}`
-                              : `${(item as GlobalService).price}€ • ${(item as GlobalService).duration} Min`
+                              : `${(item as any).price}€ • ${(item as any).duration} Min`
                           }
                         />
                       </ListItem>
@@ -481,7 +531,29 @@ export default function AdminCatalogPage() {
           <Button variant="contained" onClick={createStaff}>Anlegen</Button>
         </DialogActions>
       </Dialog>
-
+      <Dialog open={skillDlgOpen} onClose={() => setSkillDlgOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>Fähigkeiten für {currentStaff?.firstName} {currentStaff?.lastName}</DialogTitle>
+        <DialogContent>
+            <FormGroup>
+                {gServices.map((service) => (
+                    <FormControlLabel
+                        key={service._id}
+                        control={
+                            <Checkbox
+                                checked={selectedServices.has(service._id)}
+                                onChange={() => handleSkillToggle(service._id)}
+                            />
+                        }
+                        label={service.title}
+                    />
+                ))}
+            </FormGroup>
+        </DialogContent>
+        <DialogActions>
+            <Button onClick={() => setSkillDlgOpen(false)}>Abbrechen</Button>
+            <Button variant="contained" onClick={handleSaveSkills}>Speichern</Button>
+        </DialogActions>
+    </Dialog>
       <Dialog 
         open={dlgServiceOpen} 
         onClose={() => {
