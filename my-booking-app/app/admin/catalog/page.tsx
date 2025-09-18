@@ -13,7 +13,7 @@ import {
   listServiceAssignmentsForSalon, assignServiceToSalon, unassignServiceFromSalon,
   type Salon, type GlobalStaff, type GlobalService, type Service,
   SalonGuard,
-  fetchSalonsWithGuards, updateUserRole, 
+  fetchSalonsWithGuards, updateUserRole,
   updateGlobalService,
   updateUserSkills,
 } from '@/services/api'
@@ -443,11 +443,13 @@ export default function AdminCatalogPage() {
                             
                             {tab === 'staff' && (
                                 <>
-                                    <Tooltip title="Fähigkeiten bearbeiten">
-                                        <IconButton onClick={() => openSkillDialog(item as GlobalStaff)}>
-                                            <TuneIcon />
-                                        </IconButton>
-                                    </Tooltip>
+                                    {(item as GlobalStaff).role === 'staff' && (
+                                        <Tooltip title="Fähigkeiten bearbeiten">
+                                            <IconButton onClick={() => openSkillDialog(item as GlobalStaff)}>
+                                                <TuneIcon />
+                                            </IconButton>
+                                        </Tooltip>
+                                    )}
                                     <Tooltip title="Benutzer bearbeiten">
                                         <IconButton onClick={() => handleOpenEditStaff(item as GlobalStaff)}>
                                             <EditIcon />
@@ -473,7 +475,7 @@ export default function AdminCatalogPage() {
 
                             <Tooltip title={already ? 'Schon zugeordnet' : 'Zum Salon zuordnen'}>
                               <span>
-                                <IconButton disabled={already} onClick={() => onAssign(id)}><AddIcon /></IconButton>
+                                <IconButton disabled={already || (tab === 'staff' && (item as GlobalStaff).role !== 'staff')} onClick={() => onAssign(id)}><AddIcon /></IconButton>
                               </span>
                             </Tooltip>
                             <Tooltip title="Global löschen">

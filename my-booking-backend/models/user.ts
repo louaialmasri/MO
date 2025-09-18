@@ -6,9 +6,11 @@ const userSchema = new Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   password: { type: String, required: true, select: false },
   role: { type: String, enum: ['user','staff','admin'], required: true },
-  address: { type: String }, // Optional gemacht
-  phone: { type: String }, // Optional gemacht
+  address: { type: String },
+  phone: { type: String },
+  // Skills sind primär für Staff relevant
   skills: [{ type: Schema.Types.ObjectId, ref: 'Service', default: [] }],
+  // Salon-Zuweisung nur für Staff und Admin relevant
   salon: { type: Schema.Types.ObjectId, ref: 'Salon', default: null },
 }, { timestamps: true })
 
