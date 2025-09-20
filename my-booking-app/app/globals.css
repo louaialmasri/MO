@@ -1,9 +1,9 @@
 @import 'react-datepicker/dist/react-datepicker.css';
 
-/* Die alten generischen Styles für input, label und button wurden entfernt.
-  Das Styling wird jetzt konsistent über das MUI-Theme in app/theme.ts gesteuert.
-  Das sorgt für ein einheitliches Design in der gesamten Anwendung.
+/* Das Styling wird jetzt konsistent über das MUI-Theme in app/theme.ts gesteuert.
 */
 body {
-  background-color: #FDFBF7; /* Setzt die neue Hintergrundfarbe global */
+  /* Diese Farbe wird vom Theme (background.default) überschrieben, 
+     dient aber als guter Fallback. */
+  background-color: #F9F6F2;
 }

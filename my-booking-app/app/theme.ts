@@ -2,26 +2,27 @@
 
 import { createTheme } from '@mui/material/styles';
 
-// Eine neue, moderne und warme Farbpalette basierend auf Erd-/Beigetönen
+// Eine verfeinerte, moderne Erdton-Palette
 const theme = createTheme({
   palette: {
     primary: {
-      main: '#8D6E63', // Ein warmes, sanftes Braun
+      main: '#795548', // Ein tieferes, satteres Braun
     },
     secondary: {
-      main: '#FFAB40', // Ein kräftiger Gold-Orangeton als Akzent
+      main: '#FFA726', // Ein warmer, kräftiger Bernstein-Ton
     },
     background: {
-      default: '#FDFBF7', // Ein sehr helles, warmes Beige für den Hintergrund
+      default: '#F9F6F2', // Ein sehr helles, neutrales Off-White
       paper: '#FFFFFF',
     },
     text: {
-      primary: '#424242', // Dunkleres Grau für besseren Kontrast
+      primary: '#424242',
       secondary: '#757575',
     },
+    divider: '#EAE3DA', // Passend zur Farbpalette
   },
   typography: {
-    fontFamily: '"Poppins", "Helvetica", "Arial", sans-serif', // Eine modernere Schriftart
+    fontFamily: '"Poppins", "Helvetica", "Arial", sans-serif',
     h4: {
       fontWeight: 700,
     },
@@ -33,27 +34,31 @@ const theme = createTheme({
     },
   },
   components: {
-    // Styling für alle Paper-Komponenten (wie die KPI-Karten)
     MuiPaper: {
       styleOverrides: {
         root: {
-          borderRadius: 16, // Etwas rundere Ecken für einen weicheren Look
-          boxShadow: '0px 6px 20px rgba(0,0,0,0.07)', // Weicher, definierter Schatten
-          border: '1px solid #EFEBE9', // Subtile Umrandung
+          borderRadius: 12, // Weichere, modernere Ecken
+          boxShadow: '0 8px 16px rgba(0,0,0,0.05)', // Ein sehr subtiler Schatten
+          border: '1px solid #EAE3DA',
         },
       },
     },
-    // Styling für alle Buttons
     MuiButton: {
       styleOverrides: {
         root: {
-          borderRadius: 8,
-          textTransform: 'none', // Keine Großbuchstaben
+          borderRadius: 10,
+          textTransform: 'none',
           fontWeight: 600,
-          padding: '8px 16px',
+          padding: '8px 20px',
+          boxShadow: 'none',
+          transition: 'background-color 0.2s ease-in-out, transform 0.1s ease-in-out',
+          '&:hover': {
+            boxShadow: 'none',
+            transform: 'translateY(-1px)', // Subtiler Schwebe-Effekt
+          },
         },
         containedPrimary: {
-          color: '#FFFFFF', // Sicherstellen, dass der Text weiß ist
+          color: '#FFFFFF',
         },
       },
     },
@@ -73,6 +78,15 @@ const theme = createTheme({
         },
       },
     },
+    MuiAppBar: {
+        styleOverrides: {
+            root: {
+                // "Frosted Glass" Effekt
+                backgroundColor: 'rgba(249, 246, 242, 0.85)', 
+                backdropFilter: 'blur(10px)',
+            }
+        }
+    }
   },
 });
 
