@@ -27,6 +27,7 @@ export type Service = {
   price: number
   duration: number
   salon?: string | null
+  category?: string | null
 }
 
 export type Booking = {

@@ -1,9 +1,7 @@
+@import 'slick-carousel/slick/slick.css';
+@import 'slick-carousel/slick/slick-theme.css';
 @import 'react-datepicker/dist/react-datepicker.css';
 
-/* Das Styling wird jetzt konsistent über das MUI-Theme in app/theme.ts gesteuert.
-*/
 body {
-  /* Diese Farbe wird vom Theme (background.default) überschrieben, 
-     dient aber als guter Fallback. */
   background-color: #F9F6F2;
 }

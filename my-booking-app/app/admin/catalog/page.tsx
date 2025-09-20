@@ -1,5 +1,3 @@
-// my-booking-app/app/admin/catalog/page.tsx
-
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
@@ -13,7 +11,7 @@ import {
   listServiceAssignmentsForSalon, assignServiceToSalon, unassignServiceFromSalon,
   type Salon, type GlobalStaff, type GlobalService, type Service,
   SalonGuard,
-  fetchSalonsWithGuards, updateUserRole,
+  fetchSalonsWithGuards, updateUserRole, 
   updateGlobalService,
   updateUserSkills,
 } from '@/services/api'
@@ -21,8 +19,7 @@ import {
 import {
   Container, Paper, Tabs, Tab, Divider, Stack, Box, Typography, TextField, MenuItem,
   Button, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, List, ListItem,
-  ListItemText, Tooltip, Snackbar, Alert, Select, FormControl, InputLabel, FormGroup, FormControlLabel, Checkbox,
-  Chip
+  ListItemText, Tooltip, Snackbar, Alert, Select, FormControl, InputLabel, FormGroup, FormControlLabel, Checkbox, Chip
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
@@ -70,7 +67,7 @@ export default function AdminCatalogPage() {
   // forms
   const [formStaff, setFormStaff] = useState({ email: '', password: '', firstName: '', lastName: '' })
   const [formEditStaff, setFormEditStaff] = useState<GlobalStaff | null>(null);
-  const [formService, setFormService] = useState({ title: '', description: '', price: '', duration: '' } as any)
+  const [formService, setFormService] = useState({ title: '', description: '', price: '', duration: '', category: '' } as any)
   const [formSalon, setFormSalon] = useState({ name: '', logoUrl: '' })
 
   const [toast, setToast] = useState<{open:boolean; msg:string; sev:'success'|'error'}>({open:false,msg:'',sev:'success'})
@@ -197,11 +194,11 @@ export default function AdminCatalogPage() {
   }
 
   const createService = async () => {
-    const { title, price, duration } = formService
+    const { title, price, duration, category } = formService
     if (!title || !price || !duration) { setToast({open:true,msg:'Titel, Preis, Dauer erforderlich',sev:'error'}); return }
-    await createGlobalService({ title, description: formService.description || undefined, price: Number(price), duration: Number(duration) })
+    await createGlobalService({ title, description: formService.description || undefined, price: Number(price), duration: Number(duration), category })
     setGServices(await fetchGlobalServices())
-    setDlgServiceOpen(false); setFormService({ title:'', description:'', price:'', duration:'' })
+    setDlgServiceOpen(false); setFormService({ title:'', description:'', price:'', duration:'', category:'' })
     setToast({open:true,msg:'Service angelegt',sev:'success'})
   }
 
@@ -209,7 +206,7 @@ export default function AdminCatalogPage() {
   if (!editingServiceId) return;
 
   try {
-    const { title, price, duration } = formService;
+    const { title, price, duration, category } = formService;
     if (!title || !price || !duration) {
       setToast({ open: true, msg: 'Titel, Preis, Dauer erforderlich', sev: 'error' });
       return;
@@ -219,6 +216,7 @@ export default function AdminCatalogPage() {
       description: formService.description || undefined,
       price: Number(price),
       duration: Number(duration),
+      category,
     });
 
     setGServices(await fetchGlobalServices()); // Liste aktualisieren
@@ -422,7 +420,7 @@ export default function AdminCatalogPage() {
                   ) : (
                     <Button variant="contained" startIcon={<AddIcon />} onClick={() => {
                       setEditingServiceId(null); // Wichtig: Bearbeitungsmodus ausschalten
-                      setFormService({ title: '', description: '', price: '', duration: '' }); // Formular leeren
+                      setFormService({ title: '', description: '', price: '', duration: '', category: '' }); // Formular leeren
                       setDlgServiceOpen(true);
                     }}>
                       Service anlegen
@@ -643,12 +641,11 @@ export default function AdminCatalogPage() {
           {editingServiceId ? 'Service bearbeiten' : 'Service anlegen (global)'}
         </DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-          {/* Die TextFields bleiben unverändert */}
           <TextField label="Titel" value={formService.title} onChange={e => setFormService({ ...formService, title: e.target.value })} />
-          {/* ... andere TextFields ... */}
           <TextField label="Beschreibung" value={formService.description} onChange={e=>setFormService({...formService, description:e.target.value})} />
           <TextField label="Preis (€)" type="number" value={formService.price} onChange={e=>setFormService({...formService, price:e.target.value})} />
           <TextField label="Dauer (Minuten)" type="number" value={formService.duration} onChange={e=>setFormService({...formService, duration:e.target.value})} />
+          <TextField label="Kategorie" value={formService.category} onChange={e=>setFormService({...formService, category:e.target.value})} />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => { setDlgServiceOpen(false); setEditingServiceId(null); }}>Abbrechen</Button>
