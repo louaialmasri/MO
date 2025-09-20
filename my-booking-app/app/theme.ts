@@ -6,7 +6,7 @@ import { createTheme } from '@mui/material/styles';
 const theme = createTheme({
   palette: {
     primary: {
-      main: '#795548', // Ein tieferes, satteres Braun
+      main: '#e2673aff', // Ein tieferes, satteres Braun
     },
     secondary: {
       main: '#FFA726', // Ein warmer, kräftiger Bernstein-Ton
