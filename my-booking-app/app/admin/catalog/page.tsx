@@ -1,3 +1,5 @@
+// my-booking-app/app/admin/catalog/page.tsx
+
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
@@ -9,7 +11,7 @@ import {
   fetchGlobalServices, createGlobalService, deleteGlobalService,
   listStaffAssignmentsForSalon, assignStaffToSalon, unassignStaffFromSalon,
   listServiceAssignmentsForSalon, assignServiceToSalon, unassignServiceFromSalon,
-  type Salon, type GlobalStaff, type GlobalService, type Service,
+  type Salon, type GlobalStaff, type GlobalService,
   SalonGuard,
   fetchSalonsWithGuards, updateUserRole, 
   updateGlobalService,
@@ -641,11 +643,11 @@ export default function AdminCatalogPage() {
           {editingServiceId ? 'Service bearbeiten' : 'Service anlegen (global)'}
         </DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-          <TextField label="Titel" value={formService.title} onChange={e => setFormService({ ...formService, title: e.target.value })} />
-          <TextField label="Beschreibung" value={formService.description} onChange={e=>setFormService({...formService, description:e.target.value})} />
-          <TextField label="Preis (€)" type="number" value={formService.price} onChange={e=>setFormService({...formService, price:e.target.value})} />
-          <TextField label="Dauer (Minuten)" type="number" value={formService.duration} onChange={e=>setFormService({...formService, duration:e.target.value})} />
-          <TextField label="Kategorie" value={formService.category} onChange={e=>setFormService({...formService, category:e.target.value})} />
+          <TextField label="Titel" value={formService.title || ''} onChange={e => setFormService({ ...formService, title: e.target.value })} />
+          <TextField label="Beschreibung" value={formService.description || ''} onChange={e=>setFormService({...formService, description:e.target.value})} />
+          <TextField label="Preis (€)" type="number" value={formService.price || ''} onChange={e=>setFormService({...formService, price:e.target.value})} />
+          <TextField label="Dauer (Minuten)" type="number" value={formService.duration || ''} onChange={e=>setFormService({...formService, duration:e.target.value})} />
+          <TextField label="Kategorie" value={formService.category || ''} onChange={e=>setFormService({...formService, category:e.target.value})} />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => { setDlgServiceOpen(false); setEditingServiceId(null); }}>Abbrechen</Button>

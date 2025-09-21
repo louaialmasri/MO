@@ -5,6 +5,7 @@ import { User } from '../models/User'
 import { Service } from '../models/Service'
 import bcrypt from 'bcrypt';
 import { Salon } from '../models/Salon'
+import mongoose from 'mongoose'
 
 const router = express.Router()
 // KORREKTUR: Middleware wird jetzt pro Route angewendet
@@ -52,6 +53,21 @@ router.get('/services-all', async (_, res) => {
   const services = await Service.find({}).lean()
   res.json({ success:true, services })
 })
+
+router.get('/g-services/:id', async (req, res) => {
+    try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).send('Ungültige Service ID');
+        }
+        const service = await Service.findById(req.params.id);
+        if (!service) {
+            return res.status(404).send('Service nicht gefunden');
+        }
+        res.json(service);
+    } catch (error: any) {
+        res.status(500).json({ message: 'Fehler beim Abrufen des Services', error: error.message });
+    }
+});
 
 // Admin-spezifische Service-Endpunkte
 router.post('/g-services', async (req, res) => {
