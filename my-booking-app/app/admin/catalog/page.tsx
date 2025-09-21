@@ -1,5 +1,3 @@
-// my-booking-app/app/admin/catalog/page.tsx
-
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
@@ -10,11 +8,10 @@ import {
   fetchGlobalStaff, createGlobalStaff, deleteGlobalUser,
   fetchGlobalServices, createGlobalService, deleteGlobalService,
   listStaffAssignmentsForSalon, assignStaffToSalon, unassignStaffFromSalon,
-  listServiceAssignmentsForSalon, assignServiceToSalon, unassignServiceFromSalon,
+  listServiceAssignmentsForSalon, assignServiceToSalon, unassignServiceFromSalon, updateGlobalService,
   type Salon, type GlobalStaff, type GlobalService,
   SalonGuard,
   fetchSalonsWithGuards, updateUserRole, 
-  updateGlobalService,
   updateUserSkills,
 } from '@/services/api'
 
@@ -69,7 +66,7 @@ export default function AdminCatalogPage() {
   // forms
   const [formStaff, setFormStaff] = useState({ email: '', password: '', firstName: '', lastName: '' })
   const [formEditStaff, setFormEditStaff] = useState<GlobalStaff | null>(null);
-  const [formService, setFormService] = useState({ title: '', description: '', price: '', duration: '', category: '' } as any)
+  const [formService, setFormService] = useState({ title: '', description: '', price: '', duration: '', category: '' })
   const [formSalon, setFormSalon] = useState({ name: '', logoUrl: '' })
 
   const [toast, setToast] = useState<{open:boolean; msg:string; sev:'success'|'error'}>({open:false,msg:'',sev:'success'})
