@@ -72,11 +72,12 @@ router.get('/g-services/:id', async (req, res) => {
 // Admin-spezifische Service-Endpunkte
 router.post('/g-services', async (req, res) => {
   try {
-    const { title, description, price, duration, category } = req.body // category hinzugefügt
+    const { title, description, price, duration, category } = req.body
     if (!title || !price || !duration) {
       return res.status(400).send('Titel, Preis und Dauer sind erforderlich')
     }
-    const newService = new Service({ title, description, price, duration, category }) // category hinzugefügt
+    // KORREKTUR: 'category' wird jetzt dem neuen Service hinzugefügt
+    const newService = new Service({ title, description, price, duration, category })
     await newService.save()
     res.status(201).json(newService)
   } catch (error: any) {
@@ -87,10 +88,11 @@ router.post('/g-services', async (req, res) => {
 // PUT /api/admin/g-services/:id - Aktualisiert einen globalen Service
 router.put('/g-services/:id', async (req, res) => {
   try {
-    const { title, description, price, duration, category } = req.body // category hinzugefügt
+    const { title, description, price, duration, category } = req.body
     const updatedService = await Service.findByIdAndUpdate(
       req.params.id,
-      { title, description, price, duration, category }, // category hinzugefügt
+      // KORREKTUR: 'category' wird jetzt beim Update berücksichtigt
+      { title, description, price, duration, category },
       { new: true }
     )
     if (!updatedService) return res.status(404).send('Service nicht gefunden')
