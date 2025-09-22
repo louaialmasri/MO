@@ -541,14 +541,14 @@ export async function createGlobalService(payload: { title: string; description?
 export async function deleteGlobalService(id: string) {
   const config = {} as any;
   config.noSalonHeader = true;
-  const res = await api.delete(`/admin/services/${id}`, config);
+  const res = await api.delete(`/admin/g-services/${id}`, config);
   return res.data
 }
 
 export async function updateGlobalService(id: string, payload: { title: string; description?: string; price: number; duration: number; category?: string | null }) {
   const config = {} as any;
   config.noSalonHeader = true; // Wichtig für globale Admin-Funktionen
-  const res = await api.patch(`/admin/g-services/${id}`, payload, config);
+  const res = await api.put(`/admin/g-services/${id}`, payload, config);
   return res.data.service as GlobalService;
 }
 
@@ -684,6 +684,16 @@ export const createProductCategory = async (name: string, token: string): Promis
   return res.data;
 };
 
+export const updateServiceCategory = async (id: string, name: string, token: string): Promise<ServiceCategory> => {
+  const res = await api.patch(`/service-categories/${id}`, { name }, { headers: { Authorization: `Bearer ${token}` } });
+  return res.data;
+};
+
+export const deleteServiceCategory = async (id: string, token: string): Promise<void> => {
+  await api.delete(`/service-categories/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+};
+
+
 // Products
 export const fetchProducts = async (token: string): Promise<Product[]> => {
   const res = await api.get('/products', { headers: { Authorization: `Bearer ${token}` } });
@@ -694,6 +704,5 @@ export const createProduct = async (productData: Omit<Product, '_id' | 'category
   const res = await api.post('/products', productData, { headers: { Authorization: `Bearer ${token}` } });
   return res.data;
 };
-
 
 export default api
