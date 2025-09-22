@@ -9,10 +9,10 @@ import {
   fetchGlobalServices, createGlobalService, deleteGlobalService,
   listStaffAssignmentsForSalon, assignStaffToSalon, unassignStaffFromSalon,
   listServiceAssignmentsForSalon, assignServiceToSalon, unassignServiceFromSalon, updateGlobalService,
-  fetchServiceCategories, createServiceCategory, updateServiceCategory, deleteServiceCategory, // Geändert
+  fetchServiceCategories, createServiceCategory, updateServiceCategory, deleteServiceCategory,
   type Salon, type GlobalStaff, type GlobalService, type ServiceCategory,
   SalonGuard,
-  fetchSalonsWithGuards, updateUserRole, 
+  fetchSalonsWithGuards, updateUserRole,
   updateUserSkills,
 } from '@/services/api'
 
@@ -33,7 +33,7 @@ export default function AdminCatalogPage() {
   const { user, loading, token } = useAuth()
   const router = useRouter()
 
-  const [tab, setTab] = useState<'staff'|'services'|'salons'>('staff')
+  const [tab, setTab] = useState<'staff' | 'services' | 'salons'>('staff')
   const [salons, setSalons] = useState<Salon[]>([])
   const [salonId, setSalonId] = useState<string>('')
 
@@ -44,7 +44,7 @@ export default function AdminCatalogPage() {
 
   // assignments
   const [assignedStaff, setAssignedStaff] = useState<GlobalStaff[]>([])
-  const [assignedServices, setAssignedServices] = useState<(GlobalService & { price:number; duration:number })[]>([])
+  const [assignedServices, setAssignedServices] = useState<(GlobalService & { price: number; duration: number })[]>([])
 
   // search and filter
   const [qLeft, setQLeft] = useState('')
@@ -56,8 +56,8 @@ export default function AdminCatalogPage() {
   const [dlgStaffOpen, setDlgStaffOpen] = useState(false)
   const [dlgEditStaffOpen, setDlgEditStaffOpen] = useState(false);
   const [dlgServiceOpen, setDlgServiceOpen] = useState(false)
-  const [dlgServiceCategoryOpen, setDlgServiceCategoryOpen] = useState(false); 
-  const [editingCategory, setEditingCategory] = useState<ServiceCategory | null>(null); // NEU
+  const [dlgServiceCategoryOpen, setDlgServiceCategoryOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<ServiceCategory | null>(null);
   const [dlgSalonOpen, setDlgSalonOpen] = useState(false)
   const [ovrOpen, setOvrOpen] = useState(false)
   const [ovrSvc, setOvrSvc] = useState<GlobalService | null>(null)
@@ -70,23 +70,23 @@ export default function AdminCatalogPage() {
   // forms
   const [formStaff, setFormStaff] = useState({ email: '', password: '', firstName: '', lastName: '' })
   const [formEditStaff, setFormEditStaff] = useState<GlobalStaff | null>(null);
-  const [formService, setFormService] = useState({ title: '', description: '', price: '', duration: '', category: ''})
+  const [formService, setFormService] = useState({ title: '', description: '', price: '', duration: '', category: '' })
   const [newServiceCategoryName, setNewServiceCategoryName] = useState('');
   const [formSalon, setFormSalon] = useState({ name: '', logoUrl: '' })
 
-  const [toast, setToast] = useState<{open:boolean; msg:string; sev:'success'|'error'}>({open:false,msg:'',sev:'success'})
+  const [toast, setToast] = useState<{ open: boolean; msg: string; sev: 'success' | 'error' }>({ open: false, msg: '', sev: 'success' })
 
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
 
   useEffect(() => {
-      if (loading) return
-      if (!user) return router.replace('/login')
-      if (user.role !== 'admin') return router.replace('/')
-    }, [user, loading])
+    if (loading) return
+    if (!user) return router.replace('/login')
+    if (user.role !== 'admin') return router.replace('/')
+  }, [user, loading])
 
   useEffect(() => {
     (async () => {
-      if (!token) return; // NEU
+      if (!token) return;
       const [salonList, staffList, svcList, serviceCatList] = await Promise.all([
         fetchSalons(), fetchGlobalStaff(), fetchGlobalServices(), fetchServiceCategories(token)
       ])
@@ -95,8 +95,8 @@ export default function AdminCatalogPage() {
       setGStaff(staffList)
       setGServices(svcList)
       setServiceCategories(serviceCatList);
-    })().catch(() => {})
-  }, [token]) 
+    })().catch(() => { })
+  }, [token])
 
   useEffect(() => {
     (async () => {
@@ -113,27 +113,27 @@ export default function AdminCatalogPage() {
     const roleOrder = { admin: 1, staff: 2, user: 3 };
 
     if (tab === 'staff') {
-        let filteredStaff = gStaff;
+      let filteredStaff = gStaff;
 
-        if (staffFilter !== 'all') {
-            filteredStaff = filteredStaff.filter(s => s.role === staffFilter);
-        }
+      if (staffFilter !== 'all') {
+        filteredStaff = filteredStaff.filter(s => s.role === staffFilter);
+      }
 
-        if (qLeft) {
-            filteredStaff = filteredStaff.filter(s => fuzzy(`${s.firstName || ''} ${s.lastName || ''} ${s.email}`, qLeft));
-        }
+      if (qLeft) {
+        filteredStaff = filteredStaff.filter(s => fuzzy(`${s.firstName || ''} ${s.lastName || ''} ${s.email}`, qLeft));
+      }
 
-        return filteredStaff.sort((a, b) => (roleOrder[a.role] || 4) - (roleOrder[b.role] || 4));
+      return filteredStaff.sort((a, b) => (roleOrder[a.role] || 4) - (roleOrder[b.role] || 4));
     }
     if (tab === 'services') {
-      return qLeft ? gServices.filter(s => fuzzy(`${s.title} ${s.description||''}`, qLeft)) : gServices
+      return qLeft ? gServices.filter(s => fuzzy(`${s.title} ${s.description || ''}`, qLeft)) : gServices
     }
     return salons
   }, [tab, qLeft, gStaff, gServices, salons, staffFilter])
 
   const rightList = useMemo(() => {
     if (tab === 'staff') {
-      return qRight ? assignedStaff.filter(s => fuzzy(`${s.firstName||''} ${s.lastName||''} ${s.email}`, qRight)) : assignedStaff
+      return qRight ? assignedStaff.filter(s => fuzzy(`${s.firstName || ''} ${s.lastName || ''} ${s.email}`, qRight)) : assignedStaff
     }
     if (tab === 'services') {
       return qRight ? assignedServices.filter(s => fuzzy(`${s.price}`, qRight)) : assignedServices
@@ -148,7 +148,7 @@ export default function AdminCatalogPage() {
     if (tab === 'staff') {
       await assignStaffToSalon(id, salonId)
       setAssignedStaff(await listStaffAssignmentsForSalon(salonId))
-      setToast({open:true,msg:'Mitarbeiter zugeordnet',sev:'success'})
+      setToast({ open: true, msg: 'Mitarbeiter zugeordnet', sev: 'success' })
       await reloadGuards()
     } else if (tab === 'services') {
       const svc = gServices.find(s => s._id === id) || null
@@ -164,7 +164,7 @@ export default function AdminCatalogPage() {
     })
     setAssignedServices(await listServiceAssignmentsForSalon(salonId))
     setOvrOpen(false)
-    setToast({open:true,msg:'Service zugeordnet',sev:'success'})
+    setToast({ open: true, msg: 'Service zugeordnet', sev: 'success' })
     await reloadGuards()
   }
   const onUnassign = async (id: string) => {
@@ -172,12 +172,12 @@ export default function AdminCatalogPage() {
     if (tab === 'staff') {
       await unassignStaffFromSalon(id, salonId)
       setAssignedStaff(await listStaffAssignmentsForSalon(salonId))
-      setToast({open:true,msg:'Mitarbeiter entfernt',sev:'success'})
+      setToast({ open: true, msg: 'Mitarbeiter entfernt', sev: 'success' })
       await reloadGuards()
     } else if (tab === 'services') {
       await unassignServiceFromSalon(id, salonId)
       setAssignedServices(await listServiceAssignmentsForSalon(salonId))
-      setToast({open:true,msg:'Service entfernt',sev:'success'})
+      setToast({ open: true, msg: 'Service entfernt', sev: 'success' })
     }
   }
 
@@ -201,42 +201,42 @@ export default function AdminCatalogPage() {
 
   const createService = async () => {
     const { title, price, duration, category } = formService
-    if (!title || !price || !duration) { setToast({open:true,msg:'Titel, Preis, Dauer erforderlich',sev:'error'}); return }
+    if (!title || !price || !duration) { setToast({ open: true, msg: 'Titel, Preis, Dauer erforderlich', sev: 'error' }); return }
     await createGlobalService({ title, description: formService.description || undefined, price: Number(price), duration: Number(duration), category: category || undefined })
     setGServices(await fetchGlobalServices())
-    setDlgServiceOpen(false); setFormService({ title:'', description:'', price:'', duration:'', category: '' })
-    setToast({open:true,msg:'Service angelegt',sev:'success'})
+    setDlgServiceOpen(false); setFormService({ title: '', description: '', price: '', duration: '', category: '' })
+    setToast({ open: true, msg: 'Service angelegt', sev: 'success' })
   }
 
   const updateService = async () => {
-  if (!editingServiceId) return;
+    if (!editingServiceId) return;
 
-  try {
-    const { title, price, duration, category } = formService;
-    if (!title || !price || !duration) {
-      setToast({ open: true, msg: 'Titel, Preis, Dauer erforderlich', sev: 'error' });
-      return;
+    try {
+      const { title, price, duration, category } = formService;
+      if (!title || !price || !duration) {
+        setToast({ open: true, msg: 'Titel, Preis, Dauer erforderlich', sev: 'error' });
+        return;
+      }
+      await updateGlobalService(editingServiceId, {
+        title,
+        description: formService.description || undefined,
+        price: Number(price),
+        duration: Number(duration),
+        category: category || undefined,
+      });
+
+      setGServices(await fetchGlobalServices()); // Liste aktualisieren
+      setDlgServiceOpen(false); // Dialog schließen
+      setToast({ open: true, msg: 'Service erfolgreich aktualisiert', sev: 'success' });
+    } catch (e: any) {
+      setToast({ open: true, msg: 'Fehler beim Speichern', sev: 'error' });
     }
-    await updateGlobalService(editingServiceId, {
-      title,
-      description: formService.description || undefined,
-      price: Number(price),
-      duration: Number(duration),
-      category: category || undefined,
-    });
+  };
 
-    setGServices(await fetchGlobalServices()); // Liste aktualisieren
-    setDlgServiceOpen(false); // Dialog schließen
-    setToast({ open: true, msg: 'Service erfolgreich aktualisiert', sev: 'success' });
-  } catch (e: any) {
-    setToast({ open: true, msg: 'Fehler beim Speichern', sev: 'error' });
-  }
-};
-  
   const handleCreateServiceCategory = async () => {
     if (!newServiceCategoryName.trim()) {
-        setToast({ open: true, msg: 'Kategoriename darf nicht leer sein', sev: 'error' });
-        return;
+      setToast({ open: true, msg: 'Kategoriename darf nicht leer sein', sev: 'error' });
+      return;
     }
     try {
       if (editingCategory) {
@@ -246,23 +246,23 @@ export default function AdminCatalogPage() {
         await createServiceCategory(newServiceCategoryName, token!);
         setToast({ open: true, msg: 'Service-Kategorie erfolgreich erstellt', sev: 'success' });
       }
-        setDlgServiceCategoryOpen(false);
-        setNewServiceCategoryName('');
-        setEditingCategory(null);
-        setServiceCategories(await fetchServiceCategories(token!)); // Reload categories
+      setDlgServiceCategoryOpen(false);
+      setNewServiceCategoryName('');
+      setEditingCategory(null);
+      setServiceCategories(await fetchServiceCategories(token!)); // Reload categories
     } catch (error) {
-        setToast({ open: true, msg: 'Fehler beim Speichern der Service-Kategorie', sev: 'error' });
+      setToast({ open: true, msg: 'Fehler beim Speichern der Service-Kategorie', sev: 'error' });
     }
   };
 
   const handleDeleteServiceCategory = async (id: string) => {
     try {
-        await deleteServiceCategory(id, token!);
-        setToast({ open: true, msg: 'Service-Kategorie erfolgreich gelöscht', sev: 'success' });
-        setServiceCategories(await fetchServiceCategories(token!)); // Reload categories
+      await deleteServiceCategory(id, token!);
+      setToast({ open: true, msg: 'Service-Kategorie erfolgreich gelöscht', sev: 'success' });
+      setServiceCategories(await fetchServiceCategories(token!)); // Reload categories
     } catch (error: any) {
-        const msg = error?.response?.data?.message || 'Fehler beim Löschen der Kategorie';
-        setToast({ open: true, msg, sev: 'error' });
+      const msg = error?.response?.data?.message || 'Fehler beim Löschen der Kategorie';
+      setToast({ open: true, msg, sev: 'error' });
     }
   };
 
@@ -274,13 +274,13 @@ export default function AdminCatalogPage() {
 
 
   const createSalon = async () => {
-    if (!formSalon.name) { setToast({open:true,msg:'Name erforderlich',sev:'error'}); return }
+    if (!formSalon.name) { setToast({ open: true, msg: 'Name erforderlich', sev: 'error' }); return }
     const s = await createSalonApi({ name: formSalon.name, logoUrl: formSalon.logoUrl || undefined })
     const list = await fetchSalons()
     setSalons(list)
     setSalonId(s._id) // direkt zum neuen Salon springen
-    setDlgSalonOpen(false); setFormSalon({ name:'', logoUrl:'' })
-    setToast({open:true,msg:'Salon angelegt',sev:'success'})
+    setDlgSalonOpen(false); setFormSalon({ name: '', logoUrl: '' })
+    setToast({ open: true, msg: 'Salon angelegt', sev: 'success' })
     await reloadGuards()
   }
 
@@ -290,13 +290,13 @@ export default function AdminCatalogPage() {
     setGStaff(await fetchGlobalStaff())
     // entfernt sich ggf. auch aus Zuweisungsliste beim Reload
     if (salonId) setAssignedStaff(await listStaffAssignmentsForSalon(salonId))
-    setToast({open:true,msg:'Staff gelöscht',sev:'success'})
+    setToast({ open: true, msg: 'Staff gelöscht', sev: 'success' })
   }
   const deleteService = async (id: string) => {
     await deleteGlobalService(id)
     setGServices(await fetchGlobalServices())
     if (salonId) setAssignedServices(await listServiceAssignmentsForSalon(salonId))
-    setToast({open:true,msg:'Service gelöscht',sev:'success'})
+    setToast({ open: true, msg: 'Service gelöscht', sev: 'success' })
   }
   const deleteSalon = async (id: string) => {
     try {
@@ -305,10 +305,10 @@ export default function AdminCatalogPage() {
       setSalons(list)
       if (salonId === id) setSalonId(list[0]?._id || '')
       await reloadGuards()
-      setToast({open:true,msg:'Salon gelöscht',sev:'success'})
-    } catch (e:any) {
+      setToast({ open: true, msg: 'Salon gelöscht', sev: 'success' })
+    } catch (e: any) {
       const msg = e?.response?.data?.message || 'Löschen fehlgeschlagen'
-      setToast({open:true,msg,sev:'error'})
+      setToast({ open: true, msg, sev: 'error' })
       await reloadGuards() // Status aktualisieren (falls sich was geändert hat)
     }
   }
@@ -323,9 +323,9 @@ export default function AdminCatalogPage() {
   const handleSkillToggle = (serviceId: string) => {
     const newSelection = new Set(selectedServices);
     if (newSelection.has(serviceId)) {
-        newSelection.delete(serviceId);
+      newSelection.delete(serviceId);
     } else {
-        newSelection.add(serviceId);
+      newSelection.add(serviceId);
     }
     setSelectedServices(newSelection);
   };
@@ -333,19 +333,19 @@ export default function AdminCatalogPage() {
   const handleSaveSkills = async () => {
     if (!currentStaff || !token) return;
     try {
-        const skillsArray = Array.from(selectedServices);
-        await updateUserSkills(currentStaff._id, skillsArray, token);
-        setGStaff(prevStaff =>
-            prevStaff.map(s =>
-                s._id === currentStaff._id
-                    ? { ...s, skills: skillsArray.map(id => ({ _id: id })) }
-                    : s
-            )
-        );
-        setSkillDlgOpen(false);
-        setToast({ open: true, msg: 'Fähigkeiten gespeichert', sev: 'success' });
+      const skillsArray = Array.from(selectedServices);
+      await updateUserSkills(currentStaff._id, skillsArray, token);
+      setGStaff(prevStaff =>
+        prevStaff.map(s =>
+          s._id === currentStaff._id
+            ? { ...s, skills: skillsArray.map(id => ({ _id: id })) }
+            : s
+        )
+      );
+      setSkillDlgOpen(false);
+      setToast({ open: true, msg: 'Fähigkeiten gespeichert', sev: 'success' });
     } catch {
-        setToast({ open: true, msg: 'Fehler beim Speichern der Fähigkeiten', sev: 'error' });
+      setToast({ open: true, msg: 'Fehler beim Speichern der Fähigkeiten', sev: 'error' });
     }
   };
 
@@ -356,7 +356,7 @@ export default function AdminCatalogPage() {
     (async () => {
       const guards = await fetchSalonsWithGuards()
       setSalonGuards(Object.fromEntries(guards.map(g => [g._id, g])))
-    })().catch(() => {})
+    })().catch(() => { })
   }, [])
 
   // nach Create/Delete unbedingt Guards neu laden:
@@ -371,16 +371,116 @@ export default function AdminCatalogPage() {
   };
 
   const handleUpdateStaff = async () => {
-      if (!formEditStaff || !token) return;
-      try {
-          await updateUserRole(formEditStaff._id, formEditStaff.role, token);
-          setGStaff(await fetchGlobalStaff());
-          setDlgEditStaffOpen(false);
-          setToast({ open: true, msg: 'Benutzer aktualisiert', sev: 'success' });
-      } catch (error) {
-          setToast({ open: true, msg: 'Fehler beim Aktualisieren', sev: 'error' });
-      }
+    if (!formEditStaff || !token) return;
+    try {
+      await updateUserRole(formEditStaff._id, formEditStaff.role, token);
+      setGStaff(await fetchGlobalStaff());
+      setDlgEditStaffOpen(false);
+      setToast({ open: true, msg: 'Benutzer aktualisiert', sev: 'success' });
+    } catch (error) {
+      setToast({ open: true, msg: 'Fehler beim Aktualisieren', sev: 'error' });
+    }
   };
+
+  const renderServicesTab = () => (
+    <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+      <Paper variant="outlined" sx={{ p: 2, flex: 2, borderRadius: 2 }}>
+        {/* Globale Service-Liste */}
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+          <TextField size="small" placeholder="Suchen…" value={qLeft} onChange={(e) => setQLeft(e.target.value)} />
+          <Box sx={{ flex: 1 }} />
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => {
+            setEditingServiceId(null);
+            setFormService({ title: '', description: '', price: '', duration: '', category: '' });
+            setDlgServiceOpen(true);
+          }}>
+            Service anlegen
+          </Button>
+        </Stack>
+        <Divider sx={{ mb: 1 }} />
+        <List dense>
+          {(leftList as GlobalService[]).map(item => {
+            const id = item._id;
+            const already = assignedServices.some(s => s._id === id);
+            return (
+              <ListItem key={id} secondaryAction={
+                <Stack direction="row" spacing={0.5} alignItems="center">
+                  <Tooltip title="Service bearbeiten"><IconButton onClick={() => {
+                    setEditingServiceId(id);
+                    setFormService({
+                      title: item.title,
+                      description: item.description || '',
+                      price: String(item.price),
+                      duration: String(item.duration),
+                      category: (item as any).category?._id || ''
+                    });
+                    setDlgServiceOpen(true);
+                  }}><TuneIcon /></IconButton></Tooltip>
+                  <Tooltip title={already ? 'Schon zugeordnet' : 'Zum Salon zuordnen'}><span><IconButton disabled={already} onClick={() => onAssign(id)}><AddIcon /></IconButton></span></Tooltip>
+                  <Tooltip title="Global löschen"><IconButton color="error" onClick={() => deleteService(id)}><DeleteIcon /></IconButton></Tooltip>
+                </Stack>
+              }>
+                <ListItemText primary={item.title} secondary={`${item.price}€ • ${item.duration} Min`} />
+              </ListItem>
+            );
+          })}
+        </List>
+      </Paper>
+  
+      <Paper variant="outlined" sx={{ p: 2, flex: 2, borderRadius: 2 }}>
+        {/* Zugeordnete Services */}
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+          <Typography fontWeight={700}>Zugeordnet: {salons.find(s => s._id === salonId)?.name || ''}</Typography>
+          <Box sx={{ flex: 1 }} />
+          <TextField size="small" placeholder="Suchen…" value={qRight} onChange={(e) => setQRight(e.target.value)} />
+        </Stack>
+        <Divider sx={{ mb: 1 }} />
+        <List dense>
+          {(rightList as any[]).map(item => (
+            <ListItem key={item._id} secondaryAction={
+              <Stack direction="row" spacing={0.5}>
+                <Tooltip title="Overrides setzen"><IconButton onClick={() => {
+                  const svc = gServices.find(s => s._id === item._id) || null;
+                  setOvrSvc(svc);
+                  const cur = assignedServices.find(s => s._id === item._id);
+                  setOvrPrice(cur?.price ?? '');
+                  setOvrDur(cur?.duration ?? '');
+                  setOvrOpen(true);
+                }}><TuneIcon /></IconButton></Tooltip>
+                <Tooltip title="Zuordnung entfernen"><IconButton color="error" onClick={() => onUnassign(item._id)}><DeleteIcon /></IconButton></Tooltip>
+              </Stack>
+            }>
+              <ListItemText primary={item.title} secondary={`${item.price}€ • ${item.duration} Min`} />
+            </ListItem>
+          ))}
+        </List>
+      </Paper>
+  
+      <Paper variant="outlined" sx={{ p: 2, flex: 1, borderRadius: 2 }}>
+        {/* Service-Kategorien */}
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+          <Typography fontWeight={700}>Kategorien</Typography>
+          <Box sx={{ flex: 1 }} />
+          <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => { setEditingCategory(null); setNewServiceCategoryName(''); setDlgServiceCategoryOpen(true); }}>
+            Neu
+          </Button>
+        </Stack>
+        <Divider sx={{ mb: 1 }} />
+        <List dense>
+          {serviceCategories.map(cat => (
+            <ListItem key={cat._id} secondaryAction={
+              <Stack direction="row" spacing={0.5}>
+                <IconButton size="small" onClick={() => openEditCategoryDialog(cat)}><EditIcon fontSize="small" /></IconButton>
+                <IconButton size="small" color="error" onClick={() => handleDeleteServiceCategory(cat._id)}><DeleteIcon fontSize="small" /></IconButton>
+              </Stack>
+            }>
+              <ListItemText primary={cat.name} />
+            </ListItem>
+          ))}
+        </List>
+      </Paper>
+    </Stack>
+  );
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -744,22 +844,13 @@ export default function AdminCatalogPage() {
       </Dialog>
       
       {/* NEUER DIALOG */}
-     <Dialog open={dlgServiceCategoryOpen} onClose={() => setDlgServiceCategoryOpen(false)}>
+     <Dialog open={dlgServiceCategoryOpen} onClose={() => { setDlgServiceCategoryOpen(false); setEditingCategory(null); }}>
         <DialogTitle>{editingCategory ? 'Kategorie bearbeiten' : 'Neue Service-Kategorie'}</DialogTitle>
         <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Kategoriename"
-            type="text"
-            fullWidth
-            variant="standard"
-            value={newServiceCategoryName}
-            onChange={(e) => setNewServiceCategoryName(e.target.value)}
-          />
+          <TextField autoFocus margin="dense" label="Kategoriename" type="text" fullWidth variant="standard" value={newServiceCategoryName} onChange={(e) => setNewServiceCategoryName(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDlgServiceCategoryOpen(false)}>Abbrechen</Button>
+          <Button onClick={() => { setDlgServiceCategoryOpen(false); setEditingCategory(null); }}>Abbrechen</Button>
           <Button onClick={handleCreateServiceCategory}>Speichern</Button>
         </DialogActions>
       </Dialog>
