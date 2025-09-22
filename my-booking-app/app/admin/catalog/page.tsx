@@ -382,6 +382,118 @@ export default function AdminCatalogPage() {
     }
   };
 
+  const renderSalonsTab = () => (
+    <>
+      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+        <TextField size="small" placeholder="Suchen…" value={qLeft} onChange={(e) => setQLeft(e.target.value)} />
+        <Box sx={{ flex: 1 }} />
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDlgSalonOpen(true)}>Salon anlegen</Button>
+      </Stack>
+      <Divider sx={{ mb: 1 }} />
+      <List dense>
+        {(qLeft ? salons.filter(s => fuzzy(`${s.name} ${s.logoUrl || ''}`, qLeft)) : salons).map(s => (
+          <ListItem
+            key={s._id}
+            secondaryAction={
+              (() => {
+                const guard = salonGuards[s._id]
+                const disabled = guard ? !guard.deletable : false
+                const title = guard
+                  ? (disabled ? guard.reasons.join(' • ') : 'Salon löschen')
+                  : 'Salon löschen'
+                return (
+                  <Tooltip title={title}>
+                    <span>
+                      <IconButton color="error" onClick={() => deleteSalon(s._id)} disabled={disabled}>
+                        <DeleteIcon />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                )
+              })()
+            }
+          >
+            <ListItemText primary={s.name} secondary={s.logoUrl} />
+          </ListItem>
+        ))}
+      </List>
+    </>
+  );
+
+  const renderStaffTab = () => (
+    <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+      {/* LEFT: global katalog */}
+      <Paper variant="outlined" sx={{ p: 2, flex: 1, borderRadius: 2 }}>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+          <TextField size="small" placeholder="Suchen…" value={qLeft} onChange={(e) => setQLeft(e.target.value)} />
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel>Rolle</InputLabel>
+            <Select
+              value={staffFilter}
+              label="Rolle"
+              onChange={(e) => setStaffFilter(e.target.value as any)}
+            >
+              <MenuItem value="all">Alle</MenuItem>
+              <MenuItem value="admin">Admin</MenuItem>
+              <MenuItem value="staff">Staff</MenuItem>
+              <MenuItem value="user">User</MenuItem>
+            </Select>
+          </FormControl>
+          <Box sx={{ flex: 1 }} />
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDlgStaffOpen(true)}>Staff anlegen</Button>
+        </Stack>
+        <Divider sx={{ mb: 1 }} />
+        <List dense>
+          {(leftList as GlobalStaff[]).map(item => {
+            const id = item._id;
+            const already = assignedStaff.some(s => s._id === id);
+            return (
+              <ListItem key={id} secondaryAction={
+                <Stack direction="row" spacing={0.5} alignItems="center">
+                  {item.role === 'staff' && (
+                    <Tooltip title="Fähigkeiten bearbeiten"><IconButton onClick={() => openSkillDialog(item)}><TuneIcon /></IconButton></Tooltip>
+                  )}
+                  <Tooltip title="Benutzer bearbeiten"><IconButton onClick={() => handleOpenEditStaff(item)}><EditIcon /></IconButton></Tooltip>
+                  <Tooltip title={already ? 'Schon zugeordnet' : 'Zum Salon zuordnen'}><span><IconButton disabled={already || item.role !== 'staff'} onClick={() => onAssign(id)}><AddIcon /></IconButton></span></Tooltip>
+                  <Tooltip title="Global löschen"><IconButton color="error" onClick={() => deleteStaff(id)}><DeleteIcon /></IconButton></Tooltip>
+                </Stack>
+              }>
+                <ListItemText
+                  primary={`${item.firstName} ${item.lastName}`}
+                  secondary={<Chip label={item.role} size="small" color={item.role === 'admin' ? 'secondary' : item.role === 'staff' ? 'primary' : 'default'} />}
+                  secondaryTypographyProps={{ component: 'div' }}
+                />
+              </ListItem>
+            );
+          })}
+        </List>
+      </Paper>
+
+      {/* RIGHT: zugeordnet im Salon */}
+      <Paper variant="outlined" sx={{ p: 2, flex: 1, borderRadius: 2 }}>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+          <Typography fontWeight={700}>Zugeordnet: {salons.find(s => s._id === salonId)?.name || ''}</Typography>
+          <Box sx={{ flex: 1 }} />
+          <TextField size="small" placeholder="Suchen…" value={qRight} onChange={(e) => setQRight(e.target.value)} />
+        </Stack>
+        <Divider sx={{ mb: 1 }} />
+        <List dense>
+          {(rightList as GlobalStaff[]).map(item => (
+            <ListItem key={item._id} secondaryAction={
+              <Tooltip title="Zuordnung entfernen"><IconButton color="error" onClick={() => onUnassign(item._id)}><DeleteIcon /></IconButton></Tooltip>
+            }>
+              <ListItemText
+                primary={`${item.firstName} ${item.lastName}`}
+                secondary={<Chip label={item.role} size="small" color={item.role === 'admin' ? 'secondary' : item.role === 'staff' ? 'primary' : 'default'} />}
+                secondaryTypographyProps={{ component: 'div' }}
+              />
+            </ListItem>
+          ))}
+        </List>
+      </Paper>
+    </Stack>
+  );
+
   const renderServicesTab = () => (
     <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
       <Paper variant="outlined" sx={{ p: 2, flex: 2, borderRadius: 2 }}>
@@ -426,319 +538,95 @@ export default function AdminCatalogPage() {
           })}
         </List>
       </Paper>
-  
-      <Paper variant="outlined" sx={{ p: 2, flex: 2, borderRadius: 2 }}>
-        {/* Zugeordnete Services */}
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-          <Typography fontWeight={700}>Zugeordnet: {salons.find(s => s._id === salonId)?.name || ''}</Typography>
-          <Box sx={{ flex: 1 }} />
-          <TextField size="small" placeholder="Suchen…" value={qRight} onChange={(e) => setQRight(e.target.value)} />
-        </Stack>
-        <Divider sx={{ mb: 1 }} />
-        <List dense>
-          {(rightList as any[]).map(item => (
-            <ListItem key={item._id} secondaryAction={
-              <Stack direction="row" spacing={0.5}>
-                <Tooltip title="Overrides setzen"><IconButton onClick={() => {
-                  const svc = gServices.find(s => s._id === item._id) || null;
-                  setOvrSvc(svc);
-                  const cur = assignedServices.find(s => s._id === item._id);
-                  setOvrPrice(cur?.price ?? '');
-                  setOvrDur(cur?.duration ?? '');
-                  setOvrOpen(true);
-                }}><TuneIcon /></IconButton></Tooltip>
-                <Tooltip title="Zuordnung entfernen"><IconButton color="error" onClick={() => onUnassign(item._id)}><DeleteIcon /></IconButton></Tooltip>
-              </Stack>
-            }>
-              <ListItemText primary={item.title} secondary={`${item.price}€ • ${item.duration} Min`} />
-            </ListItem>
-          ))}
-        </List>
-      </Paper>
-  
-      <Paper variant="outlined" sx={{ p: 2, flex: 1, borderRadius: 2 }}>
-        {/* Service-Kategorien */}
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-          <Typography fontWeight={700}>Kategorien</Typography>
-          <Box sx={{ flex: 1 }} />
-          <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => { setEditingCategory(null); setNewServiceCategoryName(''); setDlgServiceCategoryOpen(true); }}>
-            Neu
-          </Button>
-        </Stack>
-        <Divider sx={{ mb: 1 }} />
-        <List dense>
-          {serviceCategories.map(cat => (
-            <ListItem key={cat._id} secondaryAction={
-              <Stack direction="row" spacing={0.5}>
-                <IconButton size="small" onClick={() => openEditCategoryDialog(cat)}><EditIcon fontSize="small" /></IconButton>
-                <IconButton size="small" color="error" onClick={() => handleDeleteServiceCategory(cat._id)}><DeleteIcon fontSize="small" /></IconButton>
-              </Stack>
-            }>
-              <ListItemText primary={cat.name} />
-            </ListItem>
-          ))}
-        </List>
-      </Paper>
+
+      <Stack spacing={2} sx={{ flex: 1 }}>
+        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+          {/* Zugeordnete Services */}
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+            <Typography fontWeight={700}>Zugeordnet: {salons.find(s => s._id === salonId)?.name || ''}</Typography>
+            <Box sx={{ flex: 1 }} />
+            <TextField size="small" placeholder="Suchen…" value={qRight} onChange={(e) => setQRight(e.target.value)} />
+          </Stack>
+          <Divider sx={{ mb: 1 }} />
+          <List dense>
+            {(rightList as any[]).map(item => (
+              <ListItem key={item._id} secondaryAction={
+                <Stack direction="row" spacing={0.5}>
+                  <Tooltip title="Overrides setzen"><IconButton onClick={() => {
+                    const svc = gServices.find(s => s._id === item._id) || null;
+                    setOvrSvc(svc);
+                    const cur = assignedServices.find(s => s._id === item._id);
+                    setOvrPrice(cur?.price ?? '');
+                    setOvrDur(cur?.duration ?? '');
+                    setOvrOpen(true);
+                  }}><TuneIcon /></IconButton></Tooltip>
+                  <Tooltip title="Zuordnung entfernen"><IconButton color="error" onClick={() => onUnassign(item._id)}><DeleteIcon /></IconButton></Tooltip>
+                </Stack>
+              }>
+                <ListItemText primary={item.title} secondary={`${item.price}€ • ${item.duration} Min`} />
+              </ListItem>
+            ))}
+          </List>
+        </Paper>
+
+        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+          {/* Service-Kategorien */}
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+            <Typography fontWeight={700}>Kategorien</Typography>
+            <Box sx={{ flex: 1 }} />
+            <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => { setEditingCategory(null); setNewServiceCategoryName(''); setDlgServiceCategoryOpen(true); }}>
+              Neu
+            </Button>
+          </Stack>
+          <Divider sx={{ mb: 1 }} />
+          <List dense>
+            {serviceCategories.map(cat => (
+              <ListItem key={cat._id} secondaryAction={
+                <Stack direction="row" spacing={0.5}>
+                  <IconButton size="small" onClick={() => openEditCategoryDialog(cat)}><EditIcon fontSize="small" /></IconButton>
+                  <IconButton size="small" color="error" onClick={() => handleDeleteServiceCategory(cat._id)}><DeleteIcon fontSize="small" /></IconButton>
+                </Stack>
+              }>
+                <ListItemText primary={cat.name} />
+              </ListItem>
+            ))}
+          </List>
+        </Paper>
+      </Stack>
     </Stack>
   );
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <AdminBreadcrumbs items={[{label:'Mein Salon', href:'/admin'}, {label:'Katalog & Zuordnungen'}]} />
+      <AdminBreadcrumbs items={[{ label: 'Mein Salon', href: '/admin' }, { label: 'Katalog & Zuordnungen' }]} />
 
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
-        <Typography variant="h4" fontWeight={800} sx={{ flex:1 }}>Katalog & Zuordnungen</Typography>
+        <Typography variant="h4" fontWeight={800} sx={{ flex: 1 }}>Katalog & Zuordnungen</Typography>
         {tab !== 'salons' && (
-          <TextField select size="small" label="Salon" value={salonId} onChange={(e)=> setSalonId(e.target.value)} sx={{ minWidth: 220 }}>
+          <TextField select size="small" label="Salon" value={salonId} onChange={(e) => setSalonId(e.target.value)} sx={{ minWidth: 220 }}>
             {salons.map(s => <MenuItem key={s._id} value={s._id}>{s.name}</MenuItem>)}
           </TextField>
         )}
       </Stack>
 
       <Paper variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden' }}>
-        <Tabs value={tab} onChange={(_,v)=>setTab(v)} aria-label="tabs">
+        <Tabs value={tab} onChange={(_, v) => setTab(v)} aria-label="tabs">
           <Tab value="staff" label="Staff (global → zuordnen)" />
           <Tab value="services" label="Services (global → zuordnen)" />
           <Tab value="salons" label="Salons (global)" />
         </Tabs>
         <Divider />
         <Box sx={{ p: 2 }}>
-          {tab === 'salons' ? (
-            <>
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                <TextField size="small" placeholder="Suchen…" value={qLeft} onChange={(e)=> setQLeft(e.target.value)} />
-                <Box sx={{ flex:1 }} />
-                <Button variant="contained" startIcon={<AddIcon />} onClick={()=> setDlgSalonOpen(true)}>Salon anlegen</Button>
-              </Stack>
-              <Divider sx={{ mb: 1 }} />
-              <List dense>
-                {(qLeft ? salons.filter(s=>fuzzy(`${s.name} ${s.logoUrl||''}`, qLeft)) : salons).map(s => (
-                  <ListItem
-                    key={s._id}
-                    secondaryAction={
-                      (() => {
-                        const guard = salonGuards[s._id]
-                        const disabled = guard ? !guard.deletable : false
-                        const title = guard
-                          ? (disabled ? guard.reasons.join(' • ') : 'Salon löschen')
-                          : 'Salon löschen'
-                        return (
-                          <Tooltip title={title}>
-                            <span>
-                              <IconButton color="error" onClick={()=> deleteSalon(s._id)} disabled={disabled}>
-                                <DeleteIcon />
-                              </IconButton>
-                            </span>
-                          </Tooltip>
-                        )
-                      })()
-                    }
-                  >
-                    <ListItemText primary={s.name} secondary={s.logoUrl} />
-                  </ListItem>
-                ))}
-              </List>
-            </>
-          ) : (
-            <Stack direction={{ xs:'column', md:'row' }} spacing={2}>
-              {/* LEFT: global katalog */}
-              <Paper variant="outlined" sx={{ p:2, flex:1, borderRadius:2 }}>
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                  <TextField size="small" placeholder="Suchen…" value={qLeft} onChange={(e)=> setQLeft(e.target.value)} />
-                   {tab === 'staff' && (
-                        <FormControl size="small" sx={{ minWidth: 120 }}>
-                            <InputLabel>Rolle</InputLabel>
-                            <Select
-                                value={staffFilter}
-                                label="Rolle"
-                                onChange={(e) => setStaffFilter(e.target.value as any)}
-                            >
-                                <MenuItem value="all">Alle</MenuItem>
-                                <MenuItem value="admin">Admin</MenuItem>
-                                <MenuItem value="staff">Staff</MenuItem>
-                                <MenuItem value="user">User</MenuItem>
-                            </Select>
-                        </FormControl>
-                    )}
-                  <Box sx={{ flex:1 }} />
-                  {tab === 'staff' ? (
-                    <Button variant="contained" startIcon={<AddIcon />} onClick={()=> setDlgStaffOpen(true)}>Staff anlegen</Button>
-                  ) : (
-                    <>
-                    <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setDlgServiceCategoryOpen(true)}>Neue Kategorie</Button>
-                    <Button variant="contained" startIcon={<AddIcon />} onClick={() => {
-                      setEditingServiceId(null); // Wichtig: Bearbeitungsmodus ausschalten
-                      setFormService({ title: '', description: '', price: '', duration: '', category: ''}); // Formular leeren
-                      setDlgServiceOpen(true);
-                    }}>
-                      Service anlegen
-                    </Button>
-                    </>
-                  )}
-                </Stack>
-                <Divider sx={{ mb: 1 }} />
-                <List dense>
-                  {(leftList as Array<GlobalStaff | GlobalService>).map(item => {
-                    const id = (item as any)._id
-                    const already = tab === 'staff'
-                      ? assignedStaff.some(s => s._id === id)
-                      : assignedServices.some(s => s._id === id)
-                    return (
-                      <ListItem key={id}
-                        secondaryAction={
-                          <Stack direction="row" spacing={0.5} alignItems="center">
-                            
-                            {tab === 'staff' && (
-                                <>
-                                    {(item as GlobalStaff).role === 'staff' && (
-                                        <Tooltip title="Fähigkeiten bearbeiten">
-                                            <IconButton onClick={() => openSkillDialog(item as GlobalStaff)}>
-                                                <TuneIcon />
-                                            </IconButton>
-                                        </Tooltip>
-                                    )}
-                                    <Tooltip title="Benutzer bearbeiten">
-                                        <IconButton onClick={() => handleOpenEditStaff(item as GlobalStaff)}>
-                                            <EditIcon />
-                                        </IconButton>
-                                    </Tooltip>
-                                </>
-                            )}
-
-                            {tab === 'services' && (
-                              <Tooltip title="Service bearbeiten">
-                                <IconButton onClick={() => {
-                                  const serviceToEdit = gServices.find(s => s._id === id);
-                                  if (serviceToEdit) {
-                                    setEditingServiceId(id);
-                                    setFormService({
-                                      title: serviceToEdit.title,
-                                      description: serviceToEdit.description || '', // Stellt sicher, dass es immer ein String ist
-                                      price: String(serviceToEdit.price),          // Konvertiert number zu string
-                                      duration: String(serviceToEdit.duration),    // Konvertiert number zu string
-                                      category: (serviceToEdit as any).category?._id || '' // NEU
-                                    });
-                                    setDlgServiceOpen(true);
-                                  }
-                                }}>
-                                  <TuneIcon />
-                                </IconButton>
-                              </Tooltip>
-                            )}
-
-                            <Tooltip title={already ? 'Schon zugeordnet' : 'Zum Salon zuordnen'}>
-                              <span>
-                                <IconButton disabled={already || (tab === 'staff' && (item as GlobalStaff).role !== 'staff')} onClick={() => onAssign(id)}><AddIcon /></IconButton>
-                              </span>
-                            </Tooltip>
-                            <Tooltip title="Global löschen">
-                              <IconButton color="error" onClick={() => tab === 'staff' ? deleteStaff(id) : deleteService(id)}>
-                                <DeleteIcon />
-                              </IconButton>
-                            </Tooltip>
-                          </Stack>
-                        }>
-                        <ListItemText
-                          primary={tab === 'staff' ? `${(item as GlobalStaff).firstName} ${(item as GlobalStaff).lastName}` : (item as GlobalService).title}
-                           secondary={
-                              tab === 'staff' 
-                                ? <Chip label={(item as GlobalStaff).role} size="small" color={
-                                    (item as GlobalStaff).role === 'admin' ? 'secondary' : (item as GlobalStaff).role === 'staff' ? 'primary' : 'default'
-                                  } />
-                                : `${(item as GlobalService).price}€ • ${(item as GlobalService).duration} Min`
-                            }
-                            secondaryTypographyProps={{ component: 'div' }}
-                        />
-                      </ListItem>
-                    )
-                  })}
-                </List>
-              </Paper>
-              <Paper variant="outlined" sx={{ p:2, flex:1, borderRadius:2 }}>
-                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                      <Typography fontWeight={700}>Service-Kategorien</Typography>
-                      <Box sx={{ flex:1 }} />
-                      <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => { setEditingCategory(null); setNewServiceCategoryName(''); setDlgServiceCategoryOpen(true); }}>
-                          Neu
-                      </Button>
-                  </Stack>
-                  <Divider sx={{ mb: 1 }} />
-                  <List dense>
-                      {serviceCategories.map(cat => (
-                          <ListItem
-                              key={cat._id}
-                              secondaryAction={
-                                  <Stack direction="row" spacing={0.5}>
-                                      <IconButton size="small" onClick={() => openEditCategoryDialog(cat)}><EditIcon fontSize="small" /></IconButton>
-                                      <IconButton size="small" color="error" onClick={() => handleDeleteServiceCategory(cat._id)}><DeleteIcon fontSize="small" /></IconButton>
-                                  </Stack>
-                              }
-                          >
-                              <ListItemText primary={cat.name} />
-                          </ListItem>
-                      ))}
-                  </List>
-              </Paper>
-              {/* RIGHT: zugeordnet im Salon */}
-              <Paper variant="outlined" sx={{ p:2, flex:1, borderRadius:2 }}>
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                  <Typography fontWeight={700}>Zugeordnet: {salons.find(s=>s._id===salonId)?.name || ''}</Typography>
-                  <Box sx={{ flex:1 }} />
-                  <TextField size="small" placeholder="Suchen…" value={qRight} onChange={(e)=> setQRight(e.target.value)} />
-                </Stack>
-                <Divider sx={{ mb: 1 }} />
-                <List dense>
-                  {(rightList as Array<GlobalStaff | GlobalService>).map(item => {
-                    const id = (item as any)._id
-                    return (
-                      <ListItem key={id}
-                        secondaryAction={
-                          <Stack direction="row" spacing={0.5}>
-                            {tab==='services' && (
-                              <Tooltip title="Overrides setzen">
-                                <IconButton onClick={() => {
-                                  const svc = gServices.find(s => s._id === id) || null
-                                  setOvrSvc(svc)
-                                  const cur = assignedServices.find(s => s._id === id)
-                                  setOvrPrice(cur?.price ?? '')
-                                  setOvrDur(cur?.duration ?? '')
-                                  setOvrOpen(true)
-                                }}>
-                                  <TuneIcon />
-                                </IconButton>
-                              </Tooltip>
-                            )}
-                            <Tooltip title="Zuordnung entfernen">
-                              <IconButton color="error" onClick={()=> onUnassign(id)}><DeleteIcon /></IconButton>
-                            </Tooltip>
-                          </Stack>
-                        }>
-                        <ListItemText
-                          primary={tab === 'staff' ? `${(item as GlobalStaff).firstName} ${(item as GlobalStaff).lastName}` : (item as GlobalService).title}
-                           secondary={
-                              tab === 'staff' 
-                                ? <Chip label={(item as GlobalStaff).role} size="small" color={
-                                    (item as GlobalStaff).role === 'admin' ? 'secondary' : (item as GlobalStaff).role === 'staff' ? 'primary' : 'default'
-                                  } />
-                                : `${(item as any).price}€ • ${(item as any).duration} Min`
-                            }
-                            secondaryTypographyProps={{ component: 'div' }}
-                        />
-                      </ListItem>
-                    )
-                  })}
-                </List>
-              </Paper>
-            </Stack>
-          )}
+          {tab === 'salons' && renderSalonsTab()}
+          {tab === 'staff' && renderStaffTab()}
+          {tab === 'services' && renderServicesTab()}
         </Box>
       </Paper>
 
-      {/* Dialogs */}
+      {/* DIALOGS */}
       <Dialog open={dlgStaffOpen} onClose={() => setDlgStaffOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Neuen Staff-Mitarbeiter anlegen</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-          {/* Neue Felder für Vor- und Nachname hinzufügen */}
           <TextField label="Vorname" value={formStaff.firstName} onChange={e => setFormStaff(p => ({ ...p, firstName: e.target.value }))} />
           <TextField label="Nachname" value={formStaff.lastName} onChange={e => setFormStaff(p => ({ ...p, lastName: e.target.value }))} />
           <TextField label="E-Mail" type="email" value={formStaff.email} onChange={e => setFormStaff(p => ({ ...p, email: e.target.value }))} />
@@ -749,71 +637,71 @@ export default function AdminCatalogPage() {
           <Button variant="contained" onClick={createStaff}>Anlegen</Button>
         </DialogActions>
       </Dialog>
-        <Dialog open={dlgEditStaffOpen} onClose={() => setDlgEditStaffOpen(false)} fullWidth maxWidth="sm">
-            <DialogTitle>Benutzer bearbeiten</DialogTitle>
-            <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-                <TextField 
-                    label="Vorname" 
-                    value={formEditStaff?.firstName || ''} 
-                    onChange={e => setFormEditStaff(p => p ? { ...p, firstName: e.target.value } : null)} 
-                />
-                <TextField 
-                    label="Nachname" 
-                    value={formEditStaff?.lastName || ''} 
-                    onChange={e => setFormEditStaff(p => p ? { ...p, lastName: e.target.value } : null)} 
-                />
-                <TextField 
-                    label="E-Mail" 
-                    type="email" 
-                    value={formEditStaff?.email || ''} 
-                    onChange={e => setFormEditStaff(p => p ? { ...p, email: e.target.value } : null)} 
-                />
-                <TextField 
-                    select 
-                    label="Rolle" 
-                    value={formEditStaff?.role || 'user'} 
-                    onChange={e => setFormEditStaff(p => p ? { ...p, role: e.target.value as any } : null)}
-                >
-                    <MenuItem value="user">User</MenuItem>
-                    <MenuItem value="staff">Staff</MenuItem>
-                    <MenuItem value="admin">Admin</MenuItem>
-                </TextField>
-            </DialogContent>
-            <DialogActions>
-                <Button onClick={() => setDlgEditStaffOpen(false)}>Abbrechen</Button>
-                <Button variant="contained" onClick={handleUpdateStaff}>Speichern</Button>
-            </DialogActions>
-        </Dialog>
+      <Dialog open={dlgEditStaffOpen} onClose={() => setDlgEditStaffOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Benutzer bearbeiten</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+          <TextField
+            label="Vorname"
+            value={formEditStaff?.firstName || ''}
+            onChange={e => setFormEditStaff(p => p ? { ...p, firstName: e.target.value } : null)}
+          />
+          <TextField
+            label="Nachname"
+            value={formEditStaff?.lastName || ''}
+            onChange={e => setFormEditStaff(p => p ? { ...p, lastName: e.target.value } : null)}
+          />
+          <TextField
+            label="E-Mail"
+            type="email"
+            value={formEditStaff?.email || ''}
+            onChange={e => setFormEditStaff(p => p ? { ...p, email: e.target.value } : null)}
+          />
+          <TextField
+            select
+            label="Rolle"
+            value={formEditStaff?.role || 'user'}
+            onChange={e => setFormEditStaff(p => p ? { ...p, role: e.target.value as any } : null)}
+          >
+            <MenuItem value="user">User</MenuItem>
+            <MenuItem value="staff">Staff</MenuItem>
+            <MenuItem value="admin">Admin</MenuItem>
+          </TextField>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDlgEditStaffOpen(false)}>Abbrechen</Button>
+          <Button variant="contained" onClick={handleUpdateStaff}>Speichern</Button>
+        </DialogActions>
+      </Dialog>
       <Dialog open={skillDlgOpen} onClose={() => setSkillDlgOpen(false)} fullWidth maxWidth="xs">
         <DialogTitle>Fähigkeiten für {currentStaff?.firstName} {currentStaff?.lastName}</DialogTitle>
         <DialogContent>
-            <FormGroup>
-                {gServices.map((service) => (
-                    <FormControlLabel
-                        key={service._id}
-                        control={
-                            <Checkbox
-                                checked={selectedServices.has(service._id)}
-                                onChange={() => handleSkillToggle(service._id)}
-                            />
-                        }
-                        label={service.title}
-                    />
-                ))}
-            </FormGroup>
+          <FormGroup>
+            {gServices.map((service) => (
+              <FormControlLabel
+                key={service._id}
+                control={
+                  <Checkbox
+                    checked={selectedServices.has(service._id)}
+                    onChange={() => handleSkillToggle(service._id)}
+                  />
+                }
+                label={service.title}
+              />
+            ))}
+          </FormGroup>
         </DialogContent>
         <DialogActions>
-            <Button onClick={() => setSkillDlgOpen(false)}>Abbrechen</Button>
-            <Button variant="contained" onClick={handleSaveSkills}>Speichern</Button>
+          <Button onClick={() => setSkillDlgOpen(false)}>Abbrechen</Button>
+          <Button variant="contained" onClick={handleSaveSkills}>Speichern</Button>
         </DialogActions>
-    </Dialog>
-      <Dialog 
-        open={dlgServiceOpen} 
+      </Dialog>
+      <Dialog
+        open={dlgServiceOpen}
         onClose={() => {
-          setDlgServiceOpen(false); 
-          setEditingServiceId(null); // Bearbeitungsmodus beim Schließen zurücksetzen
-        }} 
-        fullWidth 
+          setDlgServiceOpen(false);
+          setEditingServiceId(null);
+        }}
+        fullWidth
         maxWidth="sm"
       >
         <DialogTitle>
@@ -821,33 +709,41 @@ export default function AdminCatalogPage() {
         </DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
           <TextField label="Titel" value={formService.title || ''} onChange={e => setFormService({ ...formService, title: e.target.value })} />
-          <TextField label="Beschreibung" value={formService.description || ''} onChange={e=>setFormService({...formService, description:e.target.value})} />
-          <TextField label="Preis (€)" type="number" value={formService.price || ''} onChange={e=>setFormService({...formService, price:e.target.value})} />
-          <TextField label="Dauer (Minuten)" type="number" value={formService.duration || ''} onChange={e=>setFormService({...formService, duration:e.target.value})} />
-          <TextField select label="Kategorie" value={formService.category} onChange={e => setFormService({...formService, category: e.target.value})} fullWidth>
+          <TextField label="Beschreibung" value={formService.description || ''} onChange={e => setFormService({ ...formService, description: e.target.value })} />
+          <TextField label="Preis (€)" type="number" value={formService.price || ''} onChange={e => setFormService({ ...formService, price: e.target.value })} />
+          <TextField label="Dauer (Minuten)" type="number" value={formService.duration || ''} onChange={e => setFormService({ ...formService, duration: e.target.value })} />
+          <TextField select label="Kategorie" value={formService.category} onChange={e => setFormService({ ...formService, category: e.target.value })} fullWidth>
             {serviceCategories.map((cat) => (
-                <MenuItem key={cat._id} value={cat._id}>
-                    {cat.name}
-                </MenuItem>
+              <MenuItem key={cat._id} value={cat._id}>
+                {cat.name}
+              </MenuItem>
             ))}
           </TextField>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => { setDlgServiceOpen(false); setEditingServiceId(null); }}>Abbrechen</Button>
-          <Button 
-            variant="contained" 
+          <Button
+            variant="contained"
             onClick={editingServiceId ? updateService : createService}
           >
             Speichern
           </Button>
         </DialogActions>
       </Dialog>
-      
-      {/* NEUER DIALOG */}
-     <Dialog open={dlgServiceCategoryOpen} onClose={() => { setDlgServiceCategoryOpen(false); setEditingCategory(null); }}>
+
+      <Dialog open={dlgServiceCategoryOpen} onClose={() => { setDlgServiceCategoryOpen(false); setEditingCategory(null); }}>
         <DialogTitle>{editingCategory ? 'Kategorie bearbeiten' : 'Neue Service-Kategorie'}</DialogTitle>
         <DialogContent>
-          <TextField autoFocus margin="dense" label="Kategoriename" type="text" fullWidth variant="standard" value={newServiceCategoryName} onChange={(e) => setNewServiceCategoryName(e.target.value)} />
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Kategoriename"
+            type="text"
+            fullWidth
+            variant="standard"
+            value={newServiceCategoryName}
+            onChange={(e) => setNewServiceCategoryName(e.target.value)}
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => { setDlgServiceCategoryOpen(false); setEditingCategory(null); }}>Abbrechen</Button>
@@ -855,21 +751,33 @@ export default function AdminCatalogPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={ovrOpen} onClose={()=> setOvrOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Overrides für Service {ovrSvc?.title}</DialogTitle>
-        <DialogContent sx={{ display:'flex', flexDirection:'column', gap:2, pt:2 }}>
-          <TextField type="number" label="Preis (optional Override)" value={ovrPrice} onChange={e=>setOvrPrice(e.target.value === '' ? '' : Number(e.target.value))} />
-          <TextField type="number" label="Dauer in Minuten (optional Override)" value={ovrDur} onChange={e=>setOvrDur(e.target.value === '' ? '' : Number(e.target.value))} />
+      <Dialog open={dlgSalonOpen} onClose={() => setDlgSalonOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Salon anlegen</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+          <TextField label="Name" value={formSalon.name} onChange={e => setFormSalon({ ...formSalon, name: e.target.value })} />
+          <TextField label="Logo URL (optional)" value={formSalon.logoUrl} onChange={e => setFormSalon({ ...formSalon, logoUrl: e.target.value })} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={()=> setOvrOpen(false)}>Abbrechen</Button>
+          <Button onClick={() => setDlgSalonOpen(false)}>Abbrechen</Button>
+          <Button variant="contained" onClick={createSalon}>Anlegen</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={ovrOpen} onClose={() => setOvrOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Overrides für Service {ovrSvc?.title}</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+          <TextField type="number" label="Preis (optional Override)" value={ovrPrice} onChange={e => setOvrPrice(e.target.value === '' ? '' : Number(e.target.value))} />
+          <TextField type="number" label="Dauer in Minuten (optional Override)" value={ovrDur} onChange={e => setOvrDur(e.target.value === '' ? '' : Number(e.target.value))} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOvrOpen(false)}>Abbrechen</Button>
           <Button variant="contained" onClick={onApplyOverrides}>Speichern</Button>
         </DialogActions>
       </Dialog>
 
-      <Snackbar open={toast.open} autoHideDuration={2200} onClose={()=>setToast(p=>({...p, open:false}))}
-        anchorOrigin={{ vertical:'bottom', horizontal:'center' }}>
-        <Alert severity={toast.sev} variant="filled" onClose={()=>setToast(p=>({...p, open:false}))}>
+      <Snackbar open={toast.open} autoHideDuration={2200} onClose={() => setToast(p => ({ ...p, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert severity={toast.sev} variant="filled" onClose={() => setToast(p => ({ ...p, open: false }))}>
           {toast.msg}
         </Alert>
       </Snackbar>
