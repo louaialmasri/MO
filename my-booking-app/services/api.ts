@@ -103,6 +103,24 @@ export type CashClosing = {
   notes?: string;
 }
 
+export type ServiceCategory = {
+  _id: string;
+  name: string;
+};
+
+export type ProductCategory = {
+  _id: string;
+  name: string;
+};
+
+export type Product = {
+  _id: string;
+  name: string;
+  description?: string;
+  price: number;
+  category: ProductCategory;
+};
+
 // --- Global Types ---
 export type Salon = { _id: string; name: string; logoUrl?: string; openingHours: OpeningHours[]; }
 
@@ -643,6 +661,39 @@ export async function payBooking(token: string, bookingId: string) {
   });
   return res.data;
 }
+
+// Service Categories
+export const fetchServiceCategories = async (token: string): Promise<ServiceCategory[]> => {
+  const res = await api.get('/service-categories', { headers: { Authorization: `Bearer ${token}` } });
+  return res.data;
+};
+
+export const createServiceCategory = async (name: string, token: string): Promise<ServiceCategory> => {
+  const res = await api.post('/service-categories', { name }, { headers: { Authorization: `Bearer ${token}` } });
+  return res.data;
+};
+
+// Product Categories
+export const fetchProductCategories = async (token: string): Promise<ProductCategory[]> => {
+  const res = await api.get('/product-categories', { headers: { Authorization: `Bearer ${token}` } });
+  return res.data;
+};
+
+export const createProductCategory = async (name: string, token: string): Promise<ProductCategory> => {
+  const res = await api.post('/product-categories', { name }, { headers: { Authorization: `Bearer ${token}` } });
+  return res.data;
+};
+
+// Products
+export const fetchProducts = async (token: string): Promise<Product[]> => {
+  const res = await api.get('/products', { headers: { Authorization: `Bearer ${token}` } });
+  return res.data;
+};
+
+export const createProduct = async (productData: Omit<Product, '_id' | 'category'> & { category: string }, token: string): Promise<Product> => {
+  const res = await api.post('/products', productData, { headers: { Authorization: `Bearer ${token}` } });
+  return res.data;
+};
 
 
 export default api
