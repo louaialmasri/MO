@@ -48,7 +48,7 @@ const MOCK_REVIEWS = [
     { author: 'Kai', date: '05.08.2025', text: 'Wie immer super. Alles perfekt!' },
 ]
 
-type ServiceWithCategory = Service & { category?: { name: string } };
+type ServiceWithCategory = Service & { category?: string };
 
 export default function LandingPage() {
   const router = useRouter()
@@ -72,7 +72,7 @@ export default function LandingPage() {
 
   const servicesByCategory = useMemo(() => {
     return services.reduce((acc, service) => {
-      const category = service.category?.name || 'Allgemein';
+      const category = service.category || 'Allgemein';
       if (!acc[category]) acc[category] = [];
       acc[category].push(service);
       return acc;
