@@ -6,19 +6,18 @@ import mongoose from 'mongoose'
 import { AuthRequest } from '../middlewares/authMiddleware'
 import { Booking } from '../models/Booking'
 
-export const getAllUsers = async (req: any, res: Response) => {
+export const getAllUsers = async (req: AuthRequest & { salonId?: string }, res: Response) => {
   try {
     const { role } = req.query as { role?: string };
     const sid = req.salonId;
 
-    // KORREKTUR: Wenn 'staff' ODER 'user' als Rolle explizit angefragt wird,
-    // ignorieren wir den Salon-Filter, um eine vollständige Liste für die Admin-Funktionen zu erhalten.
-    if (role === 'staff' || role === 'user') {
+    // Nur Admins dürfen den Salon-Filter umgehen
+    if (req.user?.role === 'admin' && (role === 'staff' || role === 'user')) {
       const users = await User.find({ role }).populate('skills').lean();
       return res.json({ success: true, users });
     }
 
-    // Die bestehende Logik für andere Anfragen (z.B. ohne Rollenfilter) bleibt erhalten
+    // Für alle anderen (Staff, etc.) oder wenn kein spezieller Rollen-Filter gesetzt ist:
     if (!sid) return res.json({ success: true, users: [] });
 
     const q: any = { salon: sid };
