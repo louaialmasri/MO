@@ -460,7 +460,12 @@ export default function AdminCatalogPage() {
                                   const serviceToEdit = gServices.find(s => s._id === id);
                                   if (serviceToEdit) {
                                     setEditingServiceId(id);
-                                    setFormService(serviceToEdit);
+                                    setFormService({
+                                      title: serviceToEdit.title,
+                                      description: serviceToEdit.description || '', // Stellt sicher, dass es immer ein String ist
+                                      price: String(serviceToEdit.price),          // Konvertiert number zu string
+                                      duration: String(serviceToEdit.duration),    // Konvertiert number zu string
+                                    });
                                     setDlgServiceOpen(true);
                                   }
                                 }}>
