@@ -201,8 +201,11 @@ export default function AdminCatalogPage() {
 
   const createService = async () => {
     const { title, price, duration, category } = formService
-    if (!title || !price || !duration) { setToast({ open: true, msg: 'Titel, Preis, Dauer erforderlich', sev: 'error' }); return }
-    await createGlobalService({ title, description: formService.description || undefined, price: Number(price), duration: Number(duration), category: category || undefined })
+    if (!title || !price || !duration || !category) {
+      setToast({ open: true, msg: 'Bitte alle Felder inkl. Kategorie ausfüllen', sev: 'error' });
+      return;
+    }
+    await createGlobalService({ title, description: formService.description || undefined, price: Number(price), duration: Number(duration), category: category })
     setGServices(await fetchGlobalServices())
     setDlgServiceOpen(false); setFormService({ title: '', description: '', price: '', duration: '', category: '' })
     setToast({ open: true, msg: 'Service angelegt', sev: 'success' })
