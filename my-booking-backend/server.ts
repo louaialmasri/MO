@@ -19,6 +19,9 @@ import availabilityTemplateRoutes from './routes/availabilityTemplates'
 import staffRoutes from './routes/staff';
 import invoiceRoutes from './routes/invoice';
 import cashClosingRoutes from './routes/cashClosing';
+import productCategoryRoutes from './routes/productCategories'; // NEU
+import productRoutes from './routes/products'; // NEU
+import serviceCategoryRoutes from './routes/serviceCategories'; // NEU
 
 
 const app = express()
@@ -55,6 +58,9 @@ app.use('/api/availability-templates', availabilityTemplateRoutes)
 app.use('/api/staff', activeSalon, staffRoutes);
 app.use('/api/invoices', activeSalon, invoiceRoutes);
 app.use('/api/cash-closing', cashClosingRoutes);
+app.use('/api/product-categories', activeSalon, productCategoryRoutes); // NEU
+app.use('/api/products', activeSalon, productRoutes); // NEU
+app.use('/api/service-categories', activeSalon, serviceCategoryRoutes); // NEU
 
 app.listen(PORT, () => {
   console.log(`🚀 Backend läuft auf http://localhost:${PORT}`)

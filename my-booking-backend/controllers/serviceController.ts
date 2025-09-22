@@ -14,7 +14,7 @@ export const listServices = async (req: any, res: any) => {
     const rows = await ServiceSalon.find({ salon: sid, active: true }).lean()
     if (rows.length > 0) {
       const ids = rows.map(r => r.service)
-      const svcs = await Service.find({ _id: { $in: ids } }).lean()
+      const svcs = await Service.find({ _id: { $in: ids } }).populate('category').lean() // Geändert
       const byId = new Map(svcs.map(s => [String(s._id), s]))
       const services = rows.map(r => {
         const base = byId.get(String(r.service))!
@@ -28,7 +28,7 @@ export const listServices = async (req: any, res: any) => {
     }
 
     // 2) Fallback: alte Logik (falls noch keine Zuordnungen existieren)
-    const services = await Service.find({ salon: sid }).sort({ title: 1 }).lean()
+    const services = await Service.find({ salon: sid }).sort({ title: 1 }).populate('category').lean() // Geändert
     return res.json({ success:true, services })
   } catch (e) {
     console.error('listServices error', e)
@@ -42,7 +42,7 @@ export const getAllServices = listServices;
 // ➡ Service erstellen (Admin only)
 export const createService = async (req: SalonRequest, res: Response) => {
   try {
-    const { title, description, price, duration } = req.body
+    const { title, description, price, duration, category } = req.body // Geändert
     if (!title || !duration || price == null) {
       return res.status(400).json({ success: false, message: 'title, duration, price sind erforderlich' })
     }
@@ -53,6 +53,7 @@ export const createService = async (req: SalonRequest, res: Response) => {
       duration: Number(duration),
       // Prefer salon from middleware (header/user) to ensure correct binding
       salon: req.salonId ?? null,
+      category: category || null, // Geändert
     })
     return res.status(201).json({ success: true, service })
   } catch (e) {
@@ -83,12 +84,13 @@ export const deleteService = async (req: SalonRequest, res: Response) => {
 export const updateService = async (req: SalonRequest, res: Response) => {
   try {
     const { id } = req.params
-    const { title, description, price, duration, salonId } = req.body
+    const { title, description, price, duration, salonId, category } = req.body // Geändert
     const patch: any = {}
     if (title !== undefined) patch.title = String(title).trim()
     if (description !== undefined) patch.description = String(description).trim()
     if (price !== undefined) patch.price = Number(price)
     if (duration !== undefined) patch.duration = Number(duration)
+    if (category !== undefined) patch.category = category // Geändert
     // Prevent changing salon to another salon if middleware provides one
     if (salonId !== undefined) {
       if (req.salonId && salonId && String(salonId) !== String(req.salonId)) {
