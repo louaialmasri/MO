@@ -517,6 +517,7 @@ export default function AdminCatalogPage() {
           {(leftList as GlobalService[]).map(item => {
             const id = item._id;
             const already = assignedServices.some(s => s._id === id);
+            const categoryName = (item as any).category?.name || 'Ohne Kategorie';
             return (
               <ListItem key={id} secondaryAction={
                 <Stack direction="row" spacing={0.5} alignItems="center">
@@ -535,7 +536,7 @@ export default function AdminCatalogPage() {
                   <Tooltip title="Global löschen"><IconButton color="error" onClick={() => deleteService(id)}><DeleteIcon /></IconButton></Tooltip>
                 </Stack>
               }>
-                <ListItemText primary={item.title} secondary={`${item.price}€ • ${item.duration} Min`} />
+                <ListItemText primary={item.title} secondary={`${item.price}€ • ${item.duration} Min • ${categoryName}`} />
               </ListItem>
             );
           })}
