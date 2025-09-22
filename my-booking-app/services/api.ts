@@ -531,7 +531,7 @@ export async function deleteGlobalUser(id: string) {
   return res.data
 }
 
-export async function createGlobalService(payload: { title: string; description?: string; price: number; duration: number;}) {
+export async function createGlobalService(payload: { title: string; description?: string; price: number; duration: number; category?: string | null }) {
   const config = {} as any;
   config.noSalonHeader = true;
   const res = await api.post('/admin/g-services', payload, config);
@@ -545,7 +545,7 @@ export async function deleteGlobalService(id: string) {
   return res.data
 }
 
-export async function updateGlobalService(id: string, payload: { title: string; description?: string; price: number; duration: number;}) {
+export async function updateGlobalService(id: string, payload: { title: string; description?: string; price: number; duration: number; category?: string | null }) {
   const config = {} as any;
   config.noSalonHeader = true; // Wichtig für globale Admin-Funktionen
   const res = await api.patch(`/admin/g-services/${id}`, payload, config);

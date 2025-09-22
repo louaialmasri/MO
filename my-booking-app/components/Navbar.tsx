@@ -36,6 +36,7 @@ import { fetchSalons, type Salon } from '@/services/api'
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
 
 
 export default function Navbar() {
@@ -132,6 +133,7 @@ export default function Navbar() {
                             <MenuItem onClick={() => { setCashMenuAnchor(null); router.push('/admin/cash-closing') }}><PointOfSaleIcon sx={{ mr: 1.5 }}/> Kassenabschluss</MenuItem>
                         </Menu>
         <MenuItem onClick={() => { setAdminMenuAnchor(null); router.push('/admin/catalog') }}><CategoryIcon sx={{ mr: 1.5 }}/> Katalog & Salons</MenuItem>
+        <MenuItem onClick={() => { setAdminMenuAnchor(null); router.push('/admin/products') }}><ShoppingBagIcon sx={{ mr: 1.5 }}/> Produkte</MenuItem>
         <MenuItem onClick={() => { setAdminMenuAnchor(null); router.push('/admin/availability') }}><ScheduleIcon sx={{ mr: 1.5 }}/> Arbeitszeiten</MenuItem>
         <MenuItem onClick={() => { setAdminMenuAnchor(null); router.push('/admin/availability/templates') }}><ScheduleIcon sx={{ mr: 1.5 }}/> Zeit-Vorlagen</MenuItem>
         <MenuItem onClick={() => { setAdminMenuAnchor(null); router.push('/admin/invoices') }}><ReceiptLongIcon sx={{ mr: 1.5 }}/> Rechnungen</MenuItem>

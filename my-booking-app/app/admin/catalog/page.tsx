@@ -9,7 +9,8 @@ import {
   fetchGlobalServices, createGlobalService, deleteGlobalService,
   listStaffAssignmentsForSalon, assignStaffToSalon, unassignStaffFromSalon,
   listServiceAssignmentsForSalon, assignServiceToSalon, unassignServiceFromSalon, updateGlobalService,
-  type Salon, type GlobalStaff, type GlobalService,
+  fetchServiceCategories, createServiceCategory, // NEU
+  type Salon, type GlobalStaff, type GlobalService, type ServiceCategory, // NEU
   SalonGuard,
   fetchSalonsWithGuards, updateUserRole, 
   updateUserSkills,
@@ -39,6 +40,7 @@ export default function AdminCatalogPage() {
   // global catalogs
   const [gStaff, setGStaff] = useState<GlobalStaff[]>([])
   const [gServices, setGServices] = useState<GlobalService[]>([])
+  const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]); // NEU
 
   // assignments
   const [assignedStaff, setAssignedStaff] = useState<GlobalStaff[]>([])
@@ -54,6 +56,7 @@ export default function AdminCatalogPage() {
   const [dlgStaffOpen, setDlgStaffOpen] = useState(false)
   const [dlgEditStaffOpen, setDlgEditStaffOpen] = useState(false);
   const [dlgServiceOpen, setDlgServiceOpen] = useState(false)
+  const [dlgServiceCategoryOpen, setDlgServiceCategoryOpen] = useState(false); // NEU
   const [dlgSalonOpen, setDlgSalonOpen] = useState(false)
   const [ovrOpen, setOvrOpen] = useState(false)
   const [ovrSvc, setOvrSvc] = useState<GlobalService | null>(null)
@@ -66,7 +69,8 @@ export default function AdminCatalogPage() {
   // forms
   const [formStaff, setFormStaff] = useState({ email: '', password: '', firstName: '', lastName: '' })
   const [formEditStaff, setFormEditStaff] = useState<GlobalStaff | null>(null);
-  const [formService, setFormService] = useState({ title: '', description: '', price: '', duration: ''})
+  const [formService, setFormService] = useState({ title: '', description: '', price: '', duration: '', category: ''}) // Geändert
+  const [newServiceCategoryName, setNewServiceCategoryName] = useState(''); // NEU
   const [formSalon, setFormSalon] = useState({ name: '', logoUrl: '' })
 
   const [toast, setToast] = useState<{open:boolean; msg:string; sev:'success'|'error'}>({open:false,msg:'',sev:'success'})
@@ -81,15 +85,16 @@ export default function AdminCatalogPage() {
 
   useEffect(() => {
     (async () => {
-      const [salonList, staffList, svcList] = await Promise.all([
-        fetchSalons(), fetchGlobalStaff(), fetchGlobalServices()
+      const [salonList, staffList, svcList, serviceCatList] = await Promise.all([ // NEU
+        fetchSalons(), fetchGlobalStaff(), fetchGlobalServices(), fetchServiceCategories(token!) // NEU
       ])
       setSalons(salonList)
       if (salonList[0]?._id) setSalonId(salonList[0]._id)
       setGStaff(staffList)
       setGServices(svcList)
+      setServiceCategories(serviceCatList); // NEU
     })().catch(() => {})
-  }, [])
+  }, [token]) // NEU: token als dependency
 
   useEffect(() => {
     (async () => {
@@ -193,11 +198,11 @@ export default function AdminCatalogPage() {
   }
 
   const createService = async () => {
-    const { title, price, duration } = formService
+    const { title, price, duration, category } = formService // Geändert
     if (!title || !price || !duration) { setToast({open:true,msg:'Titel, Preis, Dauer erforderlich',sev:'error'}); return }
-    await createGlobalService({ title, description: formService.description || undefined, price: Number(price), duration: Number(duration) })
+    await createGlobalService({ title, description: formService.description || undefined, price: Number(price), duration: Number(duration), category: category || undefined }) // Geändert
     setGServices(await fetchGlobalServices())
-    setDlgServiceOpen(false); setFormService({ title:'', description:'', price:'', duration:'' })
+    setDlgServiceOpen(false); setFormService({ title:'', description:'', price:'', duration:'', category: '' }) // Geändert
     setToast({open:true,msg:'Service angelegt',sev:'success'})
   }
 
@@ -205,7 +210,7 @@ export default function AdminCatalogPage() {
   if (!editingServiceId) return;
 
   try {
-    const { title, price, duration } = formService;
+    const { title, price, duration, category } = formService; // Geändert
     if (!title || !price || !duration) {
       setToast({ open: true, msg: 'Titel, Preis, Dauer erforderlich', sev: 'error' });
       return;
@@ -215,6 +220,7 @@ export default function AdminCatalogPage() {
       description: formService.description || undefined,
       price: Number(price),
       duration: Number(duration),
+      category: category || undefined, // Geändert
     });
 
     setGServices(await fetchGlobalServices()); // Liste aktualisieren
@@ -224,6 +230,24 @@ export default function AdminCatalogPage() {
     setToast({ open: true, msg: 'Fehler beim Speichern', sev: 'error' });
   }
 };
+  
+  // NEU
+  const handleCreateServiceCategory = async () => {
+    if (!newServiceCategoryName.trim()) {
+        setToast({ open: true, msg: 'Kategoriename darf nicht leer sein', sev: 'error' });
+        return;
+    }
+    try {
+        await createServiceCategory(newServiceCategoryName, token!);
+        setToast({ open: true, msg: 'Service-Kategorie erfolgreich erstellt', sev: 'success' });
+        setDlgServiceCategoryOpen(false);
+        setNewServiceCategoryName('');
+        setServiceCategories(await fetchServiceCategories(token!)); // Reload categories
+    } catch (error) {
+        setToast({ open: true, msg: 'Fehler beim Erstellen der Service-Kategorie', sev: 'error' });
+    }
+  };
+
 
   const createSalon = async () => {
     if (!formSalon.name) { setToast({open:true,msg:'Name erforderlich',sev:'error'}); return }
@@ -416,13 +440,16 @@ export default function AdminCatalogPage() {
                   {tab === 'staff' ? (
                     <Button variant="contained" startIcon={<AddIcon />} onClick={()=> setDlgStaffOpen(true)}>Staff anlegen</Button>
                   ) : (
+                    <>
+                    <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setDlgServiceCategoryOpen(true)}>Neue Kategorie</Button>
                     <Button variant="contained" startIcon={<AddIcon />} onClick={() => {
                       setEditingServiceId(null); // Wichtig: Bearbeitungsmodus ausschalten
-                      setFormService({ title: '', description: '', price: '', duration: ''}); // Formular leeren
+                      setFormService({ title: '', description: '', price: '', duration: '', category: ''}); // Formular leeren
                       setDlgServiceOpen(true);
                     }}>
                       Service anlegen
                     </Button>
+                    </>
                   )}
                 </Stack>
                 <Divider sx={{ mb: 1 }} />
@@ -465,6 +492,7 @@ export default function AdminCatalogPage() {
                                       description: serviceToEdit.description || '', // Stellt sicher, dass es immer ein String ist
                                       price: String(serviceToEdit.price),          // Konvertiert number zu string
                                       duration: String(serviceToEdit.duration),    // Konvertiert number zu string
+                                      category: (serviceToEdit as any).category?._id || '' // NEU
                                     });
                                     setDlgServiceOpen(true);
                                   }
@@ -648,6 +676,13 @@ export default function AdminCatalogPage() {
           <TextField label="Beschreibung" value={formService.description || ''} onChange={e=>setFormService({...formService, description:e.target.value})} />
           <TextField label="Preis (€)" type="number" value={formService.price || ''} onChange={e=>setFormService({...formService, price:e.target.value})} />
           <TextField label="Dauer (Minuten)" type="number" value={formService.duration || ''} onChange={e=>setFormService({...formService, duration:e.target.value})} />
+          <TextField select label="Kategorie" value={formService.category} onChange={e => setFormService({...formService, category: e.target.value})} fullWidth>
+            {serviceCategories.map((cat) => (
+                <MenuItem key={cat._id} value={cat._id}>
+                    {cat.name}
+                </MenuItem>
+            ))}
+          </TextField>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => { setDlgServiceOpen(false); setEditingServiceId(null); }}>Abbrechen</Button>
@@ -657,6 +692,27 @@ export default function AdminCatalogPage() {
           >
             Speichern
           </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* NEUER DIALOG */}
+      <Dialog open={dlgServiceCategoryOpen} onClose={() => setDlgServiceCategoryOpen(false)}>
+        <DialogTitle>Neue Service-Kategorie erstellen</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Kategoriename"
+            type="text"
+            fullWidth
+            variant="standard"
+            value={newServiceCategoryName}
+            onChange={(e) => setNewServiceCategoryName(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDlgServiceCategoryOpen(false)}>Abbrechen</Button>
+          <Button onClick={handleCreateServiceCategory}>Erstellen</Button>
         </DialogActions>
       </Dialog>
 
