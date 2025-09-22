@@ -7,6 +7,7 @@ const serviceSchema = new Schema({
   price: { type: Number, required: true },
   duration: { type: Number, required: true }, // Minuten
   salon: { type: Schema.Types.ObjectId, ref: 'Salon', default: null }, // 👈 optional
+  category: { type: Schema.Types.ObjectId, ref: 'ServiceCategory' }
 }, { timestamps: true })
 
 
