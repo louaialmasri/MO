@@ -25,14 +25,12 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
   try {
     const { bookingId, customerId, items, paymentMethod } = req.body;
     
-    // KORREKTUR: Sicherheitsprüfung für 'user' und 'salonId'.
     if (!req.user || !req.salonId) {
       await session.abortTransaction();
       session.endSession();
       return res.status(401).json({ message: 'Authentifizierung fehlgeschlagen oder kein Salon ausgewählt.' });
     }
     const salonId = req.salonId;
-    // KORREKTUR: Wir verwenden 'userId' aus dem Token, nicht '_id'.
     const staffId = req.user.userId;
 
     if (!customerId) {
@@ -59,15 +57,15 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
     if (items && Array.isArray(items)) {
       for (const item of items) {
         if (item.type === 'product') {
-          // KORREKTUR: Explizite Typisierung des Produkts als 'IProduct'.
           const product: IProduct | null = await Product.findById(item.id).session(session);
           if (!product) throw new Error(`Produkt mit ID ${item.id} nicht gefunden.`);
           if (product.stock < 1) throw new Error(`Produkt "${product.name}" ist nicht auf Lager.`);
           
           invoiceItems.push({ description: `Produkt: ${product.name}`, price: product.price });
           totalAmount += product.price;
-          // KORREKTUR: Wir verwenden eine atomare Operation, um den Lagerbestand zu aktualisieren.
-          await Product.findByIdAndUpdate(item.id, { $inc: { stock: -1 } }, { session });
+
+          // KORREKTUR: Dies ist eine stabilere Methode, um den Lagerbestand zu aktualisieren.
+          await Product.updateOne({ _id: item.id }, { $inc: { stock: -1 } }, { session });
 
         } else if (item.type === 'voucher') {
           const voucherValue = Number(item.value);
@@ -131,7 +129,6 @@ export const listInvoices = async (req: SalonRequest, res: Response) => {
     }
 };
 
-// Eine Rechnung anhand ihrer ID oder Booking-ID abrufen
 export const getInvoiceById = async (req: SalonRequest, res: Response) => {
     try {
         const invoice = await Invoice.findOne({ _id: req.params.id, salon: req.salonId }).populate('customer', 'firstName lastName email').populate('booking').populate('staff', 'firstName lastName');

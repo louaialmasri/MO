@@ -1,5 +1,3 @@
-// my-booking-app/app/admin/products/page.tsx
-
 'use client'
 
 import { useState, useEffect } from 'react';
@@ -34,9 +32,10 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { useAuth } from '@/context/AuthContext'; // Importieren Sie den Auth-Kontext
+import { useAuth } from '@/context/AuthContext';
 
 export default function ProductsPage() {
+  const { token } = useAuth(); // Holen Sie sich den Token
   const [products, setProducts] = useState<ProductType[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -48,24 +47,24 @@ export default function ProductsPage() {
     category: '',
     stock: '0',
   });
-  
-  const { token } = useAuth(); // Holen Sie sich den Token aus dem Kontext
 
   useEffect(() => {
-    // KORREKTUR: Laden Sie die Daten nur, wenn der Benutzer eingeloggt ist (token existiert).
+    // KORREKTUR: Daten erst laden, wenn der Token sicher vorhanden ist.
     if (token) {
       loadData();
     }
-  }, [token]); // Führen Sie den Effekt erneut aus, wenn sich der Token ändert.
+  }, [token]);
 
   const loadData = async () => {
     try {
-      const [productsData, categoriesData] = await Promise.all([
-        fetchProducts(token),
-        fetchProductCategories(token),
-      ]);
+      if (token) {
+        const [productsData, categoriesData] = await Promise.all([
+          fetchProducts(token),
+          fetchProductCategories(token),
+        ]);
       setProducts(productsData);
       setCategories(categoriesData);
+      }
     } catch (error) {
       console.error('Fehler beim Laden der Daten:', error);
     }
@@ -103,7 +102,6 @@ export default function ProductsPage() {
       alert('Bitte füllen Sie alle Pflichtfelder aus.');
       return;
     }
-
     const payload = {
       name: formState.name,
       price: parseFloat(formState.price),
@@ -111,7 +109,6 @@ export default function ProductsPage() {
       category: formState.category,
       stock: parseInt(formState.stock, 10) || 0,
     };
-
     try {
       if (editingProduct) {
         await updateProduct(editingProduct._id, payload);
@@ -148,7 +145,6 @@ export default function ProductsPage() {
           Neues Produkt
         </Button>
       </Box>
-
       <List>
         {products.map((product) => (
           <ListItem
@@ -172,7 +168,6 @@ export default function ProductsPage() {
           </ListItem>
         ))}
       </List>
-
       <Dialog open={dialogOpen} onClose={handleCloseDialog} fullWidth maxWidth="sm">
         <DialogTitle>{editingProduct ? 'Produkt bearbeiten' : 'Neues Produkt erstellen'}</DialogTitle>
         <DialogContent>
