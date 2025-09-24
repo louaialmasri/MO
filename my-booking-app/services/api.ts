@@ -61,6 +61,19 @@ export type Availability = {
   note?: string
 }
 
+export type InvoiceItem = {
+  type: 'product' | 'voucher';
+  id?: string; // für Produkte
+  value?: number; // für Gutscheine
+}
+
+export type InvoicePayload = {
+  bookingId?: string;
+  customerId: string;
+  items: InvoiceItem[];
+  paymentMethod: 'cash' | 'card';
+}
+
 export type Invoice = {
   _id: string;
   invoiceNumber: string;
@@ -615,6 +628,11 @@ export async function fetchUserInvoices(token: string): Promise<Invoice[]> {
 export async function updateSalon(id: string, data: Partial<Salon>) {
   const res = await api.patch(`/salons/${id}`, data);
   return res.data.salon as Salon;
+}
+
+export async function createInvoice(payload: InvoicePayload) {
+  const res = await api.post('/invoices', payload);
+  return res.data;
 }
 
 export async function fetchAllInvoices(token: string): Promise<InvoiceListItem[]> {

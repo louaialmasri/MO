@@ -16,7 +16,11 @@ import {
   useMediaQuery,
   Avatar,
   Stack,
-  Divider
+  Divider,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText
 } from '@mui/material'
 import MenuIcon from '@mui/icons-material/Menu'
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth'
@@ -138,6 +142,12 @@ export default function Navbar() {
         <MenuItem onClick={() => { setAdminMenuAnchor(null); router.push('/admin/availability/templates') }}><ScheduleIcon sx={{ mr: 1.5 }}/> Zeit-Vorlagen</MenuItem>
         <MenuItem onClick={() => { setAdminMenuAnchor(null); router.push('/admin/invoices') }}><ReceiptLongIcon sx={{ mr: 1.5 }}/> Rechnungen</MenuItem>
         <MenuItem onClick={() => { setAdminMenuAnchor(null); router.push('/admin/cash-closing') }}><PointOfSaleIcon sx={{ mr: 1.5 }}/> Kassenabschluss</MenuItem>
+        <ListItem disablePadding>
+          <ListItemButton component="a" href="/admin/cash-register">
+            <ListItemIcon><PointOfSaleIcon /></ListItemIcon>
+            <ListItemText primary="Kasse" />
+          </ListItemButton>
+        </ListItem>
       </Menu>
 
       <Button
