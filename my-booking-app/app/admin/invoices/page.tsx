@@ -45,10 +45,12 @@ export default function AdminInvoicesPage() {
   useEffect(() => {
     const lowercasedFilter = searchTerm.toLowerCase();
     const filtered = invoices.filter(invoice => {
+      // KORREKTUR: Prüft jetzt auch `itemsSummary` und stellt sicher, dass alle Felder existieren.
+      const customerName = invoice.customer ? `${invoice.customer.firstName} ${invoice.customer.lastName}` : '';
       return (
-        invoice.invoiceNumber.toLowerCase().includes(lowercasedFilter) ||
-        `${invoice.customer.firstName} ${invoice.customer.lastName}`.toLowerCase().includes(lowercasedFilter) ||
-        invoice.service.title.toLowerCase().includes(lowercasedFilter)
+        (invoice.invoiceNumber && invoice.invoiceNumber.toLowerCase().includes(lowercasedFilter)) ||
+        (customerName && customerName.toLowerCase().includes(lowercasedFilter)) ||
+        (invoice.itemsSummary && invoice.itemsSummary.toLowerCase().includes(lowercasedFilter))
       );
     });
     setFilteredInvoices(filtered);
@@ -84,12 +86,13 @@ export default function AdminInvoicesPage() {
                   secondary={
                     <Stack direction="row" spacing={2} alignItems="center" sx={{ mt: 0.5 }}>
                       <Typography variant="body2" component="span">
-                        Kunde: <strong>{`${invoice.customer.firstName} ${invoice.customer.lastName}`}</strong>
+                        Kunde: <strong>{invoice.customer ? `${invoice.customer.firstName} ${invoice.customer.lastName}`: 'N/A'}</strong>
                       </Typography>
                       <Typography variant="body2" color="text.secondary" component="span">
-                        {invoice.service.title}
+                        {/* KORREKTUR: Verwendet `itemsSummary` anstelle von `service.title` */}
+                        {invoice.itemsSummary}
                       </Typography>
-                       <Chip label={invoice.salon.name} size="small" component="span"/>
+                       <Chip label={invoice.salon?.name || ''} size="small" component="span"/>
                     </Stack>
                   }
                   secondaryTypographyProps={{ component: 'div' }}

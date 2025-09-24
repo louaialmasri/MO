@@ -15,8 +15,8 @@ export type User = {
   role: 'user' | 'admin' | 'staff'
   firstName?: string;
   lastName?: string;
-  address?: string; // Hinzugefügt
-  phone?: string;   // Hinzugefügt
+  address?: string;
+  phone?: string;
   skills?: { _id: string; title?: string }[];
 }
 
@@ -27,7 +27,7 @@ export type Service = {
   price: number
   duration: number
   salon?: string | null
-  category?: { _id: string; name: string; }; // Wichtig für die Anzeige
+  category?: { _id: string; name: string; };
 }
 
 export type Booking = {
@@ -35,7 +35,7 @@ export type Booking = {
   user: string
   serviceId: string
   dateTime: string
-  service: Service; // Hinzugefügt für das Dashboard
+  service: Service;
   staff: User;
 }
 
@@ -63,8 +63,8 @@ export type Availability = {
 
 export type InvoiceItem = {
   type: 'product' | 'voucher';
-  id?: string; // für Produkte
-  value?: number; // für Gutscheine
+  id?: string;
+  value?: number;
 }
 
 export type InvoicePayload = {
@@ -89,15 +89,16 @@ export type Invoice = {
   change?: number;
 };
 
+// KORREKTUR: Die Eigenschaft 'service' wurde durch 'itemsSummary' ersetzt.
 export type InvoiceListItem = {
   _id: string;
   invoiceNumber: string;
   date: string;
   amount: number;
   customer: { firstName: string; lastName: string; email: string; };
-  service: { title: string; };
   salon: { name: string; };
   staff: { firstName: string; lastName: string; };
+  itemsSummary: string; // Ersetzt das 'service'-Objekt
 }
 
 export type CashClosing = {
@@ -190,13 +191,15 @@ const api = axios.create({
 // --- Axios Interceptor ---
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
-  if (token) config.headers.Authorization = `Bearer ${token}`
-
-  // KORREKTUR: Die 'noSalonHeader' Logik wird entfernt, da sie das Problem nicht löst.
-  // Stattdessen wird der Header nur gesetzt, wenn ein Token vorhanden ist.
   if (token) {
-    const salonId = localStorage.getItem('activeSalonId')
-    if (salonId) (config.headers as any)['x-salon-id'] = salonId
+    config.headers.Authorization = `Bearer ${token}`
+  }
+
+  // KORREKTUR: Die Salon-ID wird nun immer gesendet, wenn sie vorhanden ist,
+  // unabhängig vom Login-Status. Dies ist entscheidend für Gäste-Buchungen.
+  const salonId = localStorage.getItem('activeSalonId')
+  if (salonId) {
+    (config.headers as any)['x-salon-id'] = salonId
   }
   
   return config
@@ -206,7 +209,6 @@ api.interceptors.request.use((config) => {
 export const fetchServices = async (token?: string | null, options: { global?: boolean } = {}) => {
   try {
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
-    // KORREKTUR: Hängt ?view=global an die URL an, wenn die Option gesetzt ist.
     const url = options.global ? '/services?view=global' : '/services';
     const res = await api.get(url, { headers });
 
