@@ -49,8 +49,10 @@ export default function ProductsPage() {
   });
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if(token) {
+      loadData();
+    }
+  }, [token]);
 
   const loadData = async () => {
     try {

@@ -53,3 +53,19 @@ export const getProducts = async (req: SalonRequest, res: Response) => {
         res.status(500).json({ success: false, message: 'Fehler beim Abrufen der Produkte.' });
     }
 };
+
+// Produkt löschen
+export const deleteProduct = async (req: SalonRequest, res: Response) => {
+  try {
+    const deletedProduct = await Product.findOneAndDelete({
+      _id: req.params.id,
+      salon: req.salonId, // Stellt sicher, dass man nur Produkte des eigenen Salons löschen kann
+    });
+    if (!deletedProduct) {
+      return res.status(404).json({ message: 'Produkt nicht gefunden.' });
+    }
+    res.status(200).json({ message: 'Produkt erfolgreich gelöscht.' });
+  } catch (error: any) {
+    res.status(500).json({ message: 'Fehler beim Löschen des Produkts', error: error.message });
+  }
+};
