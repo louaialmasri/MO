@@ -536,7 +536,7 @@ export default function AdminCatalogPage() {
                   <Tooltip title="Global löschen"><IconButton color="error" onClick={() => deleteService(id)}><DeleteIcon /></IconButton></Tooltip>
                 </Stack>
               }>
-                <ListItemText primary={item.title} secondary={`${item.price}€ • ${item.duration} Min • ${categoryName}`} />
+                <ListItemText primary={item.title} secondary={`${item.price}€ • ${item.duration} Min • ${(item as any).category?.name || 'Ohne Kategorie'}`} />
               </ListItem>
             );
           })}

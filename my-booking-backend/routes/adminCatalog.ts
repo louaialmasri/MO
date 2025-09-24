@@ -60,7 +60,8 @@ router.get('/g-services/:id', async (req, res) => {
         if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
             return res.status(400).send('Ungültige Service ID');
         }
-        const service = await Service.findById(req.params.id);
+        // Auch hier wird .populate('category') hinzugefügt
+        const service = await Service.findById(req.params.id).populate('category');
         if (!service) {
             return res.status(404).send('Service nicht gefunden');
         }
@@ -73,17 +74,21 @@ router.get('/g-services/:id', async (req, res) => {
 // Admin-spezifische Service-Endpunkte
 router.post('/g-services', async (req, res) => {
   try {
-    const { title, description, price, duration, category } = req.body; // 'category' hinzugefügt
-    if (!title || !price || !duration || !category) { // 'category' in der Prüfung ergänzt
-      return res.status(400).send('Titel, Preis, Dauer und Kategorie sind erforderlich');
+    const { title, description, price, duration, category } = req.body
+    if (!title || !price || !duration || !category) {
+      return res.status(400).send('Titel, Preis, Dauer und Kategorie sind erforderlich')
     }
-    const newService = new Service({ title, description, price, duration, category }); // 'category' wird jetzt übergeben
-    await newService.save();
-    res.status(201).json(newService);
+    const newService = new Service({ title, description, price, duration, category })
+    await newService.save()
+    
+    // KORREKTUR 2: Den gerade erstellten Service vor dem Senden mit den Kategorie-Daten anreichern.
+    await newService.populate('category');
+
+    res.status(201).json(newService)
   } catch (error: any) {
-    res.status(500).json({ message: 'Fehler beim Erstellen des Services', error: error.message });
+    res.status(500).json({ message: 'Fehler beim Erstellen des Services', error: error.message })
   }
-});
+})
 
 // PUT /api/admin/g-services/:id - Aktualisiert einen globalen Service
 router.put('/g-services/:id', async (req, res) => {
