@@ -21,22 +21,17 @@ function generateVoucherCode(): string {
 }
 
 export const createInvoice = async (req: SalonRequest, res: Response) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  // KORREKTUR: Transaktionslogik entfernt, um Kompatibilität mit lokalen Standalone-MongoDB-Instanzen zu gewährleisten.
   try {
     const { bookingId, customerId, items, paymentMethod } = req.body;
 
     if (!req.user || !req.salonId) {
-      await session.abortTransaction();
-      session.endSession();
       return res.status(401).json({ message: 'Authentifizierung fehlgeschlagen.' });
     }
     const salonId = req.salonId;
     const staffId = req.user.userId;
 
     if (!customerId) {
-      await session.abortTransaction();
-      session.endSession();
       return res.status(400).json({ message: 'Kunde ist erforderlich.' });
     }
 
@@ -44,7 +39,7 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
     let totalAmount = 0;
 
     if (bookingId) {
-      const booking = await Booking.findById(bookingId).populate('service').session(session);
+      const booking = await Booking.findById(bookingId).populate('service');
       if (booking && booking.service) {
         const serviceItem = {
           description: (booking.service as any).title,
@@ -58,15 +53,16 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
     if (items && Array.isArray(items)) {
       for (const item of items) {
         if (item.type === 'product') {
-          const product = await Product.findById(item.id).session(session);
+          const product = await Product.findById(item.id);
           if (!product) throw new Error(`Produkt mit ID ${item.id} nicht gefunden.`);
           if (product.stock < 1) throw new Error(`Produkt "${product.name}" ist nicht auf Lager.`);
           
           invoiceItems.push({ description: `Produkt: ${product.name}`, price: product.price });
           totalAmount += product.price;
 
-          const updateResult = await Product.findByIdAndUpdate(item.id, { $inc: { stock: -1 } }, { session, new: true });
+          const updateResult = await Product.findByIdAndUpdate(item.id, { $inc: { stock: -1 } }, { new: true });
           if (!updateResult || updateResult.stock < 0) {
+            // Sollte selten passieren, aber fängt den Fall ab, dass der Bestand zwischenzeitlich auf 0 fällt.
             throw new Error(`Konnte Produkt "${product.name}" nicht verkaufen, da es nicht mehr auf Lager ist.`);
           }
 
@@ -80,7 +76,7 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
             currentValue: voucherValue,
             salon: salonId,
           });
-          await newVoucher.save({ session });
+          await newVoucher.save();
           
           invoiceItems.push({ description: `Gutschein (${newVoucher.code})`, price: voucherValue });
           totalAmount += voucherValue;
@@ -89,43 +85,35 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
     }
 
     if (invoiceItems.length === 0) {
-        await session.abortTransaction();
-        session.endSession();
         return res.status(400).json({ message: 'Keine Artikel für die Rechnung vorhanden.' });
     }
     
-    // --- KORREKTUR: Rechnungsnummer hier generieren ---
     const today = new Date();
     const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
-    const countToday = await Invoice.countDocuments({ date: { $gte: dayjs(today).startOf('day').toDate() } }).session(session);
+    const countToday = await Invoice.countDocuments({ date: { $gte: dayjs(today).startOf('day').toDate() } });
     const invoiceNumber = `${dateStr}-${countToday + 1}`;
 
     const newInvoice = new Invoice({
-      invoiceNumber, // hinzugefügt
+      invoiceNumber,
       booking: bookingId || null,
       customer: customerId,
       salon: salonId,
       staff: staffId,
       items: invoiceItems,
-      amount: totalAmount, // umbenannt von totalAmount
+      amount: totalAmount,
       paymentMethod,
-      date: today, // hinzugefügt
+      date: today,
       status: 'paid',
     });
-    await newInvoice.save({ session });
+    await newInvoice.save();
 
     if (bookingId) {
-      await Booking.findByIdAndUpdate(bookingId, { status: 'completed', invoiceNumber: newInvoice.invoiceNumber }, { session });
+      await Booking.findByIdAndUpdate(bookingId, { status: 'completed', invoiceNumber: newInvoice.invoiceNumber });
     }
-
-    await session.commitTransaction();
-    session.endSession();
 
     res.status(201).json(newInvoice);
 
   } catch (error: any) {
-    await session.abortTransaction();
-    session.endSession();
     console.error('Fehler beim Erstellen der Rechnung:', error);
     res.status(500).json({ message: 'Fehler beim Erstellen der Rechnung', error: error.message });
   }
@@ -161,7 +149,7 @@ export const getUserInvoices = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.userId;
         const invoices = await Invoice.find({ customer: userId })
-            .populate({
+             .populate({
                 path: 'booking',
                 populate: { path: 'service', select: 'title' }
             })
@@ -251,3 +239,4 @@ export const processPaymentForBooking = async (req: AuthRequest & SalonRequest, 
         res.status(500).json({ success: false, message: 'Serverfehler' });
     }
 };
+
