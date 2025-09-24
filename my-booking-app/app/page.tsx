@@ -72,9 +72,11 @@ export default function LandingPage() {
 
   const servicesByCategory = useMemo(() => {
     return services.reduce((acc, service) => {
-      const category = service.category || 'Allgemein';
-      if (!acc[category]) acc[category] = [];
-      acc[category].push(service);
+      const categoryName = (service as any).category?.name || 'Allgemein';
+      if (!acc[categoryName]) {
+        acc[categoryName] = [];
+      }
+      acc[categoryName].push(service);
       return acc;
     }, {} as Record<string, ServiceWithCategory[]>);
   }, [services]);

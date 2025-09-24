@@ -7,39 +7,40 @@ import { SalonRequest } from '../middlewares/activeSalon'
 
 export const listServices = async (req: any, res: any) => {
   try {
-    const sid = req.salonId || (req.query?.salonId as string | undefined)
+    const sid = req.salonId || (req.query?.salonId as string | undefined);
     
-    // KORREKTUR: Wenn keine Salon-ID vorhanden ist, alle Services laden.
+    // KORREKTUR: Wenn keine Salon-ID vorhanden ist (z.B. auf der öffentlichen Startseite),
+    // werden alle Services aus der Datenbank geladen.
     if (!sid) {
       const allServices = await Service.find({}).populate('category').sort({ title: 1 }).lean();
       return res.json({ success: true, services: allServices });
     }
 
     // Die bestehende Logik für salon-spezifische Anfragen bleibt erhalten.
-    const rows = await ServiceSalon.find({ salon: sid, active: true }).lean()
+    const rows = await ServiceSalon.find({ salon: sid, active: true }).lean();
     if (rows.length > 0) {
-      const ids = rows.map(r => r.service)
-      const svcs = await Service.find({ _id: { $in: ids } }).populate('category').lean()
-      const byId = new Map(svcs.map(s => [String(s._id), s]))
+      const ids = rows.map(r => r.service);
+      const svcs = await Service.find({ _id: { $in: ids } }).populate('category').lean();
+      const byId = new Map(svcs.map(s => [String(s._id), s]));
       const services = rows.map(r => {
-        const base = byId.get(String(r.service))!
+        const base = byId.get(String(r.service))!;
         return {
           ...base,
           price: r.priceOverride ?? base.price,
           duration: r.durationOverride ?? base.duration,
-        }
-      })
-      return res.json({ success:true, services })
+        };
+      });
+      return res.json({ success: true, services });
     }
 
-    // Fallback: alte Logik (falls noch keine Zuordnungen existieren)
-    const services = await Service.find({ salon: sid }).populate('category').sort({ title: 1 }).lean()
-    return res.json({ success:true, services })
+    // Fallback für ältere Datenstrukturen
+    const services = await Service.find({ salon: sid }).populate('category').sort({ title: 1 }).lean();
+    return res.json({ success: true, services });
   } catch (e) {
-    console.error('listServices error', e)
-    return res.status(500).json({ success:false, message:'Fehler beim Laden der Services' })
+    console.error('listServices error', e);
+    return res.status(500).json({ success: false, message: 'Fehler beim Laden der Services' });
   }
-}
+};
 
 // ➡ Alle Services abrufen (öffentlich)
 export const getAllServices = listServices;

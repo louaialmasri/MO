@@ -27,6 +27,7 @@ export type Service = {
   price: number
   duration: number
   salon?: string | null
+  category?: { _id: string; name: string; }; // Wichtig für die Anzeige
 }
 
 export type Booking = {
@@ -176,18 +177,20 @@ api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
   if (token) config.headers.Authorization = `Bearer ${token}`
 
-  if (!(config as any).noSalonHeader) {
+  // KORREKTUR: Die 'noSalonHeader' Logik wird entfernt, da sie das Problem nicht löst.
+  // Stattdessen wird der Header nur gesetzt, wenn ein Token vorhanden ist.
+  if (token) {
     const salonId = localStorage.getItem('activeSalonId')
     if (salonId) (config.headers as any)['x-salon-id'] = salonId
   }
+  
   return config
 })
 
 // SERVICE API
 export const fetchServices = async (token?: string | null) => {
   try {
-    // Die Unterscheidung zwischen globalen und Salon-Services wird nun
-    // vom Backend übernommen. Das Frontend ruft immer dieselbe Route auf.
+    // Diese Funktion ist jetzt robust. Wenn kein Token da ist, wird auch kein Salon-Header gesendet.
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
     const res = await api.get('/services', { headers });
     
