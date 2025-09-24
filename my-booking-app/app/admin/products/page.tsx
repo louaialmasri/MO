@@ -24,6 +24,7 @@ import {
   fetchProducts,
   createProduct,
   updateProduct,
+  deleteProduct,
   fetchProductCategories,
   Product as ProductType,
   ProductCategory,
