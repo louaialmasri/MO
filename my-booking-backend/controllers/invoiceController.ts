@@ -66,8 +66,8 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
           
           invoiceItems.push({ description: `Produkt: ${product.name}`, price: product.price });
           totalAmount += product.price;
-          product.stock -= 1;
-          await product.save({ session });
+          // KORREKTUR: Wir verwenden eine atomare Operation, um den Lagerbestand zu aktualisieren.
+          await Product.findByIdAndUpdate(item.id, { $inc: { stock: -1 } }, { session });
 
         } else if (item.type === 'voucher') {
           const voucherValue = Number(item.value);

@@ -1,3 +1,5 @@
+// my-booking-app/app/admin/products/page.tsx
+
 'use client'
 
 import { useState, useEffect } from 'react';
@@ -32,10 +34,9 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/context/AuthContext'; // Importieren Sie den Auth-Kontext
 
 export default function ProductsPage() {
-  const { token } = useAuth();
   const [products, setProducts] = useState<ProductType[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -45,14 +46,17 @@ export default function ProductsPage() {
     price: '',
     description: '',
     category: '',
-    stock: '0', // Lagerbestand zum Formularstatus hinzugefügt
+    stock: '0',
   });
+  
+  const { token } = useAuth(); // Holen Sie sich den Token aus dem Kontext
 
   useEffect(() => {
-    if(token) {
+    // KORREKTUR: Laden Sie die Daten nur, wenn der Benutzer eingeloggt ist (token existiert).
+    if (token) {
       loadData();
     }
-  }, [token]);
+  }, [token]); // Führen Sie den Effekt erneut aus, wenn sich der Token ändert.
 
   const loadData = async () => {
     try {
@@ -75,7 +79,7 @@ export default function ProductsPage() {
         price: String(product.price),
         description: product.description || '',
         category: product.category,
-        stock: String(product.stock), // Lagerbestand beim Bearbeiten setzen
+        stock: String(product.stock),
       });
     } else {
       setEditingProduct(null);
@@ -105,7 +109,7 @@ export default function ProductsPage() {
       price: parseFloat(formState.price),
       description: formState.description,
       category: formState.category,
-      stock: parseInt(formState.stock, 10) || 0, // Lagerbestand zum Payload hinzufügen
+      stock: parseInt(formState.stock, 10) || 0,
     };
 
     try {
