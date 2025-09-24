@@ -10,8 +10,12 @@ import { fetchAllUsersForAdmin, fetchProducts, createInvoice, User, Product as P
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 
-// ... (der 'CartItem' Typ bleibt unverändert)
-
+type CartItem = {
+  id: string;
+  name: string;
+  price: number;
+  type: 'product' | 'voucher';
+};
 export default function CashRegisterPage() {
   const { token } = useAuth();
   const [customers, setCustomers] = useState<User[]>([]);

@@ -730,9 +730,14 @@ export const fetchProducts = async (token: string): Promise<Product[]> => {
   return res.data;
 };
 
-export const createProduct = async (productData: Omit<Product, '_id' | 'category'> & { category: string }, token: string): Promise<Product> => {
-  const res = await api.post('/products', productData, { headers: { Authorization: `Bearer ${token}` } });
+export async function createProduct(payload: { name: string; price: number; description?: string; category: string; stock: number; }) {
+  const res = await api.post('/products', payload);
   return res.data;
-};
+}
+
+export async function updateProduct(id: string, payload: { name: string; price: number; description?: string; category: string; stock: number; }) {
+  const res = await api.put(`/products/${id}`, payload);
+  return res.data;
+}
 
 export default api

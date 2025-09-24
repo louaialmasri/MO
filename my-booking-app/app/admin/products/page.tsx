@@ -1,211 +1,235 @@
 'use client'
 
-import { useEffect, useState } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { useState, useEffect } from 'react';
 import {
-  fetchProducts, createProduct, fetchProductCategories, createProductCategory,
-  type Product, type ProductCategory
-} from '@/services/api';
-import {
-  Container, Typography, Paper, Stack, Button, TextField, Dialog, DialogTitle,
-  DialogContent, DialogActions, List, ListItem, ListItemText, IconButton,
-  Box, Divider, Chip, CircularProgress, Snackbar, Alert, MenuItem,
-  Grid
+  Container,
+  Typography,
+  Button,
+  List,
+  ListItem,
+  ListItemText,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Box,
 } from '@mui/material';
+import {
+  fetchProducts,
+  createProduct,
+  updateProduct,
+  fetchProductCategories,
+  Product as ProductType,
+  ProductCategory,
+} from '@/services/api';
 import AddIcon from '@mui/icons-material/Add';
-import AdminBreadcrumbs from '@/components/AdminBreadcrumbs';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import { useAuth } from '@/context/AuthContext';
 
-export default function AdminProductsPage() {
-  const { token, loading: authLoading } = useAuth();
-  const [products, setProducts] = useState<Product[]>([]);
+export default function ProductsPage() {
+  const { token } = useAuth();
+  const [products, setProducts] = useState<ProductType[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<ProductType | null>(null);
+  const [formState, setFormState] = useState({
+    name: '',
+    price: '',
+    description: '',
+    category: '',
+    stock: '0', // Lagerbestand zum Formularstatus hinzugefügt
+  });
 
-  // Dialog States
-  const [productDialogOpen, setProductDialogOpen] = useState(false);
-  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
-  
-  // Form States
-  const [newProductName, setNewProductName] = useState('');
-  const [newProductPrice, setNewProductPrice] = useState('');
-  const [newProductCategory, setNewProductCategory] = useState('');
-  const [newCategoryName, setNewCategoryName] = useState('');
-
-  const [toast, setToast] = useState<{ open: boolean; msg: string; sev: 'success' | 'error' }>({ open: false, msg: '', sev: 'success' });
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const loadData = async () => {
-    if (token) {
-      setLoading(true);
+    try {
+      const [productsData, categoriesData] = await Promise.all([
+        fetchProducts(token),
+        fetchProductCategories(token),
+      ]);
+      setProducts(productsData);
+      setCategories(categoriesData);
+    } catch (error) {
+      console.error('Fehler beim Laden der Daten:', error);
+    }
+  };
+
+  const handleOpenDialog = (product?: ProductType) => {
+    if (product) {
+      setEditingProduct(product);
+      setFormState({
+        name: product.name,
+        price: String(product.price),
+        description: product.description || '',
+        category: product.category,
+        stock: String(product.stock), // Lagerbestand beim Bearbeiten setzen
+      });
+    } else {
+      setEditingProduct(null);
+      setFormState({
+        name: '',
+        price: '',
+        description: '',
+        category: '',
+        stock: '0',
+      });
+    }
+    setDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setDialogOpen(false);
+  };
+
+  const handleSave = async () => {
+    if (!formState.name || !formState.price || !formState.category) {
+      alert('Bitte füllen Sie alle Pflichtfelder aus.');
+      return;
+    }
+
+    const payload = {
+      name: formState.name,
+      price: parseFloat(formState.price),
+      description: formState.description,
+      category: formState.category,
+      stock: parseInt(formState.stock, 10) || 0, // Lagerbestand zum Payload hinzufügen
+    };
+
+    try {
+      if (editingProduct) {
+        await updateProduct(editingProduct._id, payload);
+      } else {
+        await createProduct(payload);
+      }
+      loadData();
+      handleCloseDialog();
+    } catch (error) {
+      console.error('Fehler beim Speichern des Produkts:', error);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Sind Sie sicher, dass Sie dieses Produkt löschen möchten?')) {
       try {
-        const [productsData, categoriesData] = await Promise.all([
-          fetchProducts(token),
-          fetchProductCategories(token)
-        ]);
-        setProducts(productsData);
-        setCategories(categoriesData);
+        await deleteProduct(id);
+        loadData();
       } catch (error) {
-        console.error("Fehler beim Laden der Produktdaten:", error);
-        setToast({ open: true, msg: 'Daten konnten nicht geladen werden', sev: 'error' });
-      } finally {
-        setLoading(false);
+        console.error('Fehler beim Löschen des Produkts:', error);
       }
     }
   };
 
-  useEffect(() => {
-    if (!authLoading) {
-      loadData();
-    }
-  }, [token, authLoading]);
-
-  const handleCreateCategory = async () => {
-    if (!newCategoryName.trim()) {
-      setToast({ open: true, msg: 'Kategoriename darf nicht leer sein', sev: 'error' });
-      return;
-    }
-    try {
-      await createProductCategory(newCategoryName, token!);
-      setToast({ open: true, msg: 'Kategorie erfolgreich erstellt', sev: 'success' });
-      setCategoryDialogOpen(false);
-      setNewCategoryName('');
-      loadData(); // Reload all data
-    } catch (error) {
-      setToast({ open: true, msg: 'Fehler beim Erstellen der Kategorie', sev: 'error' });
-    }
-  };
-  
-  const handleCreateProduct = async () => {
-    if (!newProductName.trim() || !newProductPrice || !newProductCategory) {
-        setToast({ open: true, msg: 'Bitte alle Felder ausfüllen', sev: 'error' });
-        return;
-    }
-    try {
-        await createProduct({
-            name: newProductName,
-            price: parseFloat(newProductPrice),
-            category: newProductCategory,
-        }, token!);
-        setToast({ open: true, msg: 'Produkt erfolgreich erstellt', sev: 'success' });
-        setProductDialogOpen(false);
-        setNewProductName('');
-        setNewProductPrice('');
-        setNewProductCategory('');
-        loadData(); // Reload all data
-    } catch (error) {
-        setToast({ open: true, msg: 'Fehler beim Erstellen des Produkts', sev: 'error' });
-    }
-  };
-
-
   return (
-    <>
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <AdminBreadcrumbs items={[{ label: 'Mein Salon', href: '/admin' }, { label: 'Produkte' }]} />
-        <Stack direction="row" alignItems="center" sx={{ mb: 3 }}>
-          <Typography variant="h4" fontWeight={800} sx={{ flexGrow: 1 }}>
-            Produktverwaltung
-          </Typography>
-          <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setCategoryDialogOpen(true)} sx={{ mr: 2 }}>
-            Neue Kategorie
-          </Button>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setProductDialogOpen(true)}>
-            Neues Produkt
-          </Button>
-        </Stack>
+    <Container maxWidth="lg">
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', my: 4 }}>
+        <Typography variant="h4">Produktverwaltung</Typography>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => handleOpenDialog()}
+        >
+          Neues Produkt
+        </Button>
+      </Box>
 
-        {loading ? (
-           <Box display="flex" justifyContent="center" alignItems="center" height="50vh"><CircularProgress /></Box>
-        ) : (
-          <Grid container spacing={4}>
-            {categories.map((category) => (
-              <Grid key={category._id} size={{ xs: 12, md: 6}}>
-                <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                  <Typography variant="h6" fontWeight={700} gutterBottom>{category.name}</Typography>
-                  <Divider />
-                  <List>
-                    {products.filter(p => p.category._id === category._id).map(product => (
-                      <ListItem key={product._id} secondaryAction={
-                        <Typography fontWeight="bold">{product.price.toFixed(2)} €</Typography>
-                      }>
-                        <ListItemText primary={product.name} />
-                      </ListItem>
-                    ))}
-                  </List>
-                </Paper>
-              </Grid>
-            ))}
-          </Grid>
-        )}
-      </Container>
+      <List>
+        {products.map((product) => (
+          <ListItem
+            key={product._id}
+            divider
+            secondaryAction={
+              <>
+                <IconButton edge="end" aria-label="edit" onClick={() => handleOpenDialog(product)}>
+                  <EditIcon />
+                </IconButton>
+                <IconButton edge="end" aria-label="delete" onClick={() => handleDelete(product._id)}>
+                  <DeleteIcon />
+                </IconButton>
+              </>
+            }
+          >
+            <ListItemText
+              primary={product.name}
+              secondary={`Preis: ${product.price.toFixed(2)}€ | Lagerbestand: ${product.stock}`}
+            />
+          </ListItem>
+        ))}
+      </List>
 
-      {/* Dialog for new category */}
-      <Dialog open={categoryDialogOpen} onClose={() => setCategoryDialogOpen(false)}>
-        <DialogTitle>Neue Produktkategorie erstellen</DialogTitle>
+      <Dialog open={dialogOpen} onClose={handleCloseDialog} fullWidth maxWidth="sm">
+        <DialogTitle>{editingProduct ? 'Produkt bearbeiten' : 'Neues Produkt erstellen'}</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
             margin="dense"
-            label="Kategoriename"
+            label="Produktname"
             type="text"
             fullWidth
-            variant="standard"
-            value={newCategoryName}
-            onChange={(e) => setNewCategoryName(e.target.value)}
+            variant="outlined"
+            value={formState.name}
+            onChange={(e) => setFormState({ ...formState, name: e.target.value })}
+          />
+          <TextField
+            margin="dense"
+            label="Preis (€)"
+            type="number"
+            fullWidth
+            variant="outlined"
+            value={formState.price}
+            onChange={(e) => setFormState({ ...formState, price: e.target.value })}
+          />
+          <TextField
+            margin="dense"
+            label="Lagerbestand"
+            type="number"
+            fullWidth
+            variant="outlined"
+            value={formState.stock}
+            onChange={(e) => setFormState({ ...formState, stock: e.target.value })}
+          />
+          <FormControl fullWidth margin="dense">
+            <InputLabel>Kategorie</InputLabel>
+            <Select
+              value={formState.category}
+              label="Kategorie"
+              onChange={(e) => setFormState({ ...formState, category: e.target.value })}
+            >
+              {categories.map((cat) => (
+                <MenuItem key={cat._id} value={cat._id}>
+                  {cat.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <TextField
+            margin="dense"
+            label="Beschreibung"
+            type="text"
+            fullWidth
+            multiline
+            rows={4}
+            variant="outlined"
+            value={formState.description}
+            onChange={(e) => setFormState({ ...formState, description: e.target.value })}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCategoryDialogOpen(false)}>Abbrechen</Button>
-          <Button onClick={handleCreateCategory}>Erstellen</Button>
+          <Button onClick={handleCloseDialog}>Abbrechen</Button>
+          <Button onClick={handleSave} variant="contained">
+            Speichern
+          </Button>
         </DialogActions>
       </Dialog>
-      
-      {/* Dialog for new product */}
-      <Dialog open={productDialogOpen} onClose={() => setProductDialogOpen(false)}>
-        <DialogTitle>Neues Produkt erstellen</DialogTitle>
-        <DialogContent>
-            <Stack spacing={2} sx={{mt: 1}}>
-                <TextField
-                    autoFocus
-                    label="Produktname"
-                    type="text"
-                    fullWidth
-                    value={newProductName}
-                    onChange={(e) => setNewProductName(e.target.value)}
-                />
-                <TextField
-                    label="Preis"
-                    type="number"
-                    fullWidth
-                    value={newProductPrice}
-                    onChange={(e) => setNewProductPrice(e.target.value)}
-                    InputProps={{ endAdornment: '€' }}
-                />
-                <TextField
-                    select
-                    label="Kategorie"
-                    value={newProductCategory}
-                    onChange={(e) => setNewProductCategory(e.target.value)}
-                    fullWidth
-                >
-                    {categories.map((cat) => (
-                        <MenuItem key={cat._id} value={cat._id}>
-                            {cat.name}
-                        </MenuItem>
-                    ))}
-                </TextField>
-            </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setProductDialogOpen(false)}>Abbrechen</Button>
-          <Button onClick={handleCreateProduct}>Erstellen</Button>
-        </DialogActions>
-      </Dialog>
-
-      <Snackbar open={toast.open} autoHideDuration={3000} onClose={() => setToast(p => ({ ...p, open: false }))}>
-        <Alert onClose={() => setToast(p => ({ ...p, open: false }))} severity={toast.sev} sx={{ width: '100%' }}>
-          {toast.msg}
-        </Alert>
-      </Snackbar>
-    </>
+    </Container>
   );
 }
