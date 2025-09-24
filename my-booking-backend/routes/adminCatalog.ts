@@ -51,7 +51,7 @@ router.delete('/users/:id', verifyAdmin, async (req, res) => {
 
 // Globale Services (alle eingeloggten Benutzer)
 router.get('/services-all', async (_, res) => {
-  const services = await Service.find({}).lean()
+  const services = await Service.find({}).populate('category').lean()
   res.json({ success:true, services })
 })
 
