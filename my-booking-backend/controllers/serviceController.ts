@@ -7,16 +7,18 @@ import { SalonRequest } from '../middlewares/activeSalon'
 
 export const listServices = async (req: any, res: any) => {
   try {
+    const isGlobalView = req.query.view === 'global';
     const sid = req.salonId || (req.query?.salonId as string | undefined);
-    
-    // KORREKTUR: Wenn keine Salon-ID vorhanden ist (z.B. auf der öffentlichen Startseite),
-    // werden alle Services aus der Datenbank geladen.
-    if (!sid) {
+
+    // KORREKTUR: Wenn die Anfrage als 'global' markiert ist ODER keine Salon-ID
+    // vorhanden ist, werden immer ALLE Services zurückgegeben.
+    if (isGlobalView || !sid) {
       const allServices = await Service.find({}).populate('category').sort({ title: 1 }).lean();
       return res.json({ success: true, services: allServices });
     }
 
-    // Die bestehende Logik für salon-spezifische Anfragen bleibt erhalten.
+    // Die bestehende Logik für salon-spezifische Anfragen (z.B. im Admin-Bereich)
+    // bleibt für alle anderen Fälle erhalten.
     const rows = await ServiceSalon.find({ salon: sid, active: true }).lean();
     if (rows.length > 0) {
       const ids = rows.map(r => r.service);
@@ -33,9 +35,9 @@ export const listServices = async (req: any, res: any) => {
       return res.json({ success: true, services });
     }
 
-    // Fallback für ältere Datenstrukturen
     const services = await Service.find({ salon: sid }).populate('category').sort({ title: 1 }).lean();
     return res.json({ success: true, services });
+
   } catch (e) {
     console.error('listServices error', e);
     return res.status(500).json({ success: false, message: 'Fehler beim Laden der Services' });

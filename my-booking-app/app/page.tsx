@@ -59,7 +59,7 @@ export default function LandingPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const data = await fetchServices(token) as ServiceWithCategory[];
+        const data = await fetchServices(token, { global: true }) as ServiceWithCategory[];
         setServices(data) // Lädt alle Services
       } catch (e) {
         console.error('Service-Liste konnte nicht geladen werden', e)

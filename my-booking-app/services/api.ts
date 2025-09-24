@@ -188,12 +188,13 @@ api.interceptors.request.use((config) => {
 })
 
 // SERVICE API
-export const fetchServices = async (token?: string | null) => {
+export const fetchServices = async (token?: string | null, options: { global?: boolean } = {}) => {
   try {
-    // Diese Funktion ist jetzt robust. Wenn kein Token da ist, wird auch kein Salon-Header gesendet.
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
-    const res = await api.get('/services', { headers });
-    
+    // KORREKTUR: Hängt ?view=global an die URL an, wenn die Option gesetzt ist.
+    const url = options.global ? '/services?view=global' : '/services';
+    const res = await api.get(url, { headers });
+
     if (res.data && Array.isArray(res.data.services)) {
       return res.data.services;
     }
