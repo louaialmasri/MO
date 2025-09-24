@@ -186,12 +186,8 @@ api.interceptors.request.use((config) => {
 // SERVICE API
 export const fetchServices = async (token?: string | null) => {
   try {
-    const salonId = localStorage.getItem('activeSalonId');
-    // Wenn keine Salon-ID vorhanden ist, rufen wir die globalen Services ab.
-    if (!salonId) {
-        return fetchGlobalServices();
-    }
-    
+    // Die Unterscheidung zwischen globalen und Salon-Services wird nun
+    // vom Backend übernommen. Das Frontend ruft immer dieselbe Route auf.
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
     const res = await api.get('/services', { headers });
     

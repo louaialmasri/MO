@@ -8,13 +8,18 @@ import { SalonRequest } from '../middlewares/activeSalon'
 export const listServices = async (req: any, res: any) => {
   try {
     const sid = req.salonId || (req.query?.salonId as string | undefined)
-    if (!sid) return res.json({ success:true, services: [] })
+    
+    // KORREKTUR: Wenn keine Salon-ID vorhanden ist, alle Services laden.
+    if (!sid) {
+      const allServices = await Service.find({}).populate('category').sort({ title: 1 }).lean();
+      return res.json({ success: true, services: allServices });
+    }
 
-    // 1) bevorzugt: Zuordnungen nutzen
+    // Die bestehende Logik für salon-spezifische Anfragen bleibt erhalten.
     const rows = await ServiceSalon.find({ salon: sid, active: true }).lean()
     if (rows.length > 0) {
       const ids = rows.map(r => r.service)
-      const svcs = await Service.find({ _id: { $in: ids } }).lean()
+      const svcs = await Service.find({ _id: { $in: ids } }).populate('category').lean()
       const byId = new Map(svcs.map(s => [String(s._id), s]))
       const services = rows.map(r => {
         const base = byId.get(String(r.service))!
@@ -27,8 +32,8 @@ export const listServices = async (req: any, res: any) => {
       return res.json({ success:true, services })
     }
 
-    // 2) Fallback: alte Logik (falls noch keine Zuordnungen existieren)
-    const services = await Service.find({ salon: sid }).sort({ title: 1 }).lean()
+    // Fallback: alte Logik (falls noch keine Zuordnungen existieren)
+    const services = await Service.find({ salon: sid }).populate('category').sort({ title: 1 }).lean()
     return res.json({ success:true, services })
   } catch (e) {
     console.error('listServices error', e)
