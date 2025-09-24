@@ -7,6 +7,7 @@ import { Booking } from '../models/Booking';
 import { Voucher } from '../models/Voucher';
 import { Product, IProduct } from '../models/Product';
 import { User } from '../models/User';
+import dayjs from 'dayjs';
 
 
 // Hilfsfunktion zum Generieren eines Gutschein-Codes
@@ -64,7 +65,6 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
           invoiceItems.push({ description: `Produkt: ${product.name}`, price: product.price });
           totalAmount += product.price;
 
-          // FINALE, STABILE KORREKTUR: Atomare Operation zur Reduzierung des Lagerbestands.
           const updateResult = await Product.findByIdAndUpdate(item.id, { $inc: { stock: -1 } }, { session, new: true });
           if (!updateResult || updateResult.stock < 0) {
             throw new Error(`Konnte Produkt "${product.name}" nicht verkaufen, da es nicht mehr auf Lager ist.`);
@@ -93,21 +93,29 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
         session.endSession();
         return res.status(400).json({ message: 'Keine Artikel für die Rechnung vorhanden.' });
     }
+    
+    // --- KORREKTUR: Rechnungsnummer hier generieren ---
+    const today = new Date();
+    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+    const countToday = await Invoice.countDocuments({ date: { $gte: dayjs(today).startOf('day').toDate() } }).session(session);
+    const invoiceNumber = `${dateStr}-${countToday + 1}`;
 
     const newInvoice = new Invoice({
+      invoiceNumber, // hinzugefügt
       booking: bookingId || null,
       customer: customerId,
       salon: salonId,
       staff: staffId,
       items: invoiceItems,
-      totalAmount,
+      amount: totalAmount, // umbenannt von totalAmount
       paymentMethod,
+      date: today, // hinzugefügt
       status: 'paid',
     });
     await newInvoice.save({ session });
 
     if (bookingId) {
-      await Booking.findByIdAndUpdate(bookingId, { status: 'completed' }, { session });
+      await Booking.findByIdAndUpdate(bookingId, { status: 'completed', invoiceNumber: newInvoice.invoiceNumber }, { session });
     }
 
     await session.commitTransaction();
@@ -134,7 +142,12 @@ export const listInvoices = async (req: SalonRequest, res: Response) => {
 
 export const getInvoiceById = async (req: SalonRequest, res: Response) => {
     try {
-        const invoice = await Invoice.findOne({ _id: req.params.id, salon: req.salonId }).populate('customer', 'firstName lastName email').populate('booking').populate('staff', 'firstName lastName');
+        const invoice = await Invoice.findOne({ invoiceNumber: req.params.id, salon: req.salonId })
+            .populate('customer', 'firstName lastName email address phone')
+            .populate('booking')
+            .populate('staff', 'firstName lastName')
+            .populate('salon');
+
         if (!invoice) {
             return res.status(404).send('Rechnung nicht gefunden');
         }
@@ -144,12 +157,14 @@ export const getInvoiceById = async (req: SalonRequest, res: Response) => {
     }
 };
 
-// Alle Rechnungen eines bestimmten Benutzers abrufen
 export const getUserInvoices = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user?.userId;
         const invoices = await Invoice.find({ customer: userId })
-            .populate('service', 'title')
+            .populate({
+                path: 'booking',
+                populate: { path: 'service', select: 'title' }
+            })
             .sort({ date: -1 });
 
         res.json(invoices);
@@ -158,14 +173,16 @@ export const getUserInvoices = async (req: AuthRequest, res: Response) => {
     }
 };
 
-// Alle Rechnungen für den Admin abrufen
-export const getAllInvoices = async (req: AuthRequest, res: Response) => {
+export const getAllInvoices = async (req: AuthRequest & SalonRequest, res: Response) => {
     try {
-        const invoices = await Invoice.find({})
+        const invoices = await Invoice.find({ salon: req.salonId })
             .populate('customer', 'firstName lastName email')
-            .populate('service', 'title')
+            .populate({
+                path: 'booking',
+                populate: { path: 'service', select: 'title' }
+            })
             .populate('salon', 'name')
-            .populate('staff', 'firstName lastName') // WICHTIG: Mitarbeiterdaten hinzufügen
+            .populate('staff', 'firstName lastName')
             .sort({ date: -1 });
 
         res.json(invoices);
@@ -174,54 +191,61 @@ export const getAllInvoices = async (req: AuthRequest, res: Response) => {
     }
 };
 
-// Logik zum Abkassieren (Bezahlung) eines Termins
-export const processPaymentForBooking = async (req: AuthRequest, res: Response) => {
+export const processPaymentForBooking = async (req: AuthRequest & SalonRequest, res: Response) => {
     try {
-        const { bookingId, paymentMethod } = req.body;
+        const { bookingId, paymentMethod, amountGiven } = req.body;
         if (!bookingId) {
             return res.status(400).json({ success: false, message: 'BookingID ist erforderlich.' });
         }
-
-        type PopulatedBooking = mongoose.Document & {
-            _id: mongoose.Types.ObjectId;
-            user: mongoose.Types.ObjectId;
-            service: any;
-            staff: mongoose.Types.ObjectId;
-            salon: mongoose.Types.ObjectId;
-            status: string;
-        };
-
-        const booking = await Booking.findById(bookingId).populate('service') as PopulatedBooking | null;
-
+        
+        const booking = await Booking.findById(bookingId).populate('service');
         if (!booking) {
             return res.status(404).json({ success: false, message: 'Buchung nicht gefunden' });
         }
+        if (booking.status === 'paid' || booking.status === 'completed') {
+            return res.status(400).json({ success: false, message: 'Diese Buchung wurde bereits bezahlt.' });
+        }
 
-        // 1. Buchungsstatus aktualisieren
+        const today = new Date();
+        const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+        const countToday = await Invoice.countDocuments({ date: { $gte: dayjs(today).startOf('day').toDate() } });
+        const invoiceNumber = `${dateStr}-${countToday + 1}`;
+        const servicePrice = (booking.service as any).price;
+        const given = amountGiven ? Number(amountGiven) : servicePrice;
+        if (given < servicePrice) {
+            return res.status(400).json({ message: 'Der gegebene Betrag ist geringer als der Rechnungsbetrag.' });
+        }
+        const change = given - servicePrice;
+
+        const serviceItem = {
+            description: (booking.service as any).title,
+            price: (booking.service as any).price,
+        };
+
+        const newInvoice = new Invoice({
+            invoiceNumber,
+            booking: booking._id,
+            customer: booking.user,
+            staff: booking.staff,
+            salon: req.salonId,
+            date: today,
+            items: [serviceItem],
+            amount: servicePrice,
+            paymentMethod,
+            amountGiven: given,
+            change: change,
+            status: 'paid',
+        });
+
+        await newInvoice.save();
+
         booking.status = 'completed';
+        (booking as any).paymentMethod = paymentMethod;
+        booking.invoiceNumber = invoiceNumber;
         await booking.save();
-        
-        const service = booking.service as any;
 
-        // 2. Rechnung erstellen oder aktualisieren
-        const invoice = await Invoice.findOneAndUpdate(
-            { booking: bookingId },
-            {
-                $set: {
-                    customer: booking.user,
-                    service: booking.service._id,
-                    staff: booking.staff,
-                    salon: booking.salon,
-                    amount: service.price,
-                    date: new Date(),
-                    paymentMethod: paymentMethod || 'cash',
-                    status: 'paid',
-                }
-            },
-            { upsert: true, new: true, setDefaultsOnInsert: true }
-        );
+        res.json({ success: true, message: 'Buchung bezahlt und Rechnung erstellt.', invoice: newInvoice });
 
-        res.json({ success: true, message: 'Buchung bezahlt und Rechnung erstellt/aktualisiert', invoice });
     } catch (e) {
         console.error('payBooking Error:', e);
         res.status(500).json({ success: false, message: 'Serverfehler' });

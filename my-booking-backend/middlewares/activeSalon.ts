@@ -10,35 +10,38 @@ export const activeSalon = async (req: SalonRequest, res: Response, next: NextFu
   try {
     const headerSalonId = req.header('x-salon-id') || null
 
-    // 1) Kein Login? -> trotzdem per Header scopen (z.B. öffentliche /services-Liste)
-    if (!req.user) {
+    // Fall 1: Nicht eingeloggt oder ein normaler Kunde.
+    // Der Header hat immer Priorität, da Kunden an keinen Salon gebunden sind.
+    if (!req.user || req.user.role === 'user') {
       req.salonId = headerSalonId
       return next()
     }
 
-    // 2) Eingeloggt: Rolle ermitteln
+    // Fall 2: Eingeloggter Admin oder Mitarbeiter.
     const userDoc = await User.findById(req.user.userId).select('role salon')
     const role = userDoc?.role || req.user.role
 
     if (role === 'admin') {
-      // Admin darf per Header den aktiven Salon wählen; sonst eigener Salon (falls gesetzt)
+      // Admin darf per Header den aktiven Salon wählen;
+      // ansonsten wird der im Profil hinterlegte Salon als Fallback genutzt.
       req.salonId = headerSalonId || (userDoc?.salon ? String(userDoc.salon) : null)
       return next()
     }
 
-    if (role === 'staff' || role === 'user') {
-      // Staff/User werden IMMER auf den eigenen Salon festgenagelt (Header wird ignoriert)
+    if (role === 'staff') {
+      // Mitarbeiter werden IMMER auf ihren eigenen Salon festgenagelt.
+      // Der Header wird für sie ignoriert, um sicherzustellen, dass sie nur im eigenen Salon agieren.
       req.salonId = userDoc?.salon ? String(userDoc.salon) : null
       return next()
     }
 
-    // Fallback
-    req.salonId = headerSalonId || null
+    // Fallback für unerwartete Fälle
+    req.salonId = headerSalonId
     next()
   } catch (e) {
     console.error('activeSalon error:', e)
-    const headerSalonId = req.header('x-salon-id') || null
-    req.salonId = headerSalonId || null
+    // Sicherer Fallback, falls die DB-Abfrage fehlschlägt
+    req.salonId = req.header('x-salon-id') || null
     next()
   }
 }
