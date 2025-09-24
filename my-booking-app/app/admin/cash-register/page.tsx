@@ -1,18 +1,16 @@
+// my-booking-app/app/admin/cash-register/page.tsx
+
 'use client'
 
 import { useState, useEffect } from 'react';
-import { Container, Typography, Paper, Grid, Button, Select, MenuItem, Autocomplete, TextField, List, ListItem, ListItemText, IconButton, Divider, SelectChangeEvent } from '@mui/material';
+import { Container, Typography, Paper, Grid, Button, Autocomplete, TextField, List, ListItem, ListItemText, IconButton, Divider } from '@mui/material';
 import { useAuth } from '@/context/AuthContext';
-import { fetchAllUsers, fetchProducts, createInvoice, User, Product as ProductType, InvoicePayload } from '@/services/api';
+// KORREKTUR: Wir importieren unsere neue Funktion
+import { fetchAllUsersForAdmin, fetchProducts, createInvoice, User, Product as ProductType, InvoicePayload } from '@/services/api';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 
-type CartItem = {
-  id: string;
-  name: string;
-  price: number;
-  type: 'product' | 'voucher';
-};
+// ... (der 'CartItem' Typ bleibt unverändert)
 
 export default function CashRegisterPage() {
   const { token } = useAuth();
@@ -20,22 +18,26 @@ export default function CashRegisterPage() {
   const [products, setProducts] = useState<ProductType[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<User | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash');
+  // ENTFERNT: Die Variable für die Zahlungsmethode wird nicht mehr benötigt
+  // const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash');
 
   useEffect(() => {
     const loadData = async () => {
       if (token) {
+        // KORREKTUR: Wir rufen beide Funktionen parallel auf, um die Ladezeit zu optimieren
         const [fetchedCustomers, fetchedProducts] = await Promise.all([
-          fetchAllUsers(),
-          fetchProducts()
+          fetchAllUsersForAdmin(), // << HIER DIE NEUE FUNKTION VERWENDEN
+          fetchProducts(token)
         ]);
-        setCustomers(fetchedCustomers.filter(c => c.role === 'user'));
+        // Wir zeigen alle Benutzer mit der Rolle 'user' an
+        setCustomers(fetchedCustomers.filter(u => u.role === 'user'));
         setProducts(fetchedProducts);
       }
     };
     loadData();
   }, [token]);
 
+  // ... (Die Funktionen handleAddProduct, handleAddVoucher, handleRemoveFromCart bleiben unverändert)
   const handleAddProduct = (product: ProductType) => {
     setCart(prevCart => [
       ...prevCart,
@@ -58,6 +60,7 @@ export default function CashRegisterPage() {
     setCart(prevCart => prevCart.filter(item => item.id !== itemId));
   };
 
+
   const total = cart.reduce((sum, item) => sum + item.price, 0);
 
   const handleCheckout = async () => {
@@ -68,7 +71,7 @@ export default function CashRegisterPage() {
 
     const payload: InvoicePayload = {
       customerId: selectedCustomer._id,
-      paymentMethod,
+      paymentMethod: 'cash', // KORREKTUR: Fest auf 'cash' gesetzt
       items: cart.map(item => ({
         type: item.type,
         id: item.type === 'product' ? item.id : undefined,
@@ -100,7 +103,7 @@ export default function CashRegisterPage() {
             <List>
               {products.map(product => (
                 <ListItem key={product._id} secondaryAction={
-                  <Button edge="end" onClick={() => handleAddProduct(product)} disabled={product.stock < 1}>
+                  <Button onClick={() => handleAddProduct(product)} disabled={product.stock < 1}>
                     Hinzufügen
                   </Button>
                 }>
@@ -113,7 +116,7 @@ export default function CashRegisterPage() {
 
         {/* Rechte Seite: Warenkorb und Abschluss */}
         <Grid size={{ xs: 12, md: 6 }}>
-          <Paper sx={{ p: 2 }}>
+          <Paper sx={{ p: 2, position: 'sticky', top: '20px' }}>
             <Typography variant="h6" gutterBottom>Warenkorb</Typography>
             <Autocomplete
               options={customers}
@@ -126,9 +129,9 @@ export default function CashRegisterPage() {
             <Divider sx={{ my: 2 }} />
             
             {cart.length === 0 ? (
-              <Typography color="text.secondary">Warenkorb ist leer.</Typography>
+              <Typography color="text.secondary" sx={{minHeight: 100}}>Warenkorb ist leer.</Typography>
             ) : (
-              <List>
+              <List sx={{minHeight: 100}}>
                 {cart.map(item => (
                   <ListItem key={item.id} secondaryAction={
                     <IconButton edge="end" onClick={() => handleRemoveFromCart(item.id)}>
@@ -146,11 +149,8 @@ export default function CashRegisterPage() {
               Gesamt: {total.toFixed(2)}€
             </Typography>
 
-            <Select value={paymentMethod} onChange={(e: SelectChangeEvent) => setPaymentMethod(e.target.value as 'cash' | 'card')} fullWidth sx={{ mb: 2 }}>
-              <MenuItem value="cash">Bar</MenuItem>
-              <MenuItem value="card">Karte</MenuItem>
-            </Select>
-
+            {/* ENTFERNT: Die Auswahl der Zahlungsmethode wurde entfernt */}
+            
             <Button
               variant="contained"
               color="primary"
@@ -158,7 +158,7 @@ export default function CashRegisterPage() {
               disabled={!selectedCustomer || cart.length === 0}
               onClick={handleCheckout}
             >
-              Verkauf abschließen
+              Verkauf abschließen (Bar)
             </Button>
           </Paper>
         </Grid>

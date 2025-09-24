@@ -132,7 +132,9 @@ export type Product = {
   name: string;
   description?: string;
   price: number;
-  category: ProductCategory;
+  stock: number;
+  category: string;
+  salon: string;
 };
 
 // --- Global Types ---
@@ -374,6 +376,16 @@ export const fetchAllUsers = async (token: string, role?: string): Promise<User[
         console.error("API Error in fetchAllUsers:", error);
         return [];
     }
+};
+
+export const fetchAllUsersForAdmin = async (): Promise<User[]> => {
+  try {
+    const res = await api.get('/admin/users-all');
+    return res.data.users || [];
+  } catch (error) {
+    console.error("API Error in fetchAllUsersForAdmin:", error);
+    return [];
+  }
 };
 
 

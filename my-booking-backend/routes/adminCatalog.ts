@@ -111,4 +111,11 @@ router.delete('/g-services/:id', verifyAdmin, async (req, res) => {
   res.json({ success:true })
 })
 
+// Globale User-Liste für spezielle Anwendungsfälle wie die Kasse
+router.get('/users-all', verifyAdmin, async (_, res) => {
+  // Wir laden alle Benutzer und sortieren sie nach Nachnamen
+  const users = await User.find({}).sort({ lastName: 1 }).lean(); 
+  res.json({ success: true, users });
+});
+
 export default router
