@@ -61,6 +61,7 @@ app.use('/api/cash-closing', cashClosingRoutes);
 app.use('/api/product-categories', activeSalon, productCategoryRoutes); // NEU
 app.use('/api/products', activeSalon, productRoutes); // NEU
 app.use('/api/service-categories', activeSalon, serviceCategoryRoutes); // NEU
+app.use('/api/invoices', activeSalon, invoiceRoutes);
 
 app.listen(PORT, () => {
   console.log(`🚀 Backend läuft auf http://localhost:${PORT}`)
