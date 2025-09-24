@@ -24,11 +24,11 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
   session.startTransaction();
   try {
     const { bookingId, customerId, items, paymentMethod } = req.body;
-    
+
     if (!req.user || !req.salonId) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(401).json({ message: 'Authentifizierung fehlgeschlagen oder kein Salon ausgewählt.' });
+      return res.status(401).json({ message: 'Authentifizierung fehlgeschlagen.' });
     }
     const salonId = req.salonId;
     const staffId = req.user.userId;
@@ -36,7 +36,7 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
     if (!customerId) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(400).json({ message: 'Ein Kunde ist für die Rechnung erforderlich.' });
+      return res.status(400).json({ message: 'Kunde ist erforderlich.' });
     }
 
     const invoiceItems: { description: string, price: number }[] = [];
@@ -57,15 +57,18 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
     if (items && Array.isArray(items)) {
       for (const item of items) {
         if (item.type === 'product') {
-          const product: IProduct | null = await Product.findById(item.id).session(session);
+          const product = await Product.findById(item.id).session(session);
           if (!product) throw new Error(`Produkt mit ID ${item.id} nicht gefunden.`);
           if (product.stock < 1) throw new Error(`Produkt "${product.name}" ist nicht auf Lager.`);
           
           invoiceItems.push({ description: `Produkt: ${product.name}`, price: product.price });
           totalAmount += product.price;
 
-          // KORREKTUR: Dies ist eine stabilere Methode, um den Lagerbestand zu aktualisieren.
-          await Product.updateOne({ _id: item.id }, { $inc: { stock: -1 } }, { session });
+          // FINALE, STABILE KORREKTUR: Atomare Operation zur Reduzierung des Lagerbestands.
+          const updateResult = await Product.findByIdAndUpdate(item.id, { $inc: { stock: -1 } }, { session, new: true });
+          if (!updateResult || updateResult.stock < 0) {
+            throw new Error(`Konnte Produkt "${product.name}" nicht verkaufen, da es nicht mehr auf Lager ist.`);
+          }
 
         } else if (item.type === 'voucher') {
           const voucherValue = Number(item.value);
@@ -86,9 +89,9 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
     }
 
     if (invoiceItems.length === 0) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({ message: 'Keine Artikel für die Rechnung vorhanden.' });
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ message: 'Keine Artikel für die Rechnung vorhanden.' });
     }
 
     const newInvoice = new Invoice({

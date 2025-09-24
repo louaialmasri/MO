@@ -49,7 +49,6 @@ export default function ProductsPage() {
   });
 
   useEffect(() => {
-    // KORREKTUR: Daten erst laden, wenn der Token sicher vorhanden ist.
     if (token) {
       loadData();
     }
