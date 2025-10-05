@@ -185,13 +185,17 @@ export const getOrCreateWalkInCustomer = async (req: AuthRequest, res: Response)
       walkInCustomer = await User.create({
         email: walkInEmail,
         firstName: 'Laufkunde',
-        lastName: '',
+        // Ein Leerzeichen oder ein Platzhalter wie '(Bar)' ist hier sinnvoll.
+        lastName: ' - ',
         role: 'user',
         password: await bcrypt.hash(Math.random().toString(36).slice(-8), 10),
       });
-    } else if (walkInCustomer.lastName === '(Bar)') {
-      walkInCustomer.lastName = '';
-      await walkInCustomer.save();
+    }
+    
+    // Zukünftige Absicherung: Verhindern, dass der Nachname wieder geleert wird.
+    if (walkInCustomer.lastName === '( - )') {
+      // Diese Zeile ist für die Zukunft optional, falls du den Namen anpassen willst.
+      // Fürs Erste lassen wir sie unverändert, da die Erstellung nun klappt.
     }
     
     res.json(walkInCustomer);

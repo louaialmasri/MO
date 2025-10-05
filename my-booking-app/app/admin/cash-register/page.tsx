@@ -37,46 +37,45 @@ export default function CashRegisterPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [toast, setToast] = useState<{ open: boolean; msg: string; sev: 'success' | 'error' }>({ open: false, msg: '', sev: 'success' });
 
-  // --- KORREKTUR: useEffect wurde komplett überarbeitet ---
   useEffect(() => {
-    if (!token) return;
-
-    const loadData = async () => {
-      try {
-        // Lade alle Benutzer (Kunden, Mitarbeiter)
-        const allUsers = await fetchAllUsers(token);
-        const regularCustomers = allUsers.filter(u => u.role === 'user' && u.email !== 'laufkunde@shop.local');
-        setStaff(allUsers.filter(u => u.role === 'staff'));
-
-        // Versuche, den Laufkunden zu laden
+      if (!token) return;
+  
+      const loadData = async () => {
         try {
-          const walkInCustomer = await getWalkInCustomer(token);
-          setCustomers([walkInCustomer, ...regularCustomers]);
+          const [customerUsers, staffUsers] = await Promise.all([
+          fetchAllUsers(token, 'user'),
+          fetchAllUsers(token, 'staff')
+        ]); 
+        const regularCustomers = customerUsers.filter(u => u.email !== 'laufkunde@shop.local');
+        setStaff(staffUsers);
+  
+          try {
+            const walkInCustomer = await getWalkInCustomer(token);
+            setCustomers([walkInCustomer, ...regularCustomers]);
+          } catch (error) {
+            console.error("Laufkunde konnte nicht geladen werden:", error);
+            setCustomers(regularCustomers); 
+          }
+          
+          const [fetchedProducts, fetchedServices] = await Promise.all([
+            fetchProducts(token),
+            fetchServices(token),
+          ]);
+  
+          setProducts(fetchedProducts);
+          setServices(fetchedServices);
+  
+          if (fetchedServices.length > 0) {
+            setSelectedServiceId(fetchedServices[0]._id);
+          }
         } catch (error) {
-          console.error("Laufkunde konnte nicht geladen werden:", error);
-          setCustomers(regularCustomers); // Zeige zumindest die normalen Kunden an
+          console.error("Fehler beim Laden der Kassendaten:", error);
+          setToast({ open: true, msg: "Wichtige Daten konnten nicht geladen werden.", sev: 'error' });
         }
-        
-        // Lade Produkte und Services parallel
-        const [fetchedProducts, fetchedServices] = await Promise.all([
-          fetchProducts(token),
-          fetchServices(token),
-        ]);
-
-        setProducts(fetchedProducts);
-        setServices(fetchedServices);
-
-        if (fetchedServices.length > 0) {
-          setSelectedServiceId(fetchedServices[0]._id);
-        }
-      } catch (error) {
-        console.error("Fehler beim Laden der Kassendaten:", error);
-        setToast({ open: true, msg: "Wichtige Daten konnten nicht geladen werden.", sev: 'error' });
-      }
-    };
-
-    loadData();
-  }, [token]);
+      };
+  
+      loadData();
+    }, [token]);
 
   const handleAddItem = (item: ProductType | Service, type: 'product' | 'service') => {
     const itemName = type === 'product' ? (item as ProductType).name : (item as Service).title;
