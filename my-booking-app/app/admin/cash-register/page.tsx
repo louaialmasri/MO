@@ -8,13 +8,14 @@ import {
 } from '@mui/material';
 import { useAuth } from '@/context/AuthContext';
 import { 
-    fetchAllUsers, fetchProducts, fetchServices, createInvoice, 
+    fetchAllUsersForAdmin, fetchProducts, fetchServices, createInvoice, 
     User, Product as ProductType, Service, InvoicePayload, getWalkInCustomer, 
-    fetchAllUsersForAdmin
-} from '@/services/api';
+    fetchAllUsers
+} from '@/services/api'; // fetchAllUsers wurde entfernt, da fetchAllUsersForAdmin bereits importiert ist
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 
+// ... (CartItem Typ bleibt gleich)
 type CartItem = {
   cartItemId: string; 
   id: string;        
@@ -23,6 +24,7 @@ type CartItem = {
   type: 'product' | 'voucher' | 'service';
   staffId?: string;
 };
+
 
 export default function CashRegisterPage() {
   const { token, user } = useAuth();
@@ -33,33 +35,47 @@ export default function CashRegisterPage() {
   const [selectedServiceId, setSelectedServiceId] = useState<string>('');
   const [selectedCustomer, setSelectedCustomer] = useState<User | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
-  
-  // --- State für die Snackbar-Nachricht ---
   const [toast, setToast] = useState<{ open: boolean; msg: string; sev: 'success' | 'error' }>({ open: false, msg: '', sev: 'success' });
 
+  // --- KORREKTUR: useEffect wurde komplett überarbeitet ---
   useEffect(() => {
-    if (token) {
-      const loadData = async () => {
-        const [fetchedUsers, fetchedProducts, fetchedServices, walkInCustomer] = await Promise.all([
-          fetchAllUsersForAdmin(),
+    if (!token) return;
+
+    const loadData = async () => {
+      try {
+        // Lade alle Benutzer (Kunden, Mitarbeiter)
+        const allUsers = await fetchAllUsers(token);
+        const regularCustomers = allUsers.filter(u => u.role === 'user' && u.email !== 'laufkunde@shop.local');
+        setStaff(allUsers.filter(u => u.role === 'staff'));
+
+        // Versuche, den Laufkunden zu laden
+        try {
+          const walkInCustomer = await getWalkInCustomer(token);
+          setCustomers([walkInCustomer, ...regularCustomers]);
+        } catch (error) {
+          console.error("Laufkunde konnte nicht geladen werden:", error);
+          setCustomers(regularCustomers); // Zeige zumindest die normalen Kunden an
+        }
+        
+        // Lade Produkte und Services parallel
+        const [fetchedProducts, fetchedServices] = await Promise.all([
           fetchProducts(token),
           fetchServices(token),
-          getWalkInCustomer(token),
         ]);
-        
-        const regularCustomers = fetchedUsers.filter(u => u.role === 'user' && u.email !== 'laufkunde@shop.local');
-        setCustomers([walkInCustomer, ...regularCustomers]);
 
-        setStaff(fetchedUsers.filter(u => u.role === 'staff'));
         setProducts(fetchedProducts);
         setServices(fetchedServices);
-        
+
         if (fetchedServices.length > 0) {
-            setSelectedServiceId(fetchedServices[0]._id);
+          setSelectedServiceId(fetchedServices[0]._id);
         }
-      };
-      loadData();
-    }
+      } catch (error) {
+        console.error("Fehler beim Laden der Kassendaten:", error);
+        setToast({ open: true, msg: "Wichtige Daten konnten nicht geladen werden.", sev: 'error' });
+      }
+    };
+
+    loadData();
   }, [token]);
 
   const handleAddItem = (item: ProductType | Service, type: 'product' | 'service') => {
