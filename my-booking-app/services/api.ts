@@ -404,7 +404,7 @@ export async function updateUserRole(userId: string, role: string, token: string
 }
 
 export async function updateUserSkills(userId: string, skills: string[], token: string) {
-  const res = await api.patch(`/users/${userId}/skills`, { skills }, {
+  const res = await api.put(`/staff/${userId}/skills`, { skills }, {
     headers: { Authorization: `Bearer ${token}` }
   });
   return res.data.user;
