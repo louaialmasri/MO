@@ -29,6 +29,9 @@ export default function InvoicePage() {
     if (error) return <Container sx={{ mt: 5 }}><Alert severity="error">{error}</Alert></Container>;
     if (!invoice) return <Container sx={{ mt: 5 }}><Alert severity="warning">Keine Rechnungsdaten gefunden.</Alert></Container>;
 
+    //Variable, um zu prüfen, ob es sich um einen Laufkunden handelt
+    const isWalkInCustomer = invoice.customer.email === 'laufkunde@shop.local';
+
      return (
         <Box sx={{ backgroundColor: '#f5f5f5', p: { xs: 2, md: 4 }, minHeight: '100vh' }}>
             <Container maxWidth="md">
@@ -51,8 +54,8 @@ export default function InvoicePage() {
                     <Stack direction="row" justifyContent="space-between" mb={2}>
                         <Box>
                             <Typography><strong>Rechnung an:</strong></Typography>
-                            <Typography>{invoice.customer.firstName} {invoice.customer.lastName}</Typography>
-                            <Typography>{invoice.customer.email}</Typography>
+                            <Typography>{`${invoice.customer.firstName} ${invoice.customer.lastName || ''}`.trim()}</Typography>
+                            {!isWalkInCustomer && <Typography>{invoice.customer.email}</Typography>}
                         </Box>
                         <Box sx={{ textAlign: 'right' }}>
                             <Typography><strong>Rechnungsnr.:</strong> {invoice.invoiceNumber}</Typography>

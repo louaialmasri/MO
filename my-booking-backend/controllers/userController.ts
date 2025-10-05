@@ -189,7 +189,11 @@ export const getOrCreateWalkInCustomer = async (req: AuthRequest, res: Response)
         role: 'user',
         password: await bcrypt.hash(Math.random().toString(36).slice(-8), 10),
       });
+    } else if (walkInCustomer.lastName === '(Bar)') {
+      walkInCustomer.lastName = '';
+      await walkInCustomer.save();
     }
+    
     res.json(walkInCustomer);
   } catch (error) {
     res.status(500).json({ message: 'Fehler beim Abrufen des Laufkunden-Kontos' });
