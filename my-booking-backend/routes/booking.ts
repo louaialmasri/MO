@@ -31,6 +31,6 @@ router.post('/:id/pay', verifyToken, verifyAdmin, markAsPaid);
 
 router.patch('/bookings/:id', verifyToken, updateBooking)
 
-router.patch('/:id', verifyToken, verifyAdmin, updateBookingController)
+router.patch('/:id', verifyToken, verifyAdmin, updateBooking)
 
 export default router

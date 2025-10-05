@@ -26,11 +26,9 @@ export const createBooking = async (req: AuthRequest & SalonRequest, res: Respon
   try {
     const sid = req.salonId
 
-    // Prüfe, ob der Mitarbeiter im aktuellen Salon aktiv ist
     const staffMember = await StaffSalon.findOne({ staff: staffId, salon: sid, active: true })
     if (!staffMember) return res.status(403).json({ success:false, message:'Mitarbeiter nicht diesem Salon zugeordnet' })
 
-    // Prüfe, ob der Service im aktuellen Salon aktiv ist
     const svcAssign = await ServiceSalon.findOne({ service: serviceId, salon: sid, active: true })
     if (!svcAssign) return res.status(403).json({ success:false, message:'Service nicht diesem Salon zugeordnet' })
 
@@ -40,12 +38,10 @@ export const createBooking = async (req: AuthRequest & SalonRequest, res: Respon
     if (!service) return res.status(404).json({ success: false, message: 'Service nicht gefunden' })
     if (!staff || staff.role !== 'staff') return res.status(404).json({ success: false, message: 'Mitarbeiter nicht gefunden oder ungültig' })
 
-    // Skill-Check
     const canDo = (staff.skills || []).some((id: any) => String(id) === String(serviceId))
     if (!canDo) return res.status(400).json({ success: false, message: 'Mitarbeiter hat nicht die erforderlichen Skills für diesen Service' })
 
-    // Zielkunde bestimmen:
-    let targetUserId = req.user?.userId // Standard: der eingeloggte Nutzer
+    let targetUserId = req.user?.userId
     if ((req.user?.role === 'admin' || req.user?.role === 'staff') && userId) {
       if (!mongoose.Types.ObjectId.isValid(userId)) {
         return res.status(400).json({ success: false, message: 'Ungültige Kunden-ID' })
@@ -61,8 +57,7 @@ export const createBooking = async (req: AuthRequest & SalonRequest, res: Respon
       staff: staffId,
       dateTime,
     })
-
-    // History-Eintrag für die Erstellung hinzufügen
+    
     booking.history.push({
       action: 'created',
       executedBy: new mongoose.Types.ObjectId(req.user!.userId),
@@ -72,7 +67,15 @@ export const createBooking = async (req: AuthRequest & SalonRequest, res: Respon
     const clash = await ensureNoConflicts(staffId, dateTime, serviceId)
     if (!clash.ok) return res.status(400).json({ success:false, message: clash.message }) 
     await booking.save()
-    return res.status(201).json({ success: true, message: 'Buchung erstellt', booking })
+    
+    // Nach dem Speichern neu laden und populieren
+    const savedBooking = await Booking.findById(booking._id)
+        .populate('user', 'firstName lastName email')
+        .populate('service', 'title price duration')
+        .populate('staff', 'firstName lastName email')
+        .populate('history.executedBy', 'firstName lastName');
+
+    return res.status(201).json({ success: true, message: 'Buchung erstellt', booking: savedBooking })
   } catch (err) {
     console.error('Fehler beim Erstellen der Buchung:', err)
     return res.status(500).json({ success: false, message: 'Serverfehler beim Buchen' })
@@ -89,7 +92,7 @@ export const getUserBookings = async (req: AuthRequest, res: Response) => {
 
     const bookings = await Booking.find({ user: userId })
       .populate('service', 'title duration')
-      .populate('staff', 'firstName lastName email') // Geändert: firstName und lastName werden jetzt geladen
+      .populate('staff', 'firstName lastName email')
 
     res.status(200).json({ success: true, bookings })
   } catch (error) {
@@ -114,12 +117,10 @@ export const cancelBooking = async (req: AuthRequest, res: Response) => {
     const userRole = req.user.role
     const userId = req.user.userId
 
-    // User darf nur seine eigenen Buchungen stornieren
     if (userRole === 'user' && booking.user.toString() !== userId) {
       return res.status(403).json({ success: false, message: 'Nicht autorisiert' })
     }
 
-    // ⏰ 24h-Regel für User
     const now = new Date()
     const bookingTime = new Date(booking.dateTime)
     const diffInHours = (bookingTime.getTime() - now.getTime()) / (1000 * 60 * 60)
@@ -143,92 +144,98 @@ export const cancelBooking = async (req: AuthRequest, res: Response) => {
 // PATCH /api/bookings/:id  (einfaches Update)
 export const updateBooking = async (req: AuthRequest & SalonRequest, res: Response) => {
   try {
-    const bookingId = req.params.id
-    const { serviceId, dateTime, staffId } = req.body
+    const { id } = req.params;
+    const { serviceId, dateTime, staffId } = req.body;
 
-    const booking = await Booking.findById(bookingId)
+    const booking = await Booking.findById(id);
     if (!booking) {
-      return res.status(404).json({ success: false, message: 'Buchung nicht gefunden' })
+      return res.status(404).json({ success: false, message: 'Buchung nicht gefunden' });
     }
 
-    // Berechtigungsprüfung (Staff/Admin oder Besitzer)
     if (req.user?.role !== 'staff' && req.user?.role !== 'admin' && booking.user.toString() !== req.user?.userId) {
-      return res.status(403).json({ success: false, message: 'Nicht autorisiert' })
+      return res.status(403).json({ success: false, message: 'Nicht autorisiert' });
     }
 
-    // Effektive IDs bestimmen (Body > Bestand)
-    const effectiveServiceId = String(serviceId || booking.service)
-    const effectiveStaffId = String(staffId || booking.staff)
+    const effectiveServiceId = serviceId || String(booking.service);
+    const effectiveStaffId = staffId || String(booking.staff);
+    const effectiveDateTime = dateTime || booking.dateTime.toISOString();
 
     if (!mongoose.Types.ObjectId.isValid(effectiveServiceId) || !mongoose.Types.ObjectId.isValid(effectiveStaffId)) {
-      return res.status(400).json({ success: false, message: 'Ungültige ID' })
+        return res.status(400).json({ success: false, message: 'Ungültige ID' })
     }
 
-    // NEU: Salon-Check
-    const sid = req.salonId
-    const staffMember = await StaffSalon.findOne({ staff: effectiveStaffId, salon: sid, active: true })
-    if (!staffMember) return res.status(403).json({ success:false, message:'Mitarbeiter nicht diesem Salon zugeordnet' })
-
-    const svcAssign = await ServiceSalon.findOne({ service: effectiveServiceId, salon: sid, active: true })
-    if (!svcAssign) return res.status(403).json({ success:false, message:'Service nicht diesem Salon zugeordnet' })
-
-    // Staff validieren + Skill-Check
-    const staff = await User.findById(effectiveStaffId).select('skills role')
+    const staff = await User.findById(effectiveStaffId).select('skills role');
     if (!staff || staff.role !== 'staff') {
-      return res.status(400).json({ success: false, message: 'Ungültiger Mitarbeiter' })
+      return res.status(400).json({ success: false, message: 'Ungültiger Mitarbeiter' });
     }
-    const canDo = (staff.skills || []).some((id: any) => String(id) === String(effectiveServiceId))
+
+    const canDo = (staff.skills || []).some((skill: any) => String(skill) === effectiveServiceId);
     if (!canDo) {
-      return res.status(400).json({ success: false, message: 'Mitarbeiter hat nicht die erforderlichen Skills für diesen Service' })
+      return res.status(400).json({ success: false, message: 'Mitarbeiter hat nicht die erforderlichen Skills für diesen Service' });
     }
 
-    // Update anwenden
-    if (serviceId) booking.service = serviceId
-    if (dateTime) booking.dateTime = dateTime
-    if (staffId) booking.staff = staffId
+    const changes = [];
+    if (dateTime && new Date(dateTime).getTime() !== booking.dateTime.getTime()) {
+      changes.push(`Uhrzeit von ${dayjs(booking.dateTime).format('HH:mm')} auf ${dayjs(dateTime).format('HH:mm')}`);
+      booking.dateTime = new Date(dateTime);
+    }
+    if (staffId && staffId !== String(booking.staff)) {
+       const oldStaff = await User.findById(booking.staff).select('firstName lastName');
+       const newStaff = await User.findById(staffId).select('firstName lastName');
+       changes.push(`Mitarbeiter von ${oldStaff?.firstName} zu ${newStaff?.firstName}`);
+       booking.staff = new mongoose.Types.ObjectId(staffId);
+    }
+    if (serviceId && serviceId !== String(booking.service)) {
+        const oldService = await Service.findById(booking.service).select('title');
+        const newService = await Service.findById(serviceId).select('title');
+        changes.push(`Service von "${oldService?.title}" zu "${newService?.title}"`);
+        booking.service = new mongoose.Types.ObjectId(serviceId);
+    }
+    if (changes.length > 0) {
+        booking.history.push({
+            action: 'rescheduled',
+            executedBy: new mongoose.Types.ObjectId(req.user!.userId),
+            details: changes.join(', ')
+        });
+    }
 
-    // effektive IDs/Zeit bestimmen
-    const effectiveDateTime  = dateTime || booking.dateTime.toISOString()
-    // Konfliktcheck
-    const clash = await ensureNoConflicts(
-      effectiveStaffId,
-      effectiveDateTime,
-      effectiveServiceId,
-      bookingId // ID der aktuellen Buchung übergeben, um sie auszuschließen
-    )
-    if (!clash.ok) return res.status(400).json({ success:false, message: clash.message })
+    const clash = await ensureNoConflicts(effectiveStaffId, effectiveDateTime, effectiveServiceId, id);
+    if (!clash.ok) return res.status(400).json({ success: false, message: clash.message });
 
-    await booking.save()
-    res.json({ success: true, booking })
+    await booking.save();
+    
+    // WICHTIG: Nach dem Speichern neu laden und vollständig populieren
+    const updatedBooking = await Booking.findById(id)
+      .populate('user', 'firstName lastName email')
+      .populate('service', 'title price duration')
+      .populate('staff', 'firstName lastName email')
+      .populate('history.executedBy', 'firstName lastName');
+
+    res.json({ success: true, booking: updatedBooking });
   } catch (err) {
-    console.error('Fehler beim Aktualisieren der Buchung:', err)
-    res.status(500).json({ success: false, message: 'Fehler beim Aktualisieren der Buchung' })
+    console.error('Fehler beim Aktualisieren der Buchung:', err);
+    res.status(500).json({ success: false, message: 'Fehler beim Aktualisieren der Buchung' });
   }
-}
+};
 
 // GET /api/bookings (alle – Admin-Übersicht)
 export const getAllBookings = async (req: AuthRequest, res: Response) => {
   try {
-    // Filterung nach salonId
     const { salonId } = req.query as { salonId?: string }
     let staffIds: string[] = []
-    let serviceIds: string[] = []
     if (salonId) {
-      // Hole alle Staff-IDs und Service-IDs des Salons
       staffIds = (await User.find({ salon: salonId, role: 'staff' }).select('_id')).map(u => String(u._id))
-      serviceIds = (await Service.find({ salon: salonId }).select('_id')).map(s => String(s._id))
     }
     const filter: any = {}
     if (salonId) {
-      filter.$or = [
-        { staff: { $in: staffIds } },
-        { service: { $in: serviceIds } }
-      ]
+      filter.staff = { $in: staffIds };
     }
+    
+    // KORREKTUR: Sicherstellen, dass alle relevanten Felder immer popoliert werden.
     const bookings = await Booking.find(filter)
-      .populate('user', 'firstName lastName')
+      .populate('user', 'firstName lastName email')
       .populate('service', 'title price duration')
-      .populate('staff', 'firstName lastName')
+      .populate('staff', 'firstName lastName email')
       .populate('history.executedBy', 'firstName lastName')
       .lean();
 
