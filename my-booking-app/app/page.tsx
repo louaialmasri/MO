@@ -78,6 +78,8 @@ export default function LandingPage() {
   const [services, setServices] = useState<ServiceWithCategory[]>([])
   const [loading, setLoading] = useState(true)
 
+  const [selectedCategory, setSelectedCategory] = useState<string | false>(false);
+
   // Gruppiert die Services nach Kategorie (wie zuvor)
   const servicesByCategory = useMemo(() => {
     return services.reduce((acc, service) => {
@@ -89,9 +91,6 @@ export default function LandingPage() {
       return acc;
     }, {} as Record<string, ServiceWithCategory[]>);
   }, [services]);
-
-  // NEU: State für die ausgewählte Kategorie
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
 
   // Lade die Services (wie zuvor)
   useEffect(() => {
