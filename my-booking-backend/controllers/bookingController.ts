@@ -62,6 +62,13 @@ export const createBooking = async (req: AuthRequest & SalonRequest, res: Respon
       dateTime,
     })
 
+    // History-Eintrag für die Erstellung hinzufügen
+    booking.history.push({
+      action: 'created',
+      executedBy: new mongoose.Types.ObjectId(req.user!.userId),
+      details: `Termin erstellt von ${req.user!.role}`
+    });
+
     const clash = await ensureNoConflicts(staffId, dateTime, serviceId)
     if (!clash.ok) return res.status(400).json({ success:false, message: clash.message }) 
     await booking.save()
@@ -222,6 +229,7 @@ export const getAllBookings = async (req: AuthRequest, res: Response) => {
       .populate('user', 'firstName lastName')
       .populate('service', 'title price duration')
       .populate('staff', 'firstName lastName')
+      .populate('history.executedBy', 'firstName lastName')
       .lean();
 
     return res.json({ success: true, bookings });
@@ -279,6 +287,29 @@ export const updateBookingController = async (req: AuthRequest, res: Response) =
       return res.status(400).json({ success: false, message: 'Mitarbeiter hat nicht die erforderlichen Skills für diesen Service' })
     }
 
+    // History-Einträge für Änderungen erstellen
+    if (dateTime && new Date(dateTime).getTime() !== existing.dateTime.getTime()) {
+      existing.history.push({
+        action: 'rescheduled',
+        executedBy: new mongoose.Types.ObjectId(req.user!.userId),
+        details: `Uhrzeit geändert von ${dayjs(existing.dateTime).format('HH:mm')} auf ${dayjs(dateTime).format('HH:mm')}`
+      });
+      existing.dateTime = new Date(dateTime);
+    }
+
+    if (staffId && staffId !== String(existing.staff)) {
+       const oldStaff = await User.findById(existing.staff).select('firstName lastName');
+       const newStaff = await User.findById(staffId).select('firstName lastName');
+       existing.history.push({
+        action: 'assigned',
+        executedBy: new mongoose.Types.ObjectId(req.user!.userId),
+        details: `Mitarbeiter geändert von ${oldStaff?.firstName} auf ${newStaff?.firstName}`
+      });
+      existing.staff = new mongoose.Types.ObjectId(staffId);
+    }
+
+    await existing.save(); // Speichert die Änderungen und die neue History
+
     const patch: any = {}
     if (dateTime) patch.dateTime = new Date(dateTime)
     if (serviceId) patch.service = serviceId
@@ -288,6 +319,7 @@ export const updateBookingController = async (req: AuthRequest, res: Response) =
       .populate('service', 'name duration')
       .populate('user', 'email name')
       .populate('staff', 'email name')
+      .populate('history.executedBy', 'firstName lastName');
 
       // effektive IDs/Zeit bestimmen
       const effectiveDateTime  = dateTime || existing.dateTime.toISOString()

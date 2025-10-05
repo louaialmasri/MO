@@ -18,7 +18,11 @@ import dynamic from 'next/dynamic'
 import {
   Box, Button, Chip, Stack, Dialog, DialogTitle, DialogContent,
   DialogActions, TextField, MenuItem, Typography, Avatar, Tooltip, IconButton, Container, Paper,
-  Snackbar, Alert
+  Snackbar, Alert,
+  Divider,
+  List,
+  ListItem,
+  ListItemText
 } from '@mui/material'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
@@ -60,6 +64,12 @@ type BookingFull = {
   dateTime: string
   status: 'confirmed' | 'paid' | 'cancelled';
   invoiceNumber?: string;
+  history?: {
+    action: string;
+    executedBy: { firstName: string; lastName: string; };
+    timestamp: string;
+    details?: string;
+  }[];
 }
 
 const getInitials = (name = '') => name.split(' ').map(n => n[0]).join('').toUpperCase();
@@ -414,8 +424,26 @@ function AdminPage() {
                         <Typography variant="body1">
                             Kunde: <strong>{(typeof activeBooking.user === 'object' && ((activeBooking.user as User).firstName || (activeBooking.user as User).name)) ? `${(activeBooking.user as User).firstName} ${(activeBooking.user as User).lastName}` : 'Unbekannt'}</strong>
                         </Typography>
-                       )
-                    )}
+
+                        {activeBooking.history && activeBooking.history.length > 0 && (
+                          <>
+                            <Divider sx={{ my: 2 }} />
+                            <Typography variant="h6" fontSize="1rem" fontWeight={600}>Verlauf</Typography>
+                            <List dense sx={{ maxHeight: 150, overflowY: 'auto' }}>
+                              {activeBooking.history.slice().reverse().map((entry, index) => (
+                                <ListItem key={index} disableGutters>
+                                  <ListItemText
+                                    primary={`${entry.action}: ${entry.details || ''}`}
+                                    secondary={`Durch ${entry.executedBy.firstName} am ${dayjs(entry.timestamp).format('DD.MM.YY HH:mm')}`}
+                                  />
+                                </ListItem>
+                              ))}
+                            </List>
+                          </>
+                        )}
+                      </>
+                    )
+                  )}
                 </DialogContent>
                 <DialogActions sx={{ p: '16px 24px', justifyContent: 'space-between' }}>
                     <Box>
