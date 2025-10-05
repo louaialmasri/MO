@@ -1,9 +1,17 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import { Container, Typography, Paper, Grid, Button, Autocomplete, TextField, List, ListItem, ListItemText, IconButton, Divider, Select, MenuItem, FormControl, InputLabel, Box, Stack } from '@mui/material';
+import { 
+    Container, Typography, Paper, Grid, Button, Autocomplete, TextField, 
+    List, ListItem, ListItemText, IconButton, Divider, Select, MenuItem, 
+    FormControl, InputLabel, Box, Stack, Snackbar, Alert
+} from '@mui/material';
 import { useAuth } from '@/context/AuthContext';
-import { fetchAllUsers, fetchProducts, fetchServices, createInvoice, User, Product as ProductType, Service, InvoicePayload, getWalkInCustomer } from '@/services/api';
+import { 
+    fetchAllUsers, fetchProducts, fetchServices, createInvoice, 
+    User, Product as ProductType, Service, InvoicePayload, getWalkInCustomer, 
+    fetchAllUsersForAdmin
+} from '@/services/api';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 
@@ -23,22 +31,23 @@ export default function CashRegisterPage() {
   const [products, setProducts] = useState<ProductType[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [selectedServiceId, setSelectedServiceId] = useState<string>('');
-
   const [selectedCustomer, setSelectedCustomer] = useState<User | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
+  
+  // --- State für die Snackbar-Nachricht ---
+  const [toast, setToast] = useState<{ open: boolean; msg: string; sev: 'success' | 'error' }>({ open: false, msg: '', sev: 'success' });
 
   useEffect(() => {
     if (token) {
       const loadData = async () => {
         const [fetchedUsers, fetchedProducts, fetchedServices, walkInCustomer] = await Promise.all([
-          fetchAllUsers(token),
+          fetchAllUsersForAdmin(),
           fetchProducts(token),
           fetchServices(token),
-          getWalkInCustomer(token), // Laufkunde immer abrufen
+          getWalkInCustomer(token),
         ]);
-
-        // Alle User mit Rolle 'user' PLUS den speziellen Laufkunden
-        const regularCustomers = fetchedUsers.filter(u => u.role === 'user');
+        
+        const regularCustomers = fetchedUsers.filter(u => u.role === 'user' && u.email !== 'laufkunde@shop.local');
         setCustomers([walkInCustomer, ...regularCustomers]);
 
         setStaff(fetchedUsers.filter(u => u.role === 'staff'));
@@ -101,7 +110,7 @@ export default function CashRegisterPage() {
 
   const handleCheckout = async () => {
     if (!selectedCustomer || cart.length === 0) {
-      alert('Bitte einen Kunden und mindestens einen Artikel auswählen.');
+      setToast({ open: true, msg: 'Bitte einen Kunden und mindestens einen Artikel auswählen.', sev: 'error' });
       return;
     }
     const staffIdForInvoice = cart.find(item => item.type === 'service')?.staffId || user?._id;
@@ -119,12 +128,12 @@ export default function CashRegisterPage() {
 
     try {
       await createInvoice(payload);
-      alert('Verkauf erfolgreich abgeschlossen!');
+      setToast({ open: true, msg: 'Verkauf erfolgreich abgeschlossen!', sev: 'success' });
       setCart([]);
       setSelectedCustomer(null);
     } catch (error) {
       console.error('Fehler beim Verkauf:', error);
-      alert('Ein Fehler ist aufgetreten.');
+      setToast({ open: true, msg: 'Ein Fehler ist aufgetreten.', sev: 'error' });
     }
   };
 
@@ -132,6 +141,7 @@ export default function CashRegisterPage() {
     <Container maxWidth="xl">
       <Typography variant="h4" sx={{ my: 4 }}>Kasse / Sofortverkauf</Typography>
       <Grid container spacing={4}>
+        {/* Linke Spalte */}
         <Grid size={{ xs: 12, md: 7 }}>
           <Paper sx={{ p: 2, mb: 2 }}>
             <Typography variant="h6" gutterBottom>Dienstleistungen</Typography>
@@ -167,12 +177,14 @@ export default function CashRegisterPage() {
             </List>
           </Paper>
         </Grid>
+
+        {/* Rechte Spalte: Warenkorb */}
         <Grid size={{ xs: 12, md: 5 }}>
           <Paper sx={{ p: 2, position: 'sticky', top: '20px' }}>
             <Typography variant="h6" gutterBottom>Warenkorb</Typography>
             <Autocomplete
               options={customers}
-              getOptionLabel={(option) => `${option.firstName} ${option.lastName}`}
+              getOptionLabel={(option) => `${option.firstName} ${option.lastName || ''}`.trim()}
               value={selectedCustomer}
               onChange={(event, newValue) => setSelectedCustomer(newValue)}
               renderInput={(params) => <TextField {...params} label="Kunde auswählen" variant="outlined" fullWidth />}
@@ -199,6 +211,7 @@ export default function CashRegisterPage() {
                           </FormControl>
                         ) : `${item.price.toFixed(2)}€`
                       }
+                      secondaryTypographyProps={{ component: 'div' }} 
                     />
                      <Typography sx={{ml: 2}}>{item.price.toFixed(2)}€</Typography>
                   </ListItem>
@@ -219,6 +232,18 @@ export default function CashRegisterPage() {
           </Paper>
         </Grid>
       </Grid>
+      
+      {/* --- Snackbar-Komponente für Benachrichtigungen --- */}
+      <Snackbar 
+        open={toast.open} 
+        autoHideDuration={4000} 
+        onClose={() => setToast(p => ({...p, open: false}))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setToast(p => ({...p, open: false}))} severity={toast.sev} sx={{ width: '100%' }} variant="filled">
+            {toast.msg}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 }

@@ -185,9 +185,9 @@ export const getOrCreateWalkInCustomer = async (req: AuthRequest, res: Response)
       walkInCustomer = await User.create({
         email: walkInEmail,
         firstName: 'Laufkunde',
-        lastName: '(Bar)',
+        lastName: '',
         role: 'user',
-        password: await bcrypt.hash(Math.random().toString(36).slice(-8), 10), // Zufälliges PW
+        password: await bcrypt.hash(Math.random().toString(36).slice(-8), 10),
       });
     }
     res.json(walkInCustomer);
