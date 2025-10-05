@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import { Container, Typography, Paper, Grid, Button, Autocomplete, TextField, List, ListItem, ListItemText, IconButton, Divider, Select, MenuItem, FormControl, InputLabel, Box } from '@mui/material';
+import { Container, Typography, Paper, Grid, Button, Autocomplete, TextField, List, ListItem, ListItemText, IconButton, Divider, Select, MenuItem, FormControl, InputLabel, Box, Stack } from '@mui/material';
 import { useAuth } from '@/context/AuthContext';
-import { fetchAllUsers, fetchProducts, fetchServices, createInvoice, User, Product as ProductType, Service, InvoicePayload } from '@/services/api';
+import { fetchAllUsers, fetchProducts, fetchServices, createInvoice, User, Product as ProductType, Service, InvoicePayload, getWalkInCustomer } from '@/services/api';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 
@@ -13,7 +13,7 @@ type CartItem = {
   name: string;
   price: number;
   type: 'product' | 'voucher' | 'service';
-  staffId?: string; // Optional für Services
+  staffId?: string;
 };
 
 export default function CashRegisterPage() {
@@ -22,6 +22,7 @@ export default function CashRegisterPage() {
   const [staff, setStaff] = useState<User[]>([]);
   const [products, setProducts] = useState<ProductType[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [selectedServiceId, setSelectedServiceId] = useState<string>('');
 
   const [selectedCustomer, setSelectedCustomer] = useState<User | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -29,33 +30,52 @@ export default function CashRegisterPage() {
   useEffect(() => {
     if (token) {
       const loadData = async () => {
-        const [fetchedUsers, fetchedProducts, fetchedServices] = await Promise.all([
+        const [fetchedUsers, fetchedProducts, fetchedServices, walkInCustomer] = await Promise.all([
           fetchAllUsers(token),
           fetchProducts(token),
           fetchServices(token),
+          getWalkInCustomer(token), // Laufkunde immer abrufen
         ]);
-        setCustomers(fetchedUsers.filter(u => u.role === 'user'));
+
+        // Alle User mit Rolle 'user' PLUS den speziellen Laufkunden
+        const regularCustomers = fetchedUsers.filter(u => u.role === 'user');
+        setCustomers([walkInCustomer, ...regularCustomers]);
+
         setStaff(fetchedUsers.filter(u => u.role === 'staff'));
         setProducts(fetchedProducts);
         setServices(fetchedServices);
+        
+        if (fetchedServices.length > 0) {
+            setSelectedServiceId(fetchedServices[0]._id);
+        }
       };
       loadData();
     }
   }, [token]);
 
   const handleAddItem = (item: ProductType | Service, type: 'product' | 'service') => {
+    const itemName = type === 'product' ? (item as ProductType).name : (item as Service).title;
+    const displayName = type === 'product' ? `Produkt: ${itemName}` : itemName;
     const staffId = type === 'service' ? (staff.length > 0 ? staff[0]._id : undefined) : undefined;
+    
     setCart(prevCart => [
       ...prevCart,
       { 
         cartItemId: `${type}_${item._id}_${Date.now()}`,
         id: item._id, 
-        name: type === 'product' ? `Produkt: ${item.title}` : item.title,
+        name: displayName,
         price: item.price, 
         type: type,
         staffId: staffId,
       }
     ]);
+  };
+  
+  const handleAddSelectedService = () => {
+      const serviceToAdd = services.find(s => s._id === selectedServiceId);
+      if (serviceToAdd) {
+          handleAddItem(serviceToAdd, 'service');
+      }
   };
 
   const handleAddVoucher = () => {
@@ -84,8 +104,6 @@ export default function CashRegisterPage() {
       alert('Bitte einen Kunden und mindestens einen Artikel auswählen.');
       return;
     }
-
-    // Nimm den Mitarbeiter vom ersten Service im Warenkorb, oder den eingeloggten User
     const staffIdForInvoice = cart.find(item => item.type === 'service')?.staffId || user?._id;
 
     const payload: InvoicePayload = {
@@ -93,7 +111,7 @@ export default function CashRegisterPage() {
       paymentMethod: 'cash',
       staffId: staffIdForInvoice,
       items: cart.map(item => ({
-        type: item.type,
+        type: item.type as 'product' | 'voucher' | 'service',
         id: item.type !== 'voucher' ? item.id : undefined,
         value: item.type === 'voucher' ? item.price : undefined,
       })),
@@ -114,19 +132,24 @@ export default function CashRegisterPage() {
     <Container maxWidth="xl">
       <Typography variant="h4" sx={{ my: 4 }}>Kasse / Sofortverkauf</Typography>
       <Grid container spacing={4}>
-        {/* Linke Spalte: Services und Produkte */}
         <Grid size={{ xs: 12, md: 7 }}>
           <Paper sx={{ p: 2, mb: 2 }}>
             <Typography variant="h6" gutterBottom>Dienstleistungen</Typography>
-            <List dense>
-              {services.map(service => (
-                <ListItem key={service._id} secondaryAction={
-                  <Button onClick={() => handleAddItem(service, 'service')} startIcon={<AddIcon />}>Hinzufügen</Button>
-                }>
-                  <ListItemText primary={service.title} secondary={`${service.price.toFixed(2)}€`} />
-                </ListItem>
-              ))}
-            </List>
+            <Stack direction="row" spacing={1} alignItems="center">
+                <FormControl fullWidth>
+                    <InputLabel>Dienstleistung auswählen</InputLabel>
+                    <Select value={selectedServiceId} label="Dienstleistung auswählen" onChange={(e) => setSelectedServiceId(e.target.value)}>
+                        {services.map(service => (
+                            <MenuItem key={service._id} value={service._id}>
+                                {service.title} - {service.price.toFixed(2)}€
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+                <Button onClick={handleAddSelectedService} variant="contained" startIcon={<AddIcon />}>
+                    Hinzufügen
+                </Button>
+            </Stack>
           </Paper>
           <Paper sx={{ p: 2 }}>
             <Typography variant="h6" gutterBottom>Produkte & Gutscheine</Typography>
@@ -144,14 +167,12 @@ export default function CashRegisterPage() {
             </List>
           </Paper>
         </Grid>
-
-        {/* Rechte Spalte: Warenkorb */}
         <Grid size={{ xs: 12, md: 5 }}>
           <Paper sx={{ p: 2, position: 'sticky', top: '20px' }}>
             <Typography variant="h6" gutterBottom>Warenkorb</Typography>
             <Autocomplete
               options={customers}
-              getOptionLabel={(option) => `${option.firstName} ${option.lastName} (${option.email})`}
+              getOptionLabel={(option) => `${option.firstName} ${option.lastName}`}
               value={selectedCustomer}
               onChange={(event, newValue) => setSelectedCustomer(newValue)}
               renderInput={(params) => <TextField {...params} label="Kunde auswählen" variant="outlined" fullWidth />}
@@ -161,7 +182,7 @@ export default function CashRegisterPage() {
             {cart.length === 0 ? (
               <Typography color="text.secondary" sx={{minHeight: 150}}>Warenkorb ist leer.</Typography>
             ) : (
-              <List sx={{minHeight: 150}}>
+              <List sx={{minHeight: 150, overflowY: 'auto', maxHeight: '40vh'}}>
                 {cart.map(item => (
                   <ListItem key={item.cartItemId} secondaryAction={
                     <IconButton edge="end" onClick={() => handleRemoveFromCart(item.cartItemId)}><DeleteIcon /></IconButton>
