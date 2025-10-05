@@ -1,5 +1,3 @@
-// my-booking-app/app/admin/page.tsx
-
 'use client'
 
 import { useAuth } from '@/context/AuthContext'
@@ -39,6 +37,7 @@ import TodayIcon from '@mui/icons-material/Today';
 import PaymentIcon from '@mui/icons-material/Payment';
 import DeleteIcon from '@mui/icons-material/Delete';
 import HistoryIcon from '@mui/icons-material/History';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy'; // NEU: Icon für Kopieren
 
 
 dayjs.locale('de');
@@ -89,6 +88,7 @@ const translateAction = (action: string) => {
 
 // --- KOMPONENTEN ---
 const CalendarEventContent: React.FC<{ arg: any }> = ({ arg }) => {
+  // ... (Code unverändert)
   const eventRef = useRef<HTMLDivElement>(null);
   const [eventHeight, setEventHeight] = useState(0);
 
@@ -157,7 +157,7 @@ function AdminPage() {
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [amountGiven, setAmountGiven] = useState('');
   const [toast, setToast] = useState<{ open: boolean; msg: string; sev: 'success' | 'error' }>({ open: false, msg: '', sev: 'success' })
-  const [showHistory, setShowHistory] = useState(false); // NEU: State für History-Sichtbarkeit
+  const [showHistory, setShowHistory] = useState(false);
 
   const staffUsers = useMemo(() => users.filter(u => u.role === 'staff'), [users]);
 
@@ -173,7 +173,6 @@ function AdminPage() {
 
   useEffect(() => {
     if (!user || user.role !== 'admin' || !token) {
-      // Optional: router.push('/login') falls kein User da ist
       return;
     }
 
@@ -206,19 +205,18 @@ function AdminPage() {
       staffId: b.staff?._id || ''
     });
     setEditMode(false);
-    setShowHistory(false); // NEU: History beim Öffnen ausblenden
+    setShowHistory(false);
     setOpenEvent(true);
   };
   const closeDialog = () => {
     setOpenEvent(false);
     setActiveBooking(null);
     setEditMode(false);
-    setShowHistory(false); // NEU: History auch beim Schließen zurücksetzen
+    setShowHistory(false);
   };
 
   const calendarEvents = useMemo(() => {
     return bookings
-      // KORREKTUR: Sicherere Filterung, um den Runtime Error zu verhindern
       .filter(b => b && b.staff && b.staff._id && b.user)
       .map((b) => {
         const service = services.find(s => s._id === (b.service?._id || b.serviceId));
@@ -283,9 +281,13 @@ function AdminPage() {
         dateTime: event.start.toISOString(),
         staffId: newStaffId || originalBooking.staff?._id,
       };
-      const updatedBookingData = await updateBooking(event.id, payload, token!);
-      setBookings(prev => prev.map(b => b._id === event.id ? updatedBookingData : b));
-      setToast({ open: true, msg: 'Termin verschoben!', sev: 'success' });
+      const response = await updateBooking(event.id, payload, token!);
+      if (response && response.booking) {
+        setBookings(prev => prev.map(b => b._id === event.id ? response.booking : b));
+        setToast({ open: true, msg: 'Termin verschoben!', sev: 'success' });
+      } else {
+        throw new Error("Invalid API response");
+      }
     } catch (e: any) {
       info.revert();
       setToast({ open: true, msg: `Verschieben fehlgeschlagen: ${e.response?.data?.message || e.message}`, sev: 'error' });
@@ -303,6 +305,20 @@ function AdminPage() {
     } catch (err) {
       setToast({ open: true, msg: 'Fehler beim Löschen', sev: 'error' });
     }
+  };
+
+  const handleCopyBooking = () => {
+    if (!activeBooking) return;
+    const { user, service, staff } = activeBooking;
+    
+    const query = new URLSearchParams({
+      copyUser: user._id,
+      copyService: service?._id || '',
+      copyStaff: staff?._id || '',
+    }).toString();
+
+    router.push(`/booking?${query}`);
+    closeDialog();
   };
 
   const servicePrice = activeBooking?.service?.price || 0;
@@ -419,11 +435,10 @@ function AdminPage() {
                 <>
                   <Typography variant="body1">
                     Kunde: <strong>
-                      {`${activeBooking.user.firstName || ''} ${activeBooking.user.lastName || ''}`.trim() || 'Unbekannt'}
+                      {`${activeBooking.user.firstName || ''} ${activeBooking.user.lastName || ''}`.trim() || activeBooking.user.email}
                     </strong>
                   </Typography>
 
-                  {/* NEU: Button zum Ein-/Ausblenden der History */}
                   <Button
                     size="small"
                     startIcon={<HistoryIcon />}
@@ -434,7 +449,6 @@ function AdminPage() {
                   </Button>
 
                   {showHistory && activeBooking.history && activeBooking.history.length > 0 && (
-                    <>
                       <List dense sx={{ maxHeight: 150, overflowY: 'auto', bgcolor: 'grey.50', p: 1, borderRadius: 1, mt: 1 }}>
                         {activeBooking.history.slice().reverse().map((entry, index) => {
                           const executedByName = entry.executedBy ? `${entry.executedBy.firstName || ''} ${entry.executedBy.lastName || ''}`.trim() : 'System';
@@ -448,7 +462,6 @@ function AdminPage() {
                           );
                         })}
                       </List>
-                    </>
                   )}
                 </>
               )
@@ -465,6 +478,17 @@ function AdminPage() {
               {!editMode && <Button onClick={() => setEditMode(true)}>Bearbeiten</Button>}
             </Box>
             <Box>
+              {/* NEUER KOPIEREN-BUTTON */}
+              {!editMode && activeBooking && (
+                <Button 
+                  startIcon={<ContentCopyIcon />}
+                  onClick={handleCopyBooking}
+                  sx={{ mr: 1 }}
+                >
+                  Kopieren
+                </Button>
+              )}
+
               {activeBooking?.status === 'paid' ? (
                 <Button
                   variant="contained"

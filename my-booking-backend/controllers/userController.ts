@@ -203,3 +203,26 @@ export const getOrCreateWalkInCustomer = async (req: AuthRequest, res: Response)
     res.status(500).json({ message: 'Fehler beim Abrufen des Laufkunden-Kontos' });
   }
 };
+
+// Diese Funktion findet den letzten Termin eines Kunden
+export const getLastBookingForUser = async (req: AuthRequest, res: Response) => {
+  try {
+    const { userId } = req.params;
+
+    const lastBooking = await Booking.findOne({
+      user: userId,
+      status: { $in: ['confirmed', 'paid', 'completed'] } // Ignore cancelled bookings
+    })
+    .sort({ dateTime: -1 }) // Get the most recent one
+    .select('service staff') // We only need service and staff IDs
+    .lean();
+
+    if (!lastBooking) {
+      return res.status(404).json({ message: 'Keine vorherigen Termine gefunden.' });
+    }
+
+    res.json(lastBooking);
+  } catch (error) {
+    res.status(500).json({ message: 'Serverfehler beim Abrufen des letzten Termins.' });
+  }
+};

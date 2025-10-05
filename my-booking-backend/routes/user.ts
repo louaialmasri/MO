@@ -5,7 +5,8 @@ import {
     updateUserSkills, 
     deleteStaff, 
     createUserManually, 
-    getOrCreateWalkInCustomer 
+    getOrCreateWalkInCustomer, 
+    getLastBookingForUser
 } from '../controllers/userController';
 import { verifyToken } from '../middlewares/authMiddleware';
 import { verifyAdmin } from '../middlewares/adminMiddleware'; 
@@ -21,5 +22,8 @@ router.delete('/staff/:id', verifyToken, verifyAdmin, deleteStaff);
 
 // Diese Route benötigt keine Admin-Rechte, nur einen Login (für Mitarbeiter an der Kasse)
 router.get('/walk-in', verifyToken, getOrCreateWalkInCustomer);
+
+// Route, um den letzten Termin abzurufen
+router.get('/:userId/last-booking', verifyToken, getLastBookingForUser);
 
 export default router;

@@ -302,6 +302,14 @@ export async function deleteBooking(id: string, token: string) {
   return res.data
 }
 
+// Funktion zum Abrufen des letzten Termins
+export async function fetchLastBookingForUser(userId: string, token: string) {
+  const res = await api.get(`/users/${userId}/last-booking`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data;
+}
+
 // AUTH API
 export async function login(email: string, password: string) {
   const res = await api.post('/login', { email, password })
