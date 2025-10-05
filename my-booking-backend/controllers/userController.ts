@@ -175,3 +175,23 @@ export const updateUserSkills = async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Fehler beim Aktualisieren der Skills' })
   }
 }
+
+export const getOrCreateWalkInCustomer = async (req: AuthRequest, res: Response) => {
+  try {
+    const walkInEmail = 'laufkunde@shop.local';
+    let walkInCustomer = await User.findOne({ email: walkInEmail });
+
+    if (!walkInCustomer) {
+      walkInCustomer = await User.create({
+        email: walkInEmail,
+        firstName: 'Laufkunde',
+        lastName: '(Bar)',
+        role: 'user',
+        password: await bcrypt.hash(Math.random().toString(36).slice(-8), 10), // Zufälliges PW
+      });
+    }
+    res.json(walkInCustomer);
+  } catch (error) {
+    res.status(500).json({ message: 'Fehler beim Abrufen des Laufkunden-Kontos' });
+  }
+};

@@ -1,76 +1,78 @@
-// my-booking-app/app/admin/cash-register/page.tsx
-
 'use client'
 
 import { useState, useEffect } from 'react';
-import { Container, Typography, Paper, Grid, Button, Autocomplete, TextField, List, ListItem, ListItemText, IconButton, Divider } from '@mui/material';
+import { Container, Typography, Paper, Grid, Button, Autocomplete, TextField, List, ListItem, ListItemText, IconButton, Divider, Select, MenuItem, FormControl, InputLabel, Box } from '@mui/material';
 import { useAuth } from '@/context/AuthContext';
-import { fetchAllUsersForAdmin, fetchProducts, createInvoice, User, Product as ProductType, InvoicePayload } from '@/services/api';
+import { fetchAllUsers, fetchProducts, fetchServices, createInvoice, User, Product as ProductType, Service, InvoicePayload } from '@/services/api';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 
-// KORREKTUR 1: 'cartItemId' für einzigartige Keys hinzugefügt
 type CartItem = {
-  cartItemId: string; // Einzigartiger Key für die React-Liste
-  id: string;         // Die eigentliche Produkt-ID
+  cartItemId: string; 
+  id: string;        
   name: string;
   price: number;
-  type: 'product' | 'voucher';
+  type: 'product' | 'voucher' | 'service';
+  staffId?: string; // Optional für Services
 };
 
 export default function CashRegisterPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [customers, setCustomers] = useState<User[]>([]);
+  const [staff, setStaff] = useState<User[]>([]);
   const [products, setProducts] = useState<ProductType[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+
   const [selectedCustomer, setSelectedCustomer] = useState<User | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
 
   useEffect(() => {
-    // KORREKTUR 2: Daten erst laden, wenn der Token vorhanden ist
     if (token) {
       const loadData = async () => {
-        const [fetchedCustomers, fetchedProducts] = await Promise.all([
-          fetchAllUsersForAdmin(),
-          fetchProducts(token)
+        const [fetchedUsers, fetchedProducts, fetchedServices] = await Promise.all([
+          fetchAllUsers(token),
+          fetchProducts(token),
+          fetchServices(token),
         ]);
-        setCustomers(fetchedCustomers.filter(u => u.role === 'user'));
+        setCustomers(fetchedUsers.filter(u => u.role === 'user'));
+        setStaff(fetchedUsers.filter(u => u.role === 'staff'));
         setProducts(fetchedProducts);
+        setServices(fetchedServices);
       };
       loadData();
     }
   }, [token]);
 
-  const handleAddProduct = (product: ProductType) => {
+  const handleAddItem = (item: ProductType | Service, type: 'product' | 'service') => {
+    const staffId = type === 'service' ? (staff.length > 0 ? staff[0]._id : undefined) : undefined;
     setCart(prevCart => [
       ...prevCart,
       { 
-        cartItemId: `product_${product._id}_${Date.now()}`, // Eindeutige ID generieren
-        id: product._id, 
-        name: `Produkt: ${product.name}`, 
-        price: product.price, 
-        type: 'product' 
+        cartItemId: `${type}_${item._id}_${Date.now()}`,
+        id: item._id, 
+        name: type === 'product' ? `Produkt: ${item.title}` : item.title,
+        price: item.price, 
+        type: type,
+        staffId: staffId,
       }
     ]);
   };
-  
+
   const handleAddVoucher = () => {
-    const value = prompt('Bitte den Wert des Gutscheins eingeben:');
+    const value = prompt('Wert des Gutscheins eingeben:');
     const voucherValue = Number(value);
     if (value && !isNaN(voucherValue) && voucherValue > 0) {
-      const uniqueId = `voucher_${Date.now()}`;
-      setCart(prevCart => [
-        ...prevCart,
-        { 
-          cartItemId: uniqueId, // Eindeutige ID
-          id: uniqueId, 
-          name: `Gutschein`, 
-          price: voucherValue, 
-          type: 'voucher' 
-        }
-      ]);
+      setCart(prevCart => [...prevCart, { 
+        cartItemId: `voucher_${Date.now()}`, id: `voucher_${Date.now()}`, 
+        name: `Gutschein`, price: voucherValue, type: 'voucher' 
+      }]);
     }
   };
 
+  const handleUpdateCartStaff = (cartItemId: string, staffId: string) => {
+    setCart(cart => cart.map(item => item.cartItemId === cartItemId ? { ...item, staffId } : item));
+  };
+  
   const handleRemoveFromCart = (cartItemId: string) => {
     setCart(prevCart => prevCart.filter(item => item.cartItemId !== cartItemId));
   };
@@ -82,15 +84,21 @@ export default function CashRegisterPage() {
       alert('Bitte einen Kunden und mindestens einen Artikel auswählen.');
       return;
     }
+
+    // Nimm den Mitarbeiter vom ersten Service im Warenkorb, oder den eingeloggten User
+    const staffIdForInvoice = cart.find(item => item.type === 'service')?.staffId || user?._id;
+
     const payload: InvoicePayload = {
       customerId: selectedCustomer._id,
       paymentMethod: 'cash',
+      staffId: staffIdForInvoice,
       items: cart.map(item => ({
         type: item.type,
-        id: item.type === 'product' ? item.id : undefined, // Hier die originale Produkt-ID verwenden
+        id: item.type !== 'voucher' ? item.id : undefined,
         value: item.type === 'voucher' ? item.price : undefined,
       })),
     };
+
     try {
       await createInvoice(payload);
       alert('Verkauf erfolgreich abgeschlossen!');
@@ -103,17 +111,30 @@ export default function CashRegisterPage() {
   };
 
   return (
-    <Container maxWidth="lg">
+    <Container maxWidth="xl">
       <Typography variant="h4" sx={{ my: 4 }}>Kasse / Sofortverkauf</Typography>
       <Grid container spacing={4}>
-        <Grid size={{ xs: 12, md: 6 }}>
+        {/* Linke Spalte: Services und Produkte */}
+        <Grid size={{ xs: 12, md: 7 }}>
+          <Paper sx={{ p: 2, mb: 2 }}>
+            <Typography variant="h6" gutterBottom>Dienstleistungen</Typography>
+            <List dense>
+              {services.map(service => (
+                <ListItem key={service._id} secondaryAction={
+                  <Button onClick={() => handleAddItem(service, 'service')} startIcon={<AddIcon />}>Hinzufügen</Button>
+                }>
+                  <ListItemText primary={service.title} secondary={`${service.price.toFixed(2)}€`} />
+                </ListItem>
+              ))}
+            </List>
+          </Paper>
           <Paper sx={{ p: 2 }}>
             <Typography variant="h6" gutterBottom>Produkte & Gutscheine</Typography>
             <Button onClick={handleAddVoucher} variant="outlined" startIcon={<AddIcon />} sx={{ mb: 2, width: '100%'}}>Gutschein hinzufügen</Button>
-            <List>
+            <List dense>
               {products.map(product => (
                 <ListItem key={product._id} secondaryAction={
-                  <Button onClick={() => handleAddProduct(product)} disabled={product.stock < 1}>
+                  <Button onClick={() => handleAddItem(product, 'product')} startIcon={<AddIcon />} disabled={product.stock < 1}>
                     Hinzufügen
                   </Button>
                 }>
@@ -123,7 +144,9 @@ export default function CashRegisterPage() {
             </List>
           </Paper>
         </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
+
+        {/* Rechte Spalte: Warenkorb */}
+        <Grid size={{ xs: 12, md: 5 }}>
           <Paper sx={{ p: 2, position: 'sticky', top: '20px' }}>
             <Typography variant="h6" gutterBottom>Warenkorb</Typography>
             <Autocomplete
@@ -136,16 +159,27 @@ export default function CashRegisterPage() {
             />
             <Divider sx={{ my: 2 }} />
             {cart.length === 0 ? (
-              <Typography color="text.secondary" sx={{minHeight: 100}}>Warenkorb ist leer.</Typography>
+              <Typography color="text.secondary" sx={{minHeight: 150}}>Warenkorb ist leer.</Typography>
             ) : (
-              <List sx={{minHeight: 100}}>
+              <List sx={{minHeight: 150}}>
                 {cart.map(item => (
-                  <ListItem key={item.cartItemId} secondaryAction={ // KORREKTUR 3: Einzigartigen Key verwenden
-                    <IconButton edge="end" onClick={() => handleRemoveFromCart(item.cartItemId)}>
-                      <DeleteIcon />
-                    </IconButton>
+                  <ListItem key={item.cartItemId} secondaryAction={
+                    <IconButton edge="end" onClick={() => handleRemoveFromCart(item.cartItemId)}><DeleteIcon /></IconButton>
                   }>
-                    <ListItemText primary={item.name} secondary={`${item.price.toFixed(2)}€`} />
+                    <ListItemText 
+                      primary={item.name}
+                      secondary={
+                        item.type === 'service' ? (
+                          <FormControl size="small" variant="standard" sx={{mt: 1, minWidth: 150}}>
+                            <InputLabel>Mitarbeiter</InputLabel>
+                            <Select value={item.staffId || ''} onChange={(e) => handleUpdateCartStaff(item.cartItemId, e.target.value)}>
+                              {staff.map(s => <MenuItem key={s._id} value={s._id}>{s.firstName} {s.lastName}</MenuItem>)}
+                            </Select>
+                          </FormControl>
+                        ) : `${item.price.toFixed(2)}€`
+                      }
+                    />
+                     <Typography sx={{ml: 2}}>{item.price.toFixed(2)}€</Typography>
                   </ListItem>
                 ))}
               </List>
@@ -155,9 +189,7 @@ export default function CashRegisterPage() {
               Gesamt: {total.toFixed(2)}€
             </Typography>
             <Button
-              variant="contained"
-              color="primary"
-              fullWidth
+              variant="contained" color="primary" fullWidth
               disabled={!selectedCustomer || cart.length === 0}
               onClick={handleCheckout}
             >

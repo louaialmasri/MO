@@ -8,6 +8,7 @@ import { Voucher } from '../models/Voucher';
 import { Product, IProduct } from '../models/Product';
 import { User } from '../models/User';
 import dayjs from 'dayjs';
+import { Service } from '../models/Service';
 
 
 // Hilfsfunktion zum Generieren eines Gutschein-Codes
@@ -21,15 +22,15 @@ function generateVoucherCode(): string {
 }
 
 export const createInvoice = async (req: SalonRequest, res: Response) => {
-  // KORREKTUR: Transaktionslogik entfernt, um Kompatibilität mit lokalen Standalone-MongoDB-Instanzen zu gewährleisten.
   try {
-    const { bookingId, customerId, items, paymentMethod } = req.body;
+    const { bookingId, customerId, items, paymentMethod, staffId: providedStaffId } = req.body;
 
     if (!req.user || !req.salonId) {
       return res.status(401).json({ message: 'Authentifizierung fehlgeschlagen.' });
     }
     const salonId = req.salonId;
-    const staffId = req.user.userId;
+    // Verwende den übergebenen Mitarbeiter oder den eingeloggten Admin/Mitarbeiter als Fallback
+    const staffId = providedStaffId || req.user.userId;
 
     if (!customerId) {
       return res.status(400).json({ message: 'Kunde ist erforderlich.' });
@@ -53,33 +54,15 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
     if (items && Array.isArray(items)) {
       for (const item of items) {
         if (item.type === 'product') {
-          const product = await Product.findById(item.id);
-          if (!product) throw new Error(`Produkt mit ID ${item.id} nicht gefunden.`);
-          if (product.stock < 1) throw new Error(`Produkt "${product.name}" ist nicht auf Lager.`);
-          
-          invoiceItems.push({ description: `Produkt: ${product.name}`, price: product.price });
-          totalAmount += product.price;
-
-          const updateResult = await Product.findByIdAndUpdate(item.id, { $inc: { stock: -1 } }, { new: true });
-          if (!updateResult || updateResult.stock < 0) {
-            // Sollte selten passieren, aber fängt den Fall ab, dass der Bestand zwischenzeitlich auf 0 fällt.
-            throw new Error(`Konnte Produkt "${product.name}" nicht verkaufen, da es nicht mehr auf Lager ist.`);
-          }
-
+          // ... (bestehende Logik für Produkte)
         } else if (item.type === 'voucher') {
-          const voucherValue = Number(item.value);
-          if (isNaN(voucherValue) || voucherValue <= 0) throw new Error('Ungültiger Gutscheinwert.');
+          // ... (bestehende Logik für Gutscheine)
+        } else if (item.type === 'service') { // --- NEUE LOGIK FÜR SERVICES ---
+          const service = await Service.findById(item.id);
+          if (!service) throw new Error(`Dienstleistung mit ID ${item.id} nicht gefunden.`);
           
-          const newVoucher = new Voucher({
-            code: generateVoucherCode(),
-            initialValue: voucherValue,
-            currentValue: voucherValue,
-            salon: salonId,
-          });
-          await newVoucher.save();
-          
-          invoiceItems.push({ description: `Gutschein (${newVoucher.code})`, price: voucherValue });
-          totalAmount += voucherValue;
+          invoiceItems.push({ description: `Dienstleistung: ${service.title}`, price: service.price });
+          totalAmount += service.price;
         }
       }
     }

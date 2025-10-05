@@ -62,9 +62,9 @@ export type Availability = {
 }
 
 export type InvoiceItem = {
-  type: 'product' | 'voucher';
-  id?: string;
-  value?: number;
+  type: 'product' | 'voucher' | 'service'; // 'service' hinzugefügt
+  id?: string; // Wird für Services und Produkte verwendet
+  value?: number; // Wird für Gutscheine verwendet
 }
 
 export type InvoicePayload = {
@@ -72,6 +72,7 @@ export type InvoicePayload = {
   customerId: string;
   items: InvoiceItem[];
   paymentMethod: 'cash' | 'card';
+  staffId?: string;
 }
 
 export type Invoice = {
@@ -414,6 +415,13 @@ export async function deleteUserById(id: string, token: string) {
     headers: { Authorization: `Bearer ${token}` }
   })
   return res.data
+}
+
+export async function getWalkInCustomer(token: string): Promise<User> {
+  const res = await api.get('/users/walk-in', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data;
 }
 
 
