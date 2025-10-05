@@ -410,12 +410,17 @@ export const markAsPaid = async (req: AuthRequest & SalonRequest, res: Response)
 
         const servicePrice = (booking.service as any).price;
 
-        // KORREKTUR: Rückgeld berechnen
         const given = amountGiven ? Number(amountGiven) : servicePrice;
         if (given < servicePrice) {
             return res.status(400).json({ message: 'Der gegebene Betrag ist geringer als der Rechnungsbetrag.' });
         }
         const change = given - servicePrice;
+
+        // Service-Informationen für das "items"-Array vorbereiten
+        const serviceItem = {
+            description: (booking.service as any).title,
+            price: servicePrice,
+        };
 
         const newInvoice = new Invoice({
             invoiceNumber,
@@ -424,10 +429,12 @@ export const markAsPaid = async (req: AuthRequest & SalonRequest, res: Response)
             service: booking.service,
             staff: booking.staff,
             salon: req.salonId,
+            items: [serviceItem],
             amount: servicePrice,
             paymentMethod,
-            amountGiven: given, // NEU
-            change: change,     // NEU
+            amountGiven: given,
+            change: change,
+            status: 'paid',
         });
 
         await newInvoice.save();

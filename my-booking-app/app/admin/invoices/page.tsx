@@ -45,7 +45,6 @@ export default function AdminInvoicesPage() {
   useEffect(() => {
     const lowercasedFilter = searchTerm.toLowerCase();
     const filtered = invoices.filter(invoice => {
-      // KORREKTUR: Prüft jetzt auch `itemsSummary` und stellt sicher, dass alle Felder existieren.
       const customerName = invoice.customer ? `${invoice.customer.firstName} ${invoice.customer.lastName}` : '';
       return (
         (invoice.invoiceNumber && invoice.invoiceNumber.toLowerCase().includes(lowercasedFilter)) ||
@@ -82,15 +81,12 @@ export default function AdminInvoicesPage() {
             <Box key={invoice._id}>
               <ListItemButton onClick={() => router.push(`/invoice/${invoice.invoiceNumber}`)}>
                 <ListItemText
-                  primary={`Rechnung #${invoice.invoiceNumber}`}
+                  // KORREKTUR: `itemsSummary` statt `service.title` verwenden
+                  primary={`Rechnung #${invoice.invoiceNumber} - ${invoice.itemsSummary}`}
                   secondary={
                     <Stack direction="row" spacing={2} alignItems="center" sx={{ mt: 0.5 }}>
                       <Typography variant="body2" component="span">
                         Kunde: <strong>{invoice.customer ? `${invoice.customer.firstName} ${invoice.customer.lastName}`: 'N/A'}</strong>
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" component="span">
-                        {/* KORREKTUR: Verwendet `itemsSummary` anstelle von `service.title` */}
-                        {invoice.itemsSummary}
                       </Typography>
                        <Chip label={invoice.salon?.name || ''} size="small" component="span"/>
                     </Stack>

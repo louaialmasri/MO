@@ -171,9 +171,33 @@ export const getAllInvoices = async (req: AuthRequest & SalonRequest, res: Respo
             })
             .populate('salon', 'name')
             .populate('staff', 'firstName lastName')
-            .sort({ date: -1 });
+            .sort({ date: -1 })
+            .lean(); // .lean() für bessere Performance und einfachere Bearbeitung
 
-        res.json(invoices);
+        // NEUE LOGIK: Transformiere die Daten für das Frontend
+        const transformedInvoices = invoices.map(invoice => {
+            let itemsSummary = 'Unbekannter Posten';
+            if (invoice.booking && (invoice.booking as any).service) {
+                itemsSummary = (invoice.booking as any).service.title;
+            } else if (invoice.items && invoice.items.length > 0) {
+                // Nimmt den ersten Posten als Zusammenfassung für die Liste
+                itemsSummary = invoice.items[0].description;
+                if (invoice.items.length > 1) {
+                    itemsSummary += ` (+${invoice.items.length - 1} weitere)`;
+                }
+            }
+            
+            // Entferne das alte 'service' Objekt aus der obersten Ebene, um Konsistenz zu schaffen
+            const { service, ...rest } = invoice as any;
+
+            return {
+                ...rest,
+                itemsSummary, // Füge die neue Zusammenfassung hinzu
+            };
+        });
+
+        res.json(transformedInvoices); // Sende die transformierten Daten
+
     } catch (error) {
         res.status(500).json({ message: 'Serverfehler beim Abrufen aller Rechnungen' });
     }

@@ -81,6 +81,10 @@ export type Invoice = {
   amount: number;
   paymentMethod: 'cash' | 'card';
   customer: { firstName: string; lastName: string; email: string; };
+  items: {
+    description: string;
+    price: number;
+  }[];
   service: { title: string; price: number; duration: number; };
   staff: { firstName: string; lastName: string; };
   salon: { name: string; address?: string; phone?: string; email?: string; };

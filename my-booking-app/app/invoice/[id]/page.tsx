@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { fetchInvoiceById, type Invoice } from '@/services/api';
-import { Container, Paper, Typography, Box, Divider, Button, CircularProgress, Alert } from '@mui/material';
+import { Container, Paper, Typography, Box, Divider, Button, CircularProgress, Alert, Stack } from '@mui/material';
 import PrintIcon from '@mui/icons-material/Print';
 import dayjs from 'dayjs';
 
@@ -29,8 +29,8 @@ export default function InvoicePage() {
     if (error) return <Container sx={{ mt: 5 }}><Alert severity="error">{error}</Alert></Container>;
     if (!invoice) return <Container sx={{ mt: 5 }}><Alert severity="warning">Keine Rechnungsdaten gefunden.</Alert></Container>;
 
-    return (
-        <Box sx={{ backgroundColor: '#f5f5f5', p: { xs: 2, md: 4 } }}>
+     return (
+        <Box sx={{ backgroundColor: '#f5f5f5', p: { xs: 2, md: 4 }, minHeight: '100vh' }}>
             <Container maxWidth="md">
                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2, '@media print': { display: 'none' } }}>
                     <Button variant="contained" startIcon={<PrintIcon />} onClick={() => window.print()}>
@@ -38,52 +38,70 @@ export default function InvoicePage() {
                     </Button>
                 </Box>
                 <Paper sx={{ p: { xs: 3, md: 5 } }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={4}>
                         <Box>
                             <Typography variant="h4" fontWeight="bold">{invoice.salon.name}</Typography>
-                            <Typography>{invoice.salon.address}</Typography>
-                            <Typography>{invoice.salon.phone}</Typography>
-                            <Typography>{invoice.salon.email}</Typography>
+                            {invoice.salon.address && <Typography>{invoice.salon.address}</Typography>}
+                            {invoice.salon.phone && <Typography>{invoice.salon.phone}</Typography>}
+                            {invoice.salon.email && <Typography>{invoice.salon.email}</Typography>}
                         </Box>
                         <Typography variant="h5" color="text.secondary">Rechnung</Typography>
-                    </Box>
+                    </Stack>
 
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', mt: 3 }}>
+                    <Stack direction="row" justifyContent="space-between" mb={2}>
                         <Box>
-                            <Typography variant="body2">Zahlungsmethode: {invoice.paymentMethod === 'cash' ? 'Barzahlung' : 'Karte'}</Typography>
+                            <Typography><strong>Rechnung an:</strong></Typography>
+                            <Typography>{invoice.customer.firstName} {invoice.customer.lastName}</Typography>
+                            <Typography>{invoice.customer.email}</Typography>
                         </Box>
                         <Box sx={{ textAlign: 'right' }}>
-                            <Typography>Betrag: {invoice.amount.toFixed(2)} €</Typography>
-                            <Typography>Gegeben: {invoice.amountGiven?.toFixed(2) ?? invoice.amount.toFixed(2)} €</Typography>
-                            <Typography>Rückgeld: {invoice.change?.toFixed(2) ?? '0.00'} €</Typography>
-                            <Divider sx={{ my: 1 }}/>
-                            <Typography variant="h6"><strong>Gesamt: {invoice.amount.toFixed(2)} €</strong></Typography>
+                            <Typography><strong>Rechnungsnr.:</strong> {invoice.invoiceNumber}</Typography>
+                            <Typography><strong>Datum:</strong> {dayjs(invoice.date).format('DD.MM.YYYY')}</Typography>
                         </Box>
-                    </Box>
+                    </Stack>
 
                     <Divider sx={{ my: 3 }} />
 
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', my: 1 }}>
-                        <Typography fontWeight="bold">Leistung</Typography>
+                        <Typography fontWeight="bold">Leistung/Produkt</Typography>
                         <Typography fontWeight="bold">Betrag</Typography>
                     </Box>
                     <Divider />
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', my: 2 }}>
-                        <Box>
-                            <Typography>{invoice.service.title}</Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                Mitarbeiter: {invoice.staff.firstName} {invoice.staff.lastName}
-                            </Typography>
-                        </Box>
-                        <Typography>{invoice.amount.toFixed(2)} €</Typography>
-                    </Box>
+                    
+                    {invoice.items.map((item, index) => (
+                      <Box key={index} sx={{ display: 'flex', justifyContent: 'space-between', my: 2 }}>
+                          <Box>
+                              <Typography>{item.description}</Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                  Mitarbeiter: {invoice.staff.firstName} {invoice.staff.lastName}
+                              </Typography>
+                          </Box>
+                          <Typography>{item.price.toFixed(2)} €</Typography>
+                      </Box>
+                    ))}
 
-                    <Divider />
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
-                        <Typography variant="h6"><strong>Gesamt: {invoice.amount.toFixed(2)} €</strong></Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
-                        <Typography>Zahlungsmethode: {invoice.paymentMethod === 'cash' ? 'Barzahlung' : 'Karte'}</Typography>
+                    <Divider sx={{ my: 3 }} />
+
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        <Stack spacing={1} sx={{ minWidth: '250px', textAlign: 'right' }}>
+                            <Stack direction="row" justifyContent="space-between">
+                                <Typography>Zwischensumme</Typography>
+                                <Typography>{invoice.amount.toFixed(2)} €</Typography>
+                            </Stack>
+                             <Divider />
+                             <Stack direction="row" justifyContent="space-between">
+                                <Typography variant="h6"><strong>Gesamtbetrag</strong></Typography>
+                                <Typography variant="h6"><strong>{invoice.amount.toFixed(2)} €</strong></Typography>
+                            </Stack>
+                             <Stack direction="row" justifyContent="space-between">
+                                <Typography>Gegeben ({invoice.paymentMethod === 'cash' ? 'Bar' : 'Karte'})</Typography>
+                                <Typography>{(invoice.amountGiven ?? invoice.amount).toFixed(2)} €</Typography>
+                            </Stack>
+                             <Stack direction="row" justifyContent="space-between">
+                                <Typography>Rückgeld</Typography>
+                                <Typography>{(invoice.change ?? 0).toFixed(2)} €</Typography>
+                            </Stack>
+                        </Stack>
                     </Box>
 
                     <Box sx={{ mt: 5, textAlign: 'center' }}>
