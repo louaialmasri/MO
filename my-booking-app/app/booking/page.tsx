@@ -1,22 +1,22 @@
 'use client'
-import { useRouter, useSearchParams } from 'next/navigation' // useSearchParams importiert
+import { useRouter, useSearchParams } from 'next/navigation' 
 import { useEffect, useState } from 'react'
 import {
   Container, Box, Stepper, Step, StepLabel, Button, Typography, CircularProgress,
   Card, CardActionArea, CardContent, Avatar, Chip, Alert, TextField, MenuItem, Paper, Stack, Grid
 } from '@mui/material'
 import api, {
-  fetchServices as fetchGlobalServices, // Umbenannt laut Anweisung
+  fetchServices as fetchGlobalServices,
   fetchAllUsers,
   createBooking,
   fetchTimeslots,
-  fetchLastBookingForUser, // NEU: API-Funktion importiert
+  fetchLastBookingForUser, // WICHTIG: Importiert
   type Service,
   type User
 } from '@/services/api'
 import { useAuth } from '@/context/AuthContext'
 import dayjs from 'dayjs'
-import { motion, AnimatePresence } from 'framer-motion' // AnimatePresence importiert
+import { motion, AnimatePresence } from 'framer-motion' // Für die Animation
 
 // Icons
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -32,7 +32,7 @@ const getInitials = (name = '') => name ? name.split(' ').map(n => n[0]).join(''
 export default function BookingPage() {
   const { user, token, loading: authLoading } = useAuth()
   const router = useRouter()
-  const searchParams = useSearchParams() // searchParams initialisiert
+  const searchParams = useSearchParams() 
 
   const [isAdminOrStaff, setIsAdminOrStaff] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
@@ -43,7 +43,7 @@ export default function BookingPage() {
   const [staffForService, setStaffForService] = useState<Staff[]>([])
   const [availableSlots, setAvailableSlots] = useState<string[]>([])
   const [loading, setLoading] = useState({ services: true, staff: false, slots: false, customers: false });
-  const [suggestion, setSuggestion] = useState<{serviceId: string, staffId: string} | null>(null); // NEU: State für Vorschlag
+  const [suggestion, setSuggestion] = useState<{service: string, staff: string} | null>(null); // State für den Vorschlag
 
   // Selection states
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
@@ -87,7 +87,7 @@ export default function BookingPage() {
     }
   }, [token, isAdminOrStaff, authLoading]);
 
-  // NEU: useEffect to handle copied data
+  // useEffect to handle copied data
   useEffect(() => {
     if (loading.services || loading.customers) return;
 
@@ -108,19 +108,23 @@ export default function BookingPage() {
     }
   }, [searchParams, services, allCustomers, loading.services, loading.customers]);
 
-  // NEU: useEffect, um Vorschläge zu laden, wenn ein Kunde ausgewählt wird
+  // NEU: Dieser Hook lädt einen Vorschlag, sobald ein Kunde ausgewählt wurde.
   useEffect(() => {
     if (isAdminOrStaff && selectedCustomerId && token) {
-      const loadSuggestion = async () => {
-        try {
-          const lastBooking = await fetchLastBookingForUser(selectedCustomerId, token);
-          setSuggestion(lastBooking);
-        } catch (error) {
-          console.log("Kein vorheriger Termin für Vorschlag gefunden.");
-          setSuggestion(null); // Sicherstellen, dass kein alter Vorschlag bleibt
-        }
-      };
-      loadSuggestion();
+        // Alten Vorschlag zurücksetzen, wenn Kunde wechselt
+        setSuggestion(null);
+
+        const loadSuggestion = async () => {
+            try {
+                const lastBooking = await fetchLastBookingForUser(selectedCustomerId, token);
+                if (lastBooking) {
+                    setSuggestion(lastBooking);
+                }
+            } catch (error) {
+                console.log("Kein vorheriger Termin für Vorschlag gefunden.");
+            }
+        };
+        loadSuggestion();
     }
   }, [selectedCustomerId, isAdminOrStaff, token]);
   
@@ -161,22 +165,22 @@ export default function BookingPage() {
   }, [selectedService, selectedStaff, selectedDate, token]);
 
   const handleNext = () => {
-    // Wenn ein Vorschlag da war und wir zum nächsten Schritt gehen, blenden wir ihn aus
     if (suggestion) setSuggestion(null); 
     setActiveStep((prev) => prev + 1);
   };
   const handleBack = () => setActiveStep((prev) => prev - 1);
 
-  // NEU: Funktion, um den Vorschlag anzunehmen
+  // NEU: Handler, um einen Vorschlag zu übernehmen
   const applySuggestion = () => {
     if (!suggestion) return;
-    const suggestedService = services.find(s => s._id === suggestion.serviceId);
+    const suggestedService = services.find(s => s._id === suggestion.service);
     if (suggestedService) {
       setSelectedService(suggestedService);
-      // Wir springen direkt zum Mitarbeiter-Schritt
-      setActiveStep(2); 
+      // Wir setzen den Mitarbeiter für den nächsten Schritt und springen dorthin
+      // Die Logik im nächsten Schritt wird ihn dann automatisch auswählen
+      handleNext(); // Springe zu Service-Auswahl (die wird übersprungen) -> Mitarbeiter
     }
-    setSuggestion(null); // Vorschlag ausblenden
+    setSuggestion(null); // Vorschlag ausblenden nach Übernahme
   };
 
   const handleBookingSubmit = async () => {
@@ -203,44 +207,37 @@ export default function BookingPage() {
 
   const renderStepContent = (step: number) => {
     switch (step) {
-      case 0:
-        const customer = allCustomers.find(c => c._id === selectedCustomerId);
-        const suggestedService = suggestion ? services.find(s => s._id === suggestion.serviceId) : null;
-        
+      case 0: // Kundenauswahl
+        const suggestedServiceDetails = suggestion ? services.find(s => s._id === suggestion.service) : null;
         return (
           <Box>
             <Typography variant="h6" gutterBottom>Für wen wird der Termin gebucht?</Typography>
-            {loading.customers ? <CircularProgress /> : (
-              <TextField
-                select
-                label="Kunde auswählen"
-                value={selectedCustomerId || ''}
-                onChange={(e) => setSelectedCustomerId(e.target.value)}
-                fullWidth
-                variant="outlined"
-              >
-                {allCustomers.map(c => (
-                  <MenuItem key={c._id} value={c._id}>
-                    {`${c.firstName} ${c.lastName}`.trim() || c.email}
-                  </MenuItem>
-                ))}
-              </TextField>
-            )}
+            <TextField
+              select
+              label="Kunde auswählen"
+              value={selectedCustomerId || ''}
+              onChange={(e) => setSelectedCustomerId(e.target.value)}
+              fullWidth
+            >
+              {allCustomers.map(c => (
+                <MenuItem key={c._id} value={c._id}>{`${c.firstName} ${c.lastName}`.trim() || c.email}</MenuItem>
+              ))}
+            </TextField>
             
-            {/* NEU: Vorschlags-Box */}
+            {/* KORREKTUR: Die Vorschlags-Box */}
             <AnimatePresence>
-              {suggestion && customer && suggestedService && (
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
-                  <Paper variant="outlined" sx={{ p: 2, mt: 3, borderColor: 'secondary.main' }}>
-                      <Typography variant="subtitle2" gutterBottom>Vorschlag basierend auf letztem Besuch:</Typography>
-                      <Typography><strong>{suggestedService.title}</strong></Typography>
-                      <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-                        <Button variant="contained" size="small" onClick={applySuggestion}>Übernehmen</Button>
-                        <Button variant="text" size="small" onClick={() => setSuggestion(null)}>Verwerfen</Button>
-                      </Stack>
-                  </Paper>
-                </motion.div>
-              )}
+            {suggestion && suggestedServiceDetails && (
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                <Paper variant="outlined" sx={{ p: 2, mt: 3, borderColor: 'secondary.main', bgcolor: 'secondary.lightest' }}>
+                    <Typography variant="subtitle2" gutterBottom>Vorschlag (letzter Termin):</Typography>
+                    <Typography><strong>{suggestedServiceDetails.title}</strong></Typography>
+                    <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+                      <Button variant="contained" size="small" onClick={applySuggestion}>Übernehmen</Button>
+                      <Button variant="text" size="small" onClick={() => setSuggestion(null)}>Ignorieren</Button>
+                    </Stack>
+                </Paper>
+              </motion.div>
+            )}
             </AnimatePresence>
           </Box>
         );
@@ -323,7 +320,7 @@ export default function BookingPage() {
       case 3:
         return (
           <Grid container spacing={3}>
-            <Grid size={{ xs: 12, md: 5 }}>
+            <Grid  size={{ xs: 12, md: 5 }}>
               <Typography variant="h6" gutterBottom>Wähle ein Datum</Typography>
               <TextField
                 type="date"
@@ -395,7 +392,6 @@ export default function BookingPage() {
     }
   };
 
-  // Korrektur: Die `size`-Prop wurde in MUI v5 durch `item` und Breakpoint-Props ersetzt (`xs`, `md`, etc.)
   return (
     <Container maxWidth="lg" sx={{ py: 5 }}>
       <Grid container spacing={4}>

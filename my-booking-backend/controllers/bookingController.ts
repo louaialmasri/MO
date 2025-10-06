@@ -231,7 +231,6 @@ export const getAllBookings = async (req: AuthRequest, res: Response) => {
       filter.staff = { $in: staffIds };
     }
     
-    // KORREKTUR: Sicherstellen, dass alle relevanten Felder immer popoliert werden.
     const bookings = await Booking.find(filter)
       .populate('user', 'firstName lastName email')
       .populate('service', 'title price duration')

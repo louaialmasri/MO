@@ -10,6 +10,7 @@ import {
   fetchAllUsers,
   updateBooking,
   markBookingAsPaid,
+  createBooking, // NEU: Import für die neue Kopier-Funktion
 } from '@/services/api'
 import dynamic from 'next/dynamic'
 import {
@@ -23,7 +24,7 @@ import {
 } from '@mui/material'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
-import interactionPlugin from '@fullcalendar/interaction'
+import interactionPlugin, { DateClickArg } from '@fullcalendar/interaction' // NEU: DateClickArg importiert
 import resourceTimeGridPlugin from '@fullcalendar/resource-timegrid';
 import type { Service } from '@/services/api'
 import dayjs from 'dayjs'
@@ -37,8 +38,7 @@ import TodayIcon from '@mui/icons-material/Today';
 import PaymentIcon from '@mui/icons-material/Payment';
 import DeleteIcon from '@mui/icons-material/Delete';
 import HistoryIcon from '@mui/icons-material/History';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy'; // NEU: Icon für Kopieren
-
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 
 dayjs.locale('de');
 
@@ -88,7 +88,6 @@ const translateAction = (action: string) => {
 
 // --- KOMPONENTEN ---
 const CalendarEventContent: React.FC<{ arg: any }> = ({ arg }) => {
-  // ... (Code unverändert)
   const eventRef = useRef<HTMLDivElement>(null);
   const [eventHeight, setEventHeight] = useState(0);
 
@@ -156,8 +155,9 @@ function AdminPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [amountGiven, setAmountGiven] = useState('');
-  const [toast, setToast] = useState<{ open: boolean; msg: string; sev: 'success' | 'error' }>({ open: false, msg: '', sev: 'success' })
+  const [toast, setToast] = useState<{ open: boolean; msg: string; sev: 'success' | 'error' | 'info' }>({ open: false, msg: '', sev: 'success' })
   const [showHistory, setShowHistory] = useState(false);
+  const [copiedBooking, setCopiedBooking] = useState<BookingFull | null>(null); // NEU: State für den Kopiermodus
 
   const staffUsers = useMemo(() => users.filter(u => u.role === 'staff'), [users]);
 
@@ -169,7 +169,6 @@ function AdminPage() {
     });
     return colorMap;
   }, [staffUsers]);
-
 
   useEffect(() => {
     if (!user || user.role !== 'admin' || !token) {
@@ -194,7 +193,6 @@ function AdminPage() {
     fetchData();
   }, [user, token, router]);
 
-
   const openDialogFor = (bookingId: string) => {
     const b = bookings.find(x => x._id === bookingId);
     if (!b) return;
@@ -208,6 +206,7 @@ function AdminPage() {
     setShowHistory(false);
     setOpenEvent(true);
   };
+
   const closeDialog = () => {
     setOpenEvent(false);
     setActiveBooking(null);
@@ -249,7 +248,6 @@ function AdminPage() {
     }));
   }, [staffUsers]);
 
-
   const handleEventDrop = async (info: any) => {
     const { event } = info;
     const originalBooking = bookings.find(b => b._id === event.id);
@@ -262,7 +260,6 @@ function AdminPage() {
     if (newStaffId && newStaffId !== originalBooking.staff?._id) {
       const serviceId = originalBooking.service?._id || originalBooking.serviceId;
       const newStaffMember = staffUsers.find(staff => staff._id === newStaffId);
-
       const hasSkill = newStaffMember?.skills?.some(skill => (typeof skill === 'string' ? skill : skill._id) === serviceId);
 
       if (!hasSkill) {
@@ -282,17 +279,53 @@ function AdminPage() {
         staffId: newStaffId || originalBooking.staff?._id,
       };
       const response = await updateBooking(event.id, payload, token!);
-      if (response && response.booking) {
+      if (response.booking) { // KORREKTUR laut Anweisung
         setBookings(prev => prev.map(b => b._id === event.id ? response.booking : b));
         setToast({ open: true, msg: 'Termin verschoben!', sev: 'success' });
       } else {
-        throw new Error("Invalid API response");
+        throw new Error("Ungültige Antwort vom Server");
       }
     } catch (e: any) {
       info.revert();
       setToast({ open: true, msg: `Verschieben fehlgeschlagen: ${e.response?.data?.message || e.message}`, sev: 'error' });
     }
   }
+
+  // NEU: Funktion, die beim Klick auf einen leeren Slot ausgeführt wird
+  const handleDateClick = async (arg: DateClickArg) => {
+    if (copiedBooking) {
+      const { user, service } = copiedBooking;
+      const staffId = arg.resource?.id;
+      const dateTime = arg.dateStr;
+
+      if (!staffId || !service?._id) {
+        setToast({ open: true, msg: 'Mitarbeiter oder Service fehlen.', sev: 'error' });
+        return;
+      }
+
+      try {
+        const response = await createBooking(service._id, dateTime, staffId, token!, user._id);
+        if (response.booking) {
+          setBookings(prev => [...prev, response.booking]);
+          setToast({ open: true, msg: 'Termin erfolgreich eingefügt!', sev: 'success' });
+        } else {
+           throw new Error(response.message || 'Fehler beim Erstellen des Termins');
+        }
+      } catch (e: any) {
+        setToast({ open: true, msg: e.response?.data?.message || 'Einfügen fehlgeschlagen.', sev: 'error' });
+      } finally {
+        setCopiedBooking(null); // Kopiermodus beenden
+      }
+    }
+  };
+
+  // NEU: Funktion, die den Kopiermodus startet
+  const handleStartCopy = () => {
+    if (!activeBooking) return;
+    setCopiedBooking(activeBooking);
+    setToast({ open: true, msg: 'Termin kopiert. Klicken Sie zum Einfügen in einen freien Slot.', sev: 'info' });
+    closeDialog();
+  };
 
   const handleDeleteBooking = async () => {
     if (!activeBooking || !token) return;
@@ -305,20 +338,6 @@ function AdminPage() {
     } catch (err) {
       setToast({ open: true, msg: 'Fehler beim Löschen', sev: 'error' });
     }
-  };
-
-  const handleCopyBooking = () => {
-    if (!activeBooking) return;
-    const { user, service, staff } = activeBooking;
-    
-    const query = new URLSearchParams({
-      copyUser: user._id,
-      copyService: service?._id || '',
-      copyStaff: staff?._id || '',
-    }).toString();
-
-    router.push(`/booking?${query}`);
-    closeDialog();
   };
 
   const servicePrice = activeBooking?.service?.price || 0;
@@ -351,7 +370,7 @@ function AdminPage() {
 
   return (
     <Box sx={{ p: { xs: 2, md: 4 }, backgroundColor: 'background.default', minHeight: '100vh' }}>
-      <Container maxWidth="xl">
+      <Container maxWidth="xl" sx={copiedBooking ? { cursor: 'copy' } : {}}>
         <AdminBreadcrumbs items={[{ label: 'Mein Salon', href: '/admin' }, { label: 'Kalender' }]} />
 
         <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3, mt: 2 }}>
@@ -396,6 +415,7 @@ function AdminPage() {
             events={calendarEvents}
             eventDrop={handleEventDrop}
             eventClick={(info) => openDialogFor(info.event.id)}
+            dateClick={handleDateClick} // NEU: dateClick Handler hinzugefügt
             resourceAreaHeaderContent="Mitarbeiter"
             resourceLabelContent={(arg) => (
               <Stack direction="row" spacing={1.5} alignItems="center" sx={{ py: 1.5, px: 1 }}>
@@ -478,11 +498,11 @@ function AdminPage() {
               {!editMode && <Button onClick={() => setEditMode(true)}>Bearbeiten</Button>}
             </Box>
             <Box>
-              {/* NEUER KOPIEREN-BUTTON */}
+              {/* ANGEPASSTER KOPIEREN-BUTTON */}
               {!editMode && activeBooking && (
                 <Button 
                   startIcon={<ContentCopyIcon />}
-                  onClick={handleCopyBooking}
+                  onClick={handleStartCopy} // Ruft die neue Funktion auf
                   sx={{ mr: 1 }}
                 >
                   Kopieren
@@ -571,4 +591,3 @@ function AdminPage() {
 }
 
 export default dynamic(() => Promise.resolve(AdminPage), { ssr: false })
-
