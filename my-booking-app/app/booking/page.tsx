@@ -10,15 +10,14 @@ import api, {
   fetchAllUsers,
   createBooking,
   fetchTimeslots,
-  fetchLastBookingForUser, // WICHTIG: Importiert
+  fetchLastBookingForUser,
   type Service,
   type User
 } from '@/services/api'
 import { useAuth } from '@/context/AuthContext'
 import dayjs from 'dayjs'
-import { motion, AnimatePresence } from 'framer-motion' // Für die Animation
+import { motion, AnimatePresence } from 'framer-motion'
 
-// Icons
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -32,20 +31,18 @@ const getInitials = (name = '') => name ? name.split(' ').map(n => n[0]).join(''
 export default function BookingPage() {
   const { user, token, loading: authLoading } = useAuth()
   const router = useRouter()
-  const searchParams = useSearchParams() 
+  const searchParams = useSearchParams()
 
   const [isAdminOrStaff, setIsAdminOrStaff] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
 
-  // Data states
   const [services, setServices] = useState<Service[]>([])
   const [allCustomers, setAllCustomers] = useState<User[]>([]);
   const [staffForService, setStaffForService] = useState<Staff[]>([])
   const [availableSlots, setAvailableSlots] = useState<string[]>([])
   const [loading, setLoading] = useState({ services: true, staff: false, slots: false, customers: false });
-  const [suggestion, setSuggestion] = useState<{service: string, staff: string} | null>(null); // State für den Vorschlag
+  const [suggestion, setSuggestion] = useState<{ service: string, staff: string } | null>(null);
 
-  // Selection states
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [selectedService, setSelectedService] = useState<Service | null>(null)
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null)
@@ -63,7 +60,6 @@ export default function BookingPage() {
     }
   }, [user]);
 
-  // Lade initiale Daten
   useEffect(() => {
     const loadInitialData = async () => {
       try {
@@ -82,53 +78,26 @@ export default function BookingPage() {
         setLoading(p => ({ ...p, services: false, customers: false }));
       }
     };
-    if (!authLoading) {
-        loadInitialData();
-    }
+    if (!authLoading) loadInitialData();
   }, [token, isAdminOrStaff, authLoading]);
 
-  // useEffect to handle copied data
-  useEffect(() => {
-    if (loading.services || loading.customers) return;
-
-    const copyUserId = searchParams.get('copyUser');
-    const copyServiceId = searchParams.get('copyService');
-    const copyStaffId = searchParams.get('copyStaff');
-
-    if (copyUserId && copyServiceId && copyStaffId) {
-      const customer = allCustomers.find(c => c._id === copyUserId);
-      const service = services.find(s => s._id === copyServiceId);
-      
-      if (customer) setSelectedCustomerId(customer._id);
-      if (service) setSelectedService(service);
-      
-      if(customer && service) {
-          setActiveStep(3); // Springt zu Datum & Zeit
-      }
-    }
-  }, [searchParams, services, allCustomers, loading.services, loading.customers]);
-
-  // NEU: Dieser Hook lädt einen Vorschlag, sobald ein Kunde ausgewählt wurde.
   useEffect(() => {
     if (isAdminOrStaff && selectedCustomerId && token) {
-        // Alten Vorschlag zurücksetzen, wenn Kunde wechselt
-        setSuggestion(null);
-
-        const loadSuggestion = async () => {
-            try {
-                const lastBooking = await fetchLastBookingForUser(selectedCustomerId, token);
-                if (lastBooking) {
-                    setSuggestion(lastBooking);
-                }
-            } catch (error) {
-                console.log("Kein vorheriger Termin für Vorschlag gefunden.");
-            }
-        };
-        loadSuggestion();
+      setSuggestion(null);
+      const loadSuggestion = async () => {
+        try {
+          const lastBooking = await fetchLastBookingForUser(selectedCustomerId, token);
+          if (lastBooking) {
+            setSuggestion(lastBooking);
+          }
+        } catch {
+          console.log('Kein vorheriger Termin für Vorschlag gefunden.');
+        }
+      };
+      loadSuggestion();
     }
   }, [selectedCustomerId, isAdminOrStaff, token]);
-  
-  // Lade Mitarbeiter, wenn ein Service gewählt wurde
+
   useEffect(() => {
     if (!selectedService) return;
     const loadStaff = async () => {
@@ -136,7 +105,7 @@ export default function BookingPage() {
       try {
         const res = await api.get(`/staff/service/${selectedService._id}`);
         setStaffForService(res.data);
-      } catch (error) {
+      } catch {
         setError('Mitarbeiter für diesen Service konnten nicht geladen werden.');
       } finally {
         setLoading(p => ({ ...p, staff: false }));
@@ -145,7 +114,6 @@ export default function BookingPage() {
     loadStaff();
   }, [selectedService]);
 
-  // Lade Zeitslots, wenn Datum, Service und Mitarbeiter gewählt sind
   useEffect(() => {
     if (!selectedService || !selectedStaff || !selectedDate) return;
     const loadSlots = async () => {
@@ -160,27 +128,31 @@ export default function BookingPage() {
       } finally {
         setLoading(p => ({ ...p, slots: false }));
       }
-    }
+    };
     loadSlots();
   }, [selectedService, selectedStaff, selectedDate, token]);
 
   const handleNext = () => {
-    if (suggestion) setSuggestion(null); 
+    if (suggestion) setSuggestion(null);
     setActiveStep((prev) => prev + 1);
   };
   const handleBack = () => setActiveStep((prev) => prev - 1);
 
-  // NEU: Handler, um einen Vorschlag zu übernehmen
+  // ✅ NEU: Vorschlag übernimmt Service & Mitarbeiter, springt direkt zu Schritt 3
   const applySuggestion = () => {
     if (!suggestion) return;
     const suggestedService = services.find(s => s._id === suggestion.service);
-    if (suggestedService) {
+    const suggestedStaff = staffForService.find(s => s._id === suggestion.staff);
+
+    if (suggestedService && suggestedStaff) {
       setSelectedService(suggestedService);
-      // Wir setzen den Mitarbeiter für den nächsten Schritt und springen dorthin
-      // Die Logik im nächsten Schritt wird ihn dann automatisch auswählen
-      handleNext(); // Springe zu Service-Auswahl (die wird übersprungen) -> Mitarbeiter
+      setSelectedStaff(suggestedStaff);
+      setActiveStep(3);
+    } else if (suggestedService) {
+      setSelectedService(suggestedService);
+      setActiveStep(2);
     }
-    setSuggestion(null); // Vorschlag ausblenden nach Übernahme
+    setSuggestion(null);
   };
 
   const handleBookingSubmit = async () => {
@@ -200,15 +172,16 @@ export default function BookingPage() {
     } catch (e: any) {
       setError(e?.response?.data?.message || 'Buchung fehlgeschlagen.');
     }
-  }
+  };
 
   const effectiveSteps = isAdminOrStaff ? steps : steps.slice(1);
   const currentStepContent = isAdminOrStaff ? activeStep : activeStep + 1;
 
   const renderStepContent = (step: number) => {
     switch (step) {
-      case 0: // Kundenauswahl
+      case 0:
         const suggestedServiceDetails = suggestion ? services.find(s => s._id === suggestion.service) : null;
+        const suggestedStaffDetails = suggestion ? staffForService.find(s => s._id === suggestion.staff) : null;
         return (
           <Box>
             <Typography variant="h6" gutterBottom>Für wen wird der Termin gebucht?</Typography>
@@ -223,21 +196,23 @@ export default function BookingPage() {
                 <MenuItem key={c._id} value={c._id}>{`${c.firstName} ${c.lastName}`.trim() || c.email}</MenuItem>
               ))}
             </TextField>
-            
-            {/* KORREKTUR: Die Vorschlags-Box */}
+
             <AnimatePresence>
-            {suggestion && suggestedServiceDetails && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                <Paper variant="outlined" sx={{ p: 2, mt: 3, borderColor: 'secondary.main', bgcolor: 'secondary.lightest' }}>
+              {suggestion && suggestedServiceDetails && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                  <Paper variant="outlined" sx={{ p: 2, mt: 3, borderColor: 'secondary.main' }}>
                     <Typography variant="subtitle2" gutterBottom>Vorschlag (letzter Termin):</Typography>
-                    <Typography><strong>{suggestedServiceDetails.title}</strong></Typography>
+                    <Typography>
+                      <strong>{suggestedServiceDetails.title}</strong>
+                      {suggestedStaffDetails && ` bei ${suggestedStaffDetails.firstName || suggestedStaffDetails.name}`}
+                    </Typography>
                     <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
                       <Button variant="contained" size="small" onClick={applySuggestion}>Übernehmen</Button>
                       <Button variant="text" size="small" onClick={() => setSuggestion(null)}>Ignorieren</Button>
                     </Stack>
-                </Paper>
-              </motion.div>
-            )}
+                  </Paper>
+                </motion.div>
+              )}
             </AnimatePresence>
           </Box>
         );
