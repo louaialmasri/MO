@@ -160,11 +160,8 @@ export const updateBooking = async (req: AuthRequest & SalonRequest, res: Respon
     const effectiveStaffId = staffId || String(booking.staff);
     const effectiveDateTime = dateTime || booking.dateTime.toISOString();
 
-    if (
-      !mongoose.Types.ObjectId.isValid(effectiveServiceId) ||
-      !mongoose.Types.ObjectId.isValid(effectiveStaffId)
-    ) {
-      return res.status(400).json({ success: false, message: 'Ungültige ID' });
+    if (!mongoose.Types.ObjectId.isValid(effectiveServiceId) || !mongoose.Types.ObjectId.isValid(effectiveStaffId)) {
+        return res.status(400).json({ success: false, message: 'Ungültige ID' })
     }
 
     const staff = await User.findById(effectiveStaffId).select('skills role');
@@ -172,48 +169,42 @@ export const updateBooking = async (req: AuthRequest & SalonRequest, res: Respon
       return res.status(400).json({ success: false, message: 'Ungültiger Mitarbeiter' });
     }
 
-    const canDo = (staff.skills || []).some((skill: any) => String(skill) === effectiveServiceId);
-    if (!canDo) {
-      return res
-        .status(400)
-        .json({ success: false, message: 'Mitarbeiter hat nicht die erforderlichen Skills für diesen Service' });
+    // Die `skills` eines Mitarbeiters sind ein Array von ObjectIDs. Wir müssen sie für den Vergleich in Strings umwandeln.
+    const staffSkillIds = (staff.skills || []).map((skill: any) => String(skill));
+    if (!staffSkillIds.includes(effectiveServiceId)) {
+      return res.status(400).json({ success: false, message: 'Mitarbeiter hat nicht die erforderlichen Skills für diesen Service' });
     }
 
-    const changes: string[] = [];
+    const changes = [];
     if (dateTime && new Date(dateTime).getTime() !== booking.dateTime.getTime()) {
-      changes.push(
-        `Uhrzeit von ${dayjs(booking.dateTime).format('HH:mm')} auf ${dayjs(dateTime).format('HH:mm')}`
-      );
+      changes.push(`Uhrzeit von ${dayjs(booking.dateTime).format('HH:mm')} auf ${dayjs(dateTime).format('HH:mm')}`);
       booking.dateTime = new Date(dateTime);
     }
     if (staffId && staffId !== String(booking.staff)) {
-      const oldStaff = await User.findById(booking.staff).select('firstName lastName');
-      const newStaff = await User.findById(staffId).select('firstName lastName');
-      changes.push(`Mitarbeiter von ${oldStaff?.firstName} zu ${newStaff?.firstName}`);
-      booking.staff = new mongoose.Types.ObjectId(staffId);
+       const oldStaff = await User.findById(booking.staff).select('firstName lastName');
+       const newStaff = await User.findById(staffId).select('firstName lastName');
+       changes.push(`Mitarbeiter von ${oldStaff?.firstName} zu ${newStaff?.firstName}`);
+       booking.staff = new mongoose.Types.ObjectId(staffId);
     }
     if (serviceId && serviceId !== String(booking.service)) {
-      const oldService = await Service.findById(booking.service).select('title');
-      const newService = await Service.findById(serviceId).select('title');
-      changes.push(`Service von "${oldService?.title}" zu "${newService?.title}"`);
-      booking.service = new mongoose.Types.ObjectId(serviceId);
+        const oldService = await Service.findById(booking.service).select('title');
+        const newService = await Service.findById(serviceId).select('title');
+        changes.push(`Service von "${oldService?.title}" zu "${newService?.title}"`);
+        booking.service = new mongoose.Types.ObjectId(serviceId);
     }
-
     if (changes.length > 0) {
-      booking.history.push({
-        action: 'rescheduled',
-        executedBy: new mongoose.Types.ObjectId(req.user!.userId),
-        details: changes.join(', ')
-      });
+        booking.history.push({
+            action: 'rescheduled',
+            executedBy: new mongoose.Types.ObjectId(req.user!.userId),
+            details: changes.join(', ')
+        });
     }
 
     const clash = await ensureNoConflicts(effectiveStaffId, effectiveDateTime, effectiveServiceId, id);
-    if (!clash.ok) {
-      return res.status(400).json({ success: false, message: clash.message });
-    }
+    if (!clash.ok) return res.status(400).json({ success: false, message: clash.message });
 
     await booking.save();
-
+    
     const updatedBooking = await Booking.findById(id)
       .populate('user', 'firstName lastName email')
       .populate('service', 'title price duration')
@@ -221,13 +212,9 @@ export const updateBooking = async (req: AuthRequest & SalonRequest, res: Respon
       .populate('history.executedBy', 'firstName lastName');
 
     if (!updatedBooking) {
-      return res
-        .status(404)
-        .json({ success: false, message: 'Fehler beim Laden des aktualisierten Termins' });
+        return res.status(404).json({ success: false, message: 'Fehler beim Laden des aktualisierten Termins' });
     }
 
-    // ✅ KORREKTUR: Wandelt das Mongoose-Dokument in ein reines JS-Objekt um.
-    // Dadurch werden keine internen Mongoose-Metadaten oder Prototypen mehr gesendet.
     res.json({ success: true, booking: updatedBooking.toObject() });
 
   } catch (err) {
