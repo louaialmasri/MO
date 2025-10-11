@@ -226,3 +226,62 @@ export const getLastBookingForUser = async (req: AuthRequest, res: Response) => 
     res.status(500).json({ message: 'Serverfehler beim Abrufen des letzten Termins.' });
   }
 };
+
+// Setzt oder ändert den Dashboard-PIN für einen Admin
+export const setDashboardPin = async (req: AuthRequest, res: Response) => {
+  try {
+    const { password, pin } = req.body;
+    const userId = req.user?.userId;
+
+    if (!password || !pin || !/^\d{4,6}$/.test(pin)) {
+      return res.status(400).json({ message: 'Passwort und eine 4- bis 6-stellige PIN sind erforderlich.' });
+    }
+
+    const user = await User.findById(userId).select('+password');
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({ message: 'Nicht autorisiert.' });
+    }
+
+    const isPasswordCorrect = await bcrypt.compare(password, user.password as string);
+    if (!isPasswordCorrect) {
+      return res.status(401).json({ message: 'Ungültiges Passwort.' });
+    }
+
+    user.dashboardPin = await bcrypt.hash(pin, 10);
+    await user.save();
+
+    res.json({ success: true, message: 'Dashboard-PIN erfolgreich gesetzt.' });
+
+  } catch (error) {
+    res.status(500).json({ message: 'Serverfehler beim Setzen der PIN.' });
+  }
+};
+
+// Überprüft den Dashboard-PIN
+export const verifyDashboardPin = async (req: AuthRequest, res: Response) => {
+  try {
+    const { pin } = req.body;
+    const userId = req.user?.userId;
+
+    if (!pin) {
+      return res.status(400).json({ message: 'PIN ist erforderlich.' });
+    }
+
+    const user = await User.findById(userId).select('+dashboardPin');
+    if (!user || user.role !== 'admin' || !user.dashboardPin) {
+      return res.status(403).json({ message: 'Keine PIN für diesen Benutzer gesetzt oder nicht autorisiert.' });
+    }
+
+    const isPinCorrect = await bcrypt.compare(pin, user.dashboardPin);
+    if (!isPinCorrect) {
+      return res.status(401).json({ message: 'Ungültige PIN.' });
+    }
+
+    // Hier könnte man später ein kurzlebiges JWT für den Dashboard-Zugang erstellen.
+    // Fürs Erste reicht ein Erfolgs-Status.
+    res.json({ success: true, message: 'PIN verifiziert.' });
+
+  } catch (error) {
+    res.status(500).json({ message: 'Serverfehler beim Überprüfen der PIN.' });
+  }
+};

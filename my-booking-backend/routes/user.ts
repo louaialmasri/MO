@@ -6,7 +6,9 @@ import {
     deleteStaff, 
     createUserManually, 
     getOrCreateWalkInCustomer, 
-    getLastBookingForUser
+    getLastBookingForUser,
+    setDashboardPin,
+    verifyDashboardPin
 } from '../controllers/userController';
 import { verifyToken } from '../middlewares/authMiddleware';
 import { verifyAdmin } from '../middlewares/adminMiddleware'; 
@@ -25,5 +27,9 @@ router.get('/walk-in', verifyToken, getOrCreateWalkInCustomer);
 
 // Route, um den letzten Termin abzurufen
 router.get('/:userId/last-booking', verifyToken, getLastBookingForUser);
+
+// NEUE ROUTEN FÜR PIN-VERWALTUNG (NUR ADMINS)
+router.post('/set-pin', verifyToken, verifyAdmin, setDashboardPin);
+router.post('/verify-pin', verifyToken, verifyAdmin, verifyDashboardPin);
 
 export default router;

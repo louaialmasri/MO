@@ -8,6 +8,8 @@ const userSchema = new Schema({
   role: { type: String, enum: ['user','staff','admin'], required: true },
   address: { type: String },
   phone: { type: String },
+  // NEU: Feld für den gehashten Dashboard-PIN
+  dashboardPin: { type: String, select: false },
   // Skills sind primär für Staff relevant
   skills: [{ type: Schema.Types.ObjectId, ref: 'Service', default: [] }],
   // Salon-Zuweisung nur für Staff und Admin relevant
