@@ -3,20 +3,23 @@ import { AuthRequest } from '../middlewares/authMiddleware';
 import { SalonRequest } from '../middlewares/activeSalon';
 import { CashClosing } from '../models/CashClosing';
 import { Invoice } from '../models/Invoice';
-import mongoose from 'mongoose'; // Import Mongoose
+import mongoose from 'mongoose';
 import dayjs from 'dayjs';
 
 // Eine Funktion, die nur die Daten für den Abschluss vorbereitet
 export const getCashClosingPreview = async (req: SalonRequest, res: Response) => {
     try {
         const salonId = req.salonId;
+        if (!salonId) {
+            return res.status(400).json({ message: 'Kein Salon ausgewählt.' });
+        }
         const today = dayjs().toDate();
-
         const startOfDay = dayjs(today).startOf('day').toDate();
         const endOfDay = dayjs(today).endOf('day').toDate();
 
+        // KORREKTUR: salonId in eine ObjectId umwandeln
         const cashInvoices = await Invoice.find({
-            salon: salonId,
+            salon: new mongoose.Types.ObjectId(salonId),
             date: { $gte: startOfDay, $lte: endOfDay },
             paymentMethod: 'cash',
             status: 'paid'

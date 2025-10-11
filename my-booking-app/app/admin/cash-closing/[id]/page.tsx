@@ -1,90 +1,99 @@
 'use client'
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { fetchCashClosingById, type CashClosing } from '@/services/api';
-import {
-  Container, Paper, Typography, Box, Divider, Button, CircularProgress, Alert, Grid, Stack
-} from '@mui/material';
-import PrintIcon from '@mui/icons-material/Print';
-import dayjs from 'dayjs';
+import { Container, Typography, Paper, Box, CircularProgress, Divider, List, ListItem, ListItemText, Grid } from '@mui/material';
 import AdminBreadcrumbs from '@/components/AdminBreadcrumbs';
-
-// Hilfskomponente für die Zeilen
-const SummaryRow = ({ label, value, bold = false }: { label: string, value: string, bold?: boolean }) => (
-  <Stack direction="row" justifyContent="space-between" alignItems="center">
-    <Typography variant={bold ? 'h6' : 'body1'}>{label}</Typography>
-    <Typography variant={bold ? 'h6' : 'body1'} fontWeight={bold ? 'bold' : 'normal'}>{value}</Typography>
-  </Stack>
-);
+import dayjs from 'dayjs';
 
 export default function CashClosingDetailPage() {
-    const { id } = useParams();
-    const { token } = useAuth();
-    const [closing, setClosing] = useState<CashClosing | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+  const { token } = useAuth();
+  const params = useParams();
+  const { id } = params;
+  const [closing, setClosing] = useState<CashClosing | null>(null);
+  const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        if (token && id) {
-            fetchCashClosingById(token, id as string)
-                .then(data => setClosing(data))
-                .catch(err => setError(err.response?.data?.message || 'Abschluss konnte nicht geladen werden.'))
-                .finally(() => setLoading(false));
-        }
-    }, [id, token]);
+  useEffect(() => {
+    if (token && id) {
+      fetchCashClosingById(id as string, token)
+        .then(data => {
+          setClosing(data);
+        })
+        .catch(console.error)
+        .finally(() => setLoading(false));
+    }
+  }, [token, id]);
 
-    if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 5 }}><CircularProgress /></Box>;
-    if (error) return <Container sx={{ mt: 5 }}><Alert severity="error">{error}</Alert></Container>;
-    if (!closing) return <Container sx={{ mt: 5 }}><Alert severity="warning">Keine Daten für diesen Abschluss gefunden.</Alert></Container>;
-    
-    const totalWithdrawal = closing.bankWithdrawal + closing.tipsWithdrawal + closing.otherWithdrawal;
+  if (loading) {
+    return <Box display="flex" justifyContent="center" mt={5}><CircularProgress /></Box>;
+  }
 
-    return (
-        <Box sx={{ backgroundColor: '#f5f5f5', p: { xs: 2, md: 4 }, minHeight: '100vh' }}>
-            <Container maxWidth="sm">
-                <AdminBreadcrumbs items={[
-                  { label: 'Kassenabschlüsse', href: '/admin/cash-closing' }, 
-                  { label: `Abschluss vom ${dayjs(closing.closingDate).format('DD.MM.YY')}` }
-                ]} />
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                    <Typography variant="h5" fontWeight={700}>Kassenabschluss Details</Typography>
-                    <Button variant="contained" startIcon={<PrintIcon />} onClick={() => window.print()}>
-                        Drucken
-                    </Button>
-                </Stack>
-                <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 2 }}>
-                    <Stack spacing={2}>
-                        <Typography variant="h6" align="center">
-                            Abschluss vom {dayjs(closing.closingDate).format('DD.MM.YYYY HH:mm')} Uhr
-                        </Typography>
-                         <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 2 }}>
-                            Mitarbeiter: {closing.employee.firstName} {closing.employee.lastName}
-                        </Typography>
+  if (!closing) {
+    return <Typography>Kassenabschluss nicht gefunden.</Typography>;
+  }
 
-                        <Divider><Typography variant="overline">Abrechnung</Typography></Divider>
-                        
-                        <SummaryRow label="Kasseneinlage" value={`${closing.cashDeposit.toFixed(2)} €`} />
-                        <SummaryRow label="+ Bareinnahmen (System)" value={`${closing.cashSales.toFixed(2)} €`} />
-                        <SummaryRow label="- Bankentnahme" value={`${closing.bankWithdrawal.toFixed(2)} €`} />
-                        <SummaryRow label="- Trinkgeldentnahme" value={`${closing.tipsWithdrawal.toFixed(2)} €`} />
-                        <SummaryRow label="- Andere Entnahmen" value={`${closing.otherWithdrawal.toFixed(2)} €`} />
-                        <Divider />
-                        <SummaryRow label="Soll-Bestand" value={`${closing.calculatedCashOnHand.toFixed(2)} €`} bold />
-                        <Divider />
-                        <SummaryRow label="Tatsächlicher Bestand" value={`${closing.actualCashOnHand.toFixed(2)} €`} />
-                        <SummaryRow label="Differenz" value={`${closing.difference.toFixed(2)} €`} bold />
+  const totalWithdrawals = closing.withdrawals.reduce((sum, w) => sum + w.amount, 0);
 
-                        {closing.notes && (
-                            <>
-                                <Divider sx={{ mt: 2 }}><Typography variant="overline">Notizen</Typography></Divider>
-                                <Typography variant="body2" sx={{ p: 1, whiteSpace: 'pre-wrap' }}>{closing.notes}</Typography>
-                            </>
-                        )}
-                    </Stack>
-                </Paper>
-            </Container>
-        </Box>
-    );
+  return (
+    <Container maxWidth="sm" sx={{ py: 4 }}>
+      <AdminBreadcrumbs items={[
+        { label: 'Mein Salon', href: '/admin' },
+        { label: 'Kassenabschlüsse', href: '/admin/cash-closing' },
+        { label: `Abschluss vom ${dayjs(closing.date).format('DD.MM.YYYY')}` }
+      ]} />
+      <Typography variant="h4" fontWeight={800} gutterBottom>
+        Detailansicht Kassenabschluss
+      </Typography>
+
+      <Paper variant="outlined" sx={{ p: 3, mt: 3 }}>
+        <Grid container spacing={2}>
+            <Grid size={{xs:6}}><Typography color="text.secondary">Datum:</Typography></Grid>
+            <Grid size={{xs:6}}><Typography align="right">{dayjs(closing.date).format('DD.MM.YYYY HH:mm')}</Typography></Grid>
+
+            <Grid size={{xs:6}}><Typography color="text.secondary">Mitarbeiter:</Typography></Grid>
+            <Grid size={{xs:6}}><Typography align="right">{closing.executedBy.firstName} {closing.executedBy.lastName}</Typography></Grid>
+
+            <Grid size={{xs:12}}><Divider sx={{ my: 1 }} /></Grid>
+
+            <Grid size={{xs:6}}><Typography>Einnahmen (Bar):</Typography></Grid>
+            <Grid size={{xs:6}}><Typography align="right" fontWeight="bold">€{closing.expectedAmount.toFixed(2)}</Typography></Grid>
+
+            <Grid size={{xs:6}}><Typography>Summe Entnahmen:</Typography></Grid>
+            <Grid size={{xs:6}}><Typography align="right" fontWeight="bold">- €{totalWithdrawals.toFixed(2)}</Typography></Grid>
+
+            <Grid size={{xs:12}}><Divider /></Grid>
+
+            <Grid size={{xs:6}}><Typography variant="h6">Soll-Bestand:</Typography></Grid>
+            <Grid size={{xs:6}}><Typography variant="h6" align="right" fontWeight="bold">€{closing.finalExpectedAmount.toFixed(2)}</Typography></Grid>
+        </Grid>
+      </Paper>
+
+      {closing.withdrawals.length > 0 && (
+        <>
+          <Typography variant="h6" sx={{ mt: 4, mb: 2 }}>Aufschlüsselung Entnahmen</Typography>
+          <Paper variant="outlined">
+            <List>
+              {closing.withdrawals.map((w, index) => (
+                <ListItem key={index}>
+                  <ListItemText primary={w.reason} />
+                  <Typography>€{w.amount.toFixed(2)}</Typography>
+                </ListItem>
+              ))}
+            </List>
+          </Paper>
+        </>
+      )}
+
+      {closing.notes && (
+          <>
+            <Typography variant="h6" sx={{ mt: 4, mb: 2 }}>Notizen</Typography>
+            <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography>{closing.notes}</Typography>
+            </Paper>
+          </>
+      )}
+    </Container>
+  );
 }

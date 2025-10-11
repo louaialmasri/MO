@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { listCashClosings, type CashClosing } from '@/services/api'; 
 import {
   Container, Typography, Paper, Stack, Button, CircularProgress, Box, Divider, List, ListItem, ListItemText,
+  ListItemButton,
 } from '@mui/material';
 import AdminBreadcrumbs from '@/components/AdminBreadcrumbs';
 import dayjs from 'dayjs';
@@ -22,7 +23,6 @@ export default function AdminCashClosingPage() {
         setLoading(true);
         listCashClosings(token)
           .then(data => {
-            // KORREKTUR: Wir wissen jetzt, dass 'data' ein Array ist.
             setClosings(data);
           })
           .catch(err => {
@@ -57,27 +57,23 @@ export default function AdminCashClosingPage() {
 
       <Paper variant="outlined" sx={{ borderRadius: 2 }}>
         <List>
-          {closings.length > 0 ? closings.map((closing, index) => (
+          {closings.map((closing, index) => (
             <Box key={closing._id}>
-              <ListItem>
+              <ListItemButton onClick={() => router.push(`/admin/cash-closing/${closing._id}`)}>
                 <ListItemText
                   primary={`Abschluss vom ${dayjs(closing.date).format('DD.MM.YYYY HH:mm')}`}
-                  // Sicherheitsprüfung mit '?' für den Fall, dass 'executedBy' mal null ist
                   secondary={`Durchgeführt von: ${closing.executedBy?.firstName || ''} ${closing.executedBy?.lastName || ''}`}
                 />
                 <Stack alignItems="flex-end">
-                  {/* Sicherheitsprüfung mit '|| 0', falls der Wert mal fehlt */}
                   <Typography variant="body1">Einnahmen (Bar): <strong>{(closing.expectedAmount || 0).toFixed(2)} €</strong></Typography>
                   <Typography variant="body2" color='text.secondary'>
                     Soll-Bestand: {(closing.finalExpectedAmount || 0).toFixed(2)} €
                   </Typography>
                 </Stack>
-              </ListItem>
+              </ListItemButton>
               {index < closings.length - 1 && <Divider />}
             </Box>
-          )) : (
-            <ListItem><ListItemText primary="Noch keine Kassenabschlüsse vorhanden." /></ListItem>
-          )}
+          ))}
         </List>
       </Paper>
     </Container>

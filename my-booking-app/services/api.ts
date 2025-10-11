@@ -715,16 +715,8 @@ export const createCashClosing = async (payload: any, token: string) => {
   return res.data;
 };
 
-
-export async function fetchAllCashClosings(token: string): Promise<CashClosing[]> {
-  const res = await api.get('/cash-closings', {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  return res.data.closings;
-}
-
 export async function fetchCashClosingById(token: string, id: string): Promise<CashClosing> {
-  const res = await api.get(`/cash-closing/${id}`, {
+  const res = await api.get(`/cash-closings/${id}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
   return res.data.closing;
