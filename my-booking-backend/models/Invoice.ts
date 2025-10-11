@@ -12,6 +12,7 @@ export interface IInvoice extends Document {
     price: number;
   }[];
   redeemedVoucher?: string;
+  redeemedAmount?: number;
   amount: number;
   paymentMethod: 'cash' | 'card';
   status: 'paid' | 'unpaid' | 'cancelled';
@@ -38,6 +39,8 @@ const invoiceSchema = new Schema({
     type: { type: String, enum: ['percentage', 'fixed'] },
     value: { type: Number }
   },
+  redeemedVoucher: { type: String },
+  redeemedAmount: { type: Number, default: 0 },
   amount: { type: Number, required: true },
   paymentMethod: { type: String, required: true, enum: ['cash', 'card'] },
   status: { type: String, required: true, enum: ['paid', 'unpaid', 'cancelled'], default: 'paid' },

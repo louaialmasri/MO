@@ -6,7 +6,10 @@ export interface ICashClosing extends Document {
   closingDate: Date;
   startPeriod: Date;
   endPeriod: Date;
-  cashSales: number;
+  revenueServices: number;
+  revenueProducts: number;
+  soldVouchers: number;
+  redeemedVouchers: number;
   cashDeposit: number;
   bankWithdrawal: number;
   tipsWithdrawal: number;
@@ -15,8 +18,6 @@ export interface ICashClosing extends Document {
   actualCashOnHand: number;
   difference: number;
   notes?: string;
-  withdrawals: { reason: string; amount: number }[];
-  finalExpectedAmount: number;
 }
 
 const cashClosingSchema = new Schema({
@@ -25,21 +26,17 @@ const cashClosingSchema = new Schema({
   closingDate: { type: Date, default: Date.now },
   startPeriod: { type: Date, required: true },
   endPeriod: { type: Date, required: true },
-  cashSales: { type: Number, required: true, default: 0 },
+  revenueServices: { type: Number, required: true, default: 0 },
+  revenueProducts: { type: Number, required: true, default: 0 },
+  soldVouchers: { type: Number, required: true, default: 0 },
+  redeemedVouchers: { type: Number, required: true, default: 0 },
   cashDeposit: { type: Number, required: true, default: 0 },
   bankWithdrawal: { type: Number, required: true, default: 0 },
   tipsWithdrawal: { type: Number, required: true, default: 0 },
   otherWithdrawal: { type: Number, required: true, default: 0 },
-  expectedAmount: { type: Number, required: true },
-  countedAmount: { type: Number, required: true },
+  calculatedCashOnHand: { type: Number, required: true },
+  actualCashOnHand: { type: Number, required: true },
   difference: { type: Number, required: true },
-  
-  withdrawals: [{
-    reason: { type: String, required: true },
-    amount: { type: Number, required: true }
-  }],
-  
-  finalExpectedAmount: { type: Number, required: true },
   notes: { type: String },
 }, { timestamps: true });
 

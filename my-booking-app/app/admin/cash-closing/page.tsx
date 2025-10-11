@@ -62,7 +62,7 @@ export default function AdminCashClosingPage() {
               <ListItemButton onClick={() => router.push(`/admin/cash-closing/${closing._id}`)}>
                 <ListItemText
                   primary={`Abschluss vom ${dayjs(closing.date).format('DD.MM.YYYY HH:mm')}`}
-                  secondary={`Durchgeführt von: ${closing.executedBy?.firstName || ''} ${closing.executedBy?.lastName || ''}`}
+                  secondary={`Durchgeführt von: ${closing.employee?.firstName || ''} ${closing.employee?.lastName || ''}`}
                 />
                 <Stack alignItems="flex-end">
                   <Typography variant="body1">Einnahmen (Bar): <strong>{(closing.expectedAmount || 0).toFixed(2)} €</strong></Typography>

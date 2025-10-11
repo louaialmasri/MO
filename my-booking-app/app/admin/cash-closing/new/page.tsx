@@ -3,69 +3,88 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
-    Container, Typography, Paper, Grid, Button, TextField, 
-    IconButton, Divider, Box, Stack, Snackbar, Alert, CircularProgress
+    Container, Typography, Paper, Button, TextField, 
+    Divider, Box, Stack, Snackbar, Alert, CircularProgress, MenuItem, FormControl, InputLabel, Select
 } from '@mui/material';
 import { useAuth } from '@/context/AuthContext';
-import { getCashClosingPreview, createCashClosing } from '@/services/api';
+import { getCashClosingPreview, createCashClosing, fetchAllUsers, User } from '@/services/api';
 import AdminBreadcrumbs from '@/components/AdminBreadcrumbs';
-import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
 import dayjs from 'dayjs';
 
-type Withdrawal = {
-    reason: string;
-    amount: string; // Als String für die Formulareingabe
+type PreviewData = {
+    revenueServices: number;
+    revenueProducts: number;
+    soldVouchers: number;
+    redeemedVouchers: number;
 };
 
 export default function NewCashClosingPage() {
-    const { token } = useAuth();
+    const { token, user } = useAuth();
     const router = useRouter();
-    const [preview, setPreview] = useState<{ expectedAmount: number } | null>(null);
-    const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([{ reason: '', amount: '' }]);
+    const [preview, setPreview] = useState<PreviewData | null>(null);
+    const [staff, setStaff] = useState<User[]>([]);
+    const [selectedStaff, setSelectedStaff] = useState<string>('');
+    const [cashDeposit, setCashDeposit] = useState('0');
+    const [bankWithdrawal, setBankWithdrawal] = useState('');
+    const [tipsWithdrawal, setTipsWithdrawal] = useState('');
+    const [otherWithdrawal, setOtherWithdrawal] = useState('');
+    const [actualCashOnHand, setActualCashOnHand] = useState('');
     const [notes, setNotes] = useState('');
     const [loading, setLoading] = useState(true);
     const [toast, setToast] = useState<{ open: boolean; msg: string; sev: 'success' | 'error' }>({ open: false, msg: '', sev: 'success' });
-    
+
     useEffect(() => {
         if (token) {
-            getCashClosingPreview(token)
-                .then(data => {
-                    setPreview(data.preview);
-                    setLoading(false);
-                })
-                .catch(err => {
-                    console.error(err);
-                    setToast({ open: true, msg: "Vorschau konnte nicht geladen werden.", sev: 'error' });
-                    setLoading(false);
-                });
+            Promise.all([
+                getCashClosingPreview(token),
+                fetchAllUsers(token, 'staff')
+            ]).then(([previewData, staffData]) => {
+                setPreview(previewData.preview);
+                setStaff(staffData);
+                if (user && staffData.some(s => s._id === user._id)) {
+                    setSelectedStaff(user._id);
+                } else if (staffData.length > 0) {
+                    setSelectedStaff(staffData[0]._id);
+                }
+                setLoading(false);
+            }).catch(err => {
+                console.error(err);
+                setToast({ open: true, msg: "Daten für den Kassenabschluss konnten nicht geladen werden.", sev: 'error' });
+                setLoading(false);
+            });
         }
-    }, [token]);
+    }, [token, user]);
 
-    const handleWithdrawalChange = (index: number, field: keyof Withdrawal, value: string) => {
-        const newWithdrawals = [...withdrawals];
-        newWithdrawals[index][field] = value;
-        setWithdrawals(newWithdrawals);
-    };
+    const numCashDeposit = parseFloat(cashDeposit) || 0;
+    const numBankWithdrawal = parseFloat(bankWithdrawal) || 0;
+    const numTipsWithdrawal = parseFloat(tipsWithdrawal) || 0;
+    const numOtherWithdrawal = parseFloat(otherWithdrawal) || 0;
+    const numActualCashOnHand = parseFloat(actualCashOnHand) || 0;
 
-    const addWithdrawal = () => {
-        setWithdrawals([...withdrawals, { reason: '', amount: '' }]);
-    };
-
-    const removeWithdrawal = (index: number) => {
-        const newWithdrawals = withdrawals.filter((_, i) => i !== index);
-        setWithdrawals(newWithdrawals);
-    };
-
-    const totalWithdrawals = withdrawals.reduce((sum, w) => sum + (parseFloat(w.amount) || 0), 0);
-    const finalExpectedAmount = (preview?.expectedAmount || 0) - totalWithdrawals;
+    const totalRevenue = (preview?.revenueServices || 0) + (preview?.revenueProducts || 0) + (preview?.soldVouchers || 0);
+    const totalWithdrawals = numBankWithdrawal + numTipsWithdrawal + numOtherWithdrawal;
+    const calculatedCashOnHand = numCashDeposit + totalRevenue - (preview?.redeemedVouchers || 0) - totalWithdrawals;
+    const difference = numActualCashOnHand - calculatedCashOnHand;
 
     const handleConfirmClosing = async () => {
+        if (!selectedStaff) {
+            setToast({ open: true, msg: 'Bitte wählen Sie einen Mitarbeiter aus.', sev: 'error' });
+            return;
+        };
+
         if (!preview || !token) return;
 
         const payload = {
-            expectedAmount: preview.expectedAmount,
-            withdrawals: withdrawals.map(w => ({...w, amount: parseFloat(w.amount)})).filter(w => w.amount > 0),
+            employee: selectedStaff,
+            revenueServices: preview.revenueServices,
+            revenueProducts: preview.revenueProducts,
+            soldVouchers: preview.soldVouchers,
+            redeemedVouchers: preview.redeemedVouchers,
+            cashDeposit: numCashDeposit,
+            bankWithdrawal: numBankWithdrawal,
+            tipsWithdrawal: numTipsWithdrawal,
+            otherWithdrawal: numOtherWithdrawal,
+            actualCashOnHand: numActualCashOnHand,
             notes,
         };
 
@@ -89,37 +108,86 @@ export default function NewCashClosingPage() {
                 Tagesabschluss für den {dayjs().format('DD.MM.YYYY')}
             </Typography>
 
-            <Paper variant="outlined" sx={{ p: 3, mt: 3 }}>
-                <Stack spacing={2}>
-                    <Box>
-                        <Typography variant="h6">1. System-Einnahmen (Bar)</Typography>
-                        <Typography variant="h4" fontWeight="bold">€{preview?.expectedAmount.toFixed(2)}</Typography>
-                    </Box>
+             <Paper variant="outlined" sx={{ p: 3, mt: 3 }}>
+                <Stack spacing={3}>
+                    <FormControl fullWidth>
+                        <InputLabel>Mitarbeiter</InputLabel>
+                        <Select
+                            value={selectedStaff}
+                            label="Mitarbeiter"
+                            onChange={(e) => setSelectedStaff(e.target.value)}
+                        >
+                            {staff.map((s) => (
+                                <MenuItem key={s._id} value={s._id}>
+                                    {s.firstName} {s.lastName}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+
                     <Divider />
+
                     <Box>
-                        <Typography variant="h6">2. Kassenentnahmen</Typography>
-                        {withdrawals.map((w, index) => (
-                            <Stack direction="row" spacing={1} key={index} sx={{ mt: 1 }}>
-                                <TextField label="Grund der Entnahme" value={w.reason} onChange={(e) => handleWithdrawalChange(index, 'reason', e.target.value)} fullWidth />
-                                <TextField label="Betrag" type="number" value={w.amount} onChange={(e) => handleWithdrawalChange(index, 'amount', e.target.value)} sx={{ width: '120px' }} />
-                                <IconButton onClick={() => removeWithdrawal(index)} disabled={withdrawals.length <= 1}>
-                                    <DeleteIcon />
-                                </IconButton>
+                        <Typography variant="h6" sx={{ mb: 2 }}>Einnahmen gesamt:</Typography>
+                        <Stack spacing={1}>
+                            <Stack direction="row" justifyContent="space-between">
+                                <Typography>Dienstleistungen:</Typography>
+                                <Typography>{(preview?.revenueServices || 0).toFixed(2)} €</Typography>
                             </Stack>
-                        ))}
-                        <Button startIcon={<AddIcon />} onClick={addWithdrawal} sx={{ mt: 1 }}>
-                            Weitere Entnahme
-                        </Button>
+                            <Stack direction="row" justifyContent="space-between">
+                                <Typography>Produkte:</Typography>
+                                <Typography>{(preview?.revenueProducts || 0).toFixed(2)} €</Typography>
+                            </Stack>
+                             <Stack direction="row" justifyContent="space-between">
+                                <Typography>Verkaufte Gutscheine:</Typography>
+                                <Typography>{(preview?.soldVouchers || 0).toFixed(2)} €</Typography>
+                            </Stack>
+                             <Stack direction="row" justifyContent="space-between">
+                                <Typography>Eingelöste Gutscheine:</Typography>
+                                <Typography>-{(preview?.redeemedVouchers || 0).toFixed(2)} €</Typography>
+                            </Stack>
+                             <Divider />
+                             <Stack direction="row" justifyContent="space-between">
+                                <Typography fontWeight="bold">Umsatz (Bar):</Typography>
+                                <Typography fontWeight="bold">{(totalRevenue - (preview?.redeemedVouchers || 0)).toFixed(2)} €</Typography>
+                            </Stack>
+                        </Stack>
                     </Box>
+
                     <Divider />
-                    <Box>
-                        <Typography variant="h6">3. Finaler Kassenbestand (Soll)</Typography>
-                         <Typography variant="h4" color="primary" fontWeight="bold">€{finalExpectedAmount.toFixed(2)}</Typography>
-                        <Typography variant="caption" color="text.secondary">Dieser Betrag sollte nach den Entnahmen in der Kasse sein.</Typography>
+
+                     <Box>
+                        <Typography variant="h6" sx={{ mb: 2 }}>Kassenbewegungen:</Typography>
+                         <Stack spacing={2}>
+                             <TextField label="Kasseneinlage" type="number" value={cashDeposit} onChange={(e) => setCashDeposit(e.target.value)} fullWidth InputProps={{ endAdornment: '€' }} />
+                             <TextField label="Bankentnahme" type="number" value={bankWithdrawal} onChange={(e) => setBankWithdrawal(e.target.value)} fullWidth InputProps={{ endAdornment: '€' }} />
+                             <TextField label="Trinkgeldentnahme" type="number" value={tipsWithdrawal} onChange={(e) => setTipsWithdrawal(e.target.value)} fullWidth InputProps={{ endAdornment: '€' }} />
+                            <TextField label="Andere Entnahmen" type="number" value={otherWithdrawal} onChange={(e) => setOtherWithdrawal(e.target.value)} fullWidth InputProps={{ endAdornment: '€' }} />
+                         </Stack>
                     </Box>
+
                      <Divider />
-                     <TextField label="Notizen (optional)" multiline rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
-                    <Button variant="contained" size="large" onClick={handleConfirmClosing}>
+
+                     <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.100' }}>
+                         <Stack direction="row" justifyContent="space-between"><Typography>+ Kasseneinlage</Typography><Typography>{numCashDeposit.toFixed(2)} €</Typography></Stack>
+                         <Stack direction="row" justifyContent="space-between"><Typography>+ Bareinnahmen (laut System)</Typography><Typography>{(totalRevenue - (preview?.redeemedVouchers || 0)).toFixed(2)} €</Typography></Stack>
+                         <Stack direction="row" justifyContent="space-between"><Typography>- Kassenentnahme (Gesamt)</Typography><Typography>{totalWithdrawals.toFixed(2)} €</Typography></Stack>
+                         <Divider sx={{ my: 1}}/>
+                         <Stack direction="row" justifyContent="space-between"><Typography variant="h6">Soll-Bestand in Kasse:</Typography><Typography variant="h6">{calculatedCashOnHand.toFixed(2)} €</Typography></Stack>
+                    </Paper>
+
+                     <TextField label="Tatsächlicher Kassenbestand (gezählt)" type="number" value={actualCashOnHand} onChange={(e) => setActualCashOnHand(e.target.value)} fullWidth InputProps={{ endAdornment: '€' }}/>
+
+                     <Paper variant="outlined" sx={{ p: 2, borderColor: difference !== 0 ? 'error.main' : 'success.main', borderWidth: 2 }}>
+                          <Stack direction="row" justifyContent="space-between">
+                             <Typography variant="h6" fontWeight="bold">Differenz:</Typography>
+                             <Typography variant="h6" fontWeight="bold" color={difference === 0 ? 'inherit' : 'error'}>{difference.toFixed(2)} €</Typography>
+                         </Stack>
+                    </Paper>
+
+                    <TextField label="Notizen (optional)" multiline rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+
+                    <Button variant="contained" size="large" onClick={handleConfirmClosing} disabled={!selectedStaff || !actualCashOnHand}>
                         Abschluss bestätigen und speichern
                     </Button>
                 </Stack>

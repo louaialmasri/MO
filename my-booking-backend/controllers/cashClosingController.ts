@@ -10,14 +10,14 @@ import dayjs from 'dayjs';
 export const getCashClosingPreview = async (req: SalonRequest, res: Response) => {
     try {
         const salonId = req.salonId;
-        if (!salonId) {
-            return res.status(400).json({ message: 'Kein Salon ausgewählt.' });
+        if (!salonId || !mongoose.Types.ObjectId.isValid(salonId)) {
+            return res.status(400).json({ message: 'Kein gültiger Salon ausgewählt.' });
         }
+
         const today = dayjs().toDate();
         const startOfDay = dayjs(today).startOf('day').toDate();
         const endOfDay = dayjs(today).endOf('day').toDate();
 
-        // KORREKTUR: salonId in eine ObjectId umwandeln
         const cashInvoices = await Invoice.find({
             salon: new mongoose.Types.ObjectId(salonId),
             date: { $gte: startOfDay, $lte: endOfDay },
@@ -25,13 +25,38 @@ export const getCashClosingPreview = async (req: SalonRequest, res: Response) =>
             status: 'paid'
         });
 
-        const expectedAmount = cashInvoices.reduce((sum, invoice) => sum + invoice.amount, 0);
+        let revenueServices = 0;
+        let revenueProducts = 0;
+        let soldVouchers = 0;
+
+        cashInvoices.forEach(invoice => {
+            invoice.items.forEach(item => {
+                if (item.description.startsWith('Produkt:')) {
+                    revenueProducts += item.price;
+                } else if (item.description.startsWith('Gutschein:')) {
+                    soldVouchers += item.price;
+                } else {
+                    revenueServices += item.price;
+                }
+            });
+        });
+
+        const allInvoicesToday = await Invoice.find({
+            salon: new mongoose.Types.ObjectId(salonId),
+            date: { $gte: startOfDay, $lte: endOfDay },
+            status: 'paid',
+        });
+
+        const redeemedVouchers = allInvoicesToday.reduce((sum, invoice) => sum + (invoice.redeemedAmount || 0), 0);
 
         res.json({
             success: true,
             preview: {
                 date: today,
-                expectedAmount: expectedAmount,
+                revenueServices,
+                revenueProducts,
+                soldVouchers,
+                redeemedVouchers,
                 invoiceCount: cashInvoices.length,
             }
         });
@@ -42,34 +67,51 @@ export const getCashClosingPreview = async (req: SalonRequest, res: Response) =>
     }
 };
 
-// Speichert den neuen Kassenabschluss
+// SPEICHER-FUNKTION
 export const createCashClosing = async (req: SalonRequest, res: Response) => {
     try {
         const salonId = req.salonId;
-        const userId = req.user?.userId;
-        const { expectedAmount, withdrawals, notes } = req.body;
+        const { employee, revenueServices, revenueProducts, soldVouchers, redeemedVouchers, cashDeposit, bankWithdrawal, tipsWithdrawal, otherWithdrawal, actualCashOnHand, notes } = req.body;
 
-        const totalWithdrawals = withdrawals.reduce((sum: number, w: { amount: number }) => sum + w.amount, 0);
-        const finalExpectedAmount = expectedAmount - totalWithdrawals;
+        if (!salonId || !employee) {
+            return res.status(400).json({ message: 'Salon- oder Mitarbeiter-ID fehlt.' });
+        }
+
+        const today = dayjs().toDate();
+        const startOfDay = dayjs(today).startOf('day').toDate();
+        const endOfDay = dayjs(today).endOf('day').toDate();
+
+        const totalRevenue = revenueServices + revenueProducts + soldVouchers;
+        const totalWithdrawals = bankWithdrawal + tipsWithdrawal + otherWithdrawal;
+        const calculatedCashOnHand = cashDeposit + totalRevenue - redeemedVouchers - totalWithdrawals;
+        const difference = actualCashOnHand - calculatedCashOnHand;
 
         const newCashClosing = new CashClosing({
-            date: new Date(),
-            executedBy: userId,
             salon: salonId,
-            expectedAmount, // Die ursprünglichen Einnahmen
-            withdrawals, // Die neuen Entnahmen
-            finalExpectedAmount, // Der Soll-Betrag nach Entnahmen
-            countedAmount: finalExpectedAmount, // Du bestätigst ja diesen Betrag
-            difference: 0, // Ist also immer 0
+            employee,
+            closingDate: today,
+            startPeriod: startOfDay,
+            endPeriod: endOfDay,
+            revenueServices,
+            revenueProducts,
+            soldVouchers,
+            redeemedVouchers,
+            cashDeposit,
+            bankWithdrawal,
+            tipsWithdrawal,
+            otherWithdrawal,
+            calculatedCashOnHand,
+            actualCashOnHand,
+            difference,
             notes,
         });
 
         await newCashClosing.save();
         res.status(201).json({ success: true, cashClosing: newCashClosing });
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Fehler beim Erstellen des Kassenabschlusses:", error);
-        res.status(500).json({ message: "Fehler beim Speichern des Abschlusses." });
+        res.status(500).json({ message: "Fehler beim Speichern des Abschlusses.", error: error.message });
     }
 };
 

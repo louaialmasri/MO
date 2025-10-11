@@ -127,7 +127,8 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
       staff: staffId,
       items: invoiceItems,
       discount: discount,
-      redeemedVoucher: redeemedVoucherCode, // NEU: Eingelöster Gutschein wird gespeichert
+      redeemedVoucher: redeemedVoucherCode,
+      redeemedAmount: redeemedAmount,
       amount: finalAmount, 
       paymentMethod,
       date: today,

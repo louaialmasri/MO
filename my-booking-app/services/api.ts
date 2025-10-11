@@ -117,17 +117,30 @@ export type InvoiceListItem = {
 export type CashClosing = {
   _id: string;
   date: string;
-  executedBy: { 
+  employee: { 
     firstName: string; 
     lastName: string; 
   };
-  expectedAmount: number;
+  revenueServices: number;
+  revenueProducts: number;
+  soldVouchers: number;
+  redeemedVouchers: number;
+  calculatedCashOnHand: number;
+  // Alte Felder für die Listenansicht:
+  expectedAmount: number; // Bleibt für Kompatibilität
+  finalExpectedAmount: number; // Bleibt für Kompatibilität
+  // Felder für die Detailansicht:
   withdrawals: { 
     reason: string; 
     amount: number 
   }[];
-  finalExpectedAmount: number;
   notes?: string;
+  cashDeposit: number;
+  bankWithdrawal: number;
+  tipsWithdrawal: number;
+  otherWithdrawal: number;
+  actualCashOnHand: number;
+  difference: number;
 }
 
 

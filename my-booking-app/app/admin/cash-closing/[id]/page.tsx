@@ -17,7 +17,7 @@ export default function CashClosingDetailPage() {
 
   useEffect(() => {
     if (token && id) {
-      fetchCashClosingById(id as string, token)
+      fetchCashClosingById(token, id as string)
         .then(data => {
           setClosing(data);
         })
@@ -53,7 +53,7 @@ export default function CashClosingDetailPage() {
             <Grid size={{xs:6}}><Typography align="right">{dayjs(closing.date).format('DD.MM.YYYY HH:mm')}</Typography></Grid>
 
             <Grid size={{xs:6}}><Typography color="text.secondary">Mitarbeiter:</Typography></Grid>
-            <Grid size={{xs:6}}><Typography align="right">{closing.executedBy.firstName} {closing.executedBy.lastName}</Typography></Grid>
+            <Grid size={{xs:6}}><Typography align="right">{closing.employee.firstName} {closing.employee.lastName}</Typography></Grid>
 
             <Grid size={{xs:12}}><Divider sx={{ my: 1 }} /></Grid>
 
