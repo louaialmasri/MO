@@ -20,6 +20,14 @@ const salonSchema = new Schema({
       open: '09:00',
       close: '18:00'
     })) 
+  },
+  datevSettings: {
+    revenueAccountServices: { type: String, default: '8400' }, // Erlöse 19%
+    revenueAccountProducts: { type: String, default: '8400' }, // Erlöse 19%
+    cashAccount: { type: String, default: '1000' }, // Kasse
+    cardAccount: { type: String, default: '1360' }, // Geldtransit
+    consultantNumber: { type: String },
+    clientNumber: { type: String },
   }
 })
 
