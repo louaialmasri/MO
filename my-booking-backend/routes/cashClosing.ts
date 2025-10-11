@@ -2,7 +2,7 @@ import express from 'express';
 import { verifyToken } from '../middlewares/authMiddleware';
 import { verifyAdmin } from '../middlewares/adminMiddleware';
 import { activeSalon } from '../middlewares/activeSalon';
-import { getCashClosingPreview, createCashClosing, listCashClosings, getCashClosingById } from '../controllers/cashClosingController';
+import { getCashClosingPreview, createCashClosing, listCashClosings, getCashClosingById, cancelCashClosing } from '../controllers/cashClosingController';
 
 const router = express.Router();
 
@@ -16,6 +16,10 @@ router.post('/', createCashClosing);
 
 // Dynamische Routen (mit Parametern) zuletzt
 router.get('/:id', getCashClosingById);
+
+// Route zum Stornieren
+router.patch('/:id/cancel', cancelCashClosing);
+
 
 
 export default router;

@@ -18,16 +18,17 @@ export const getCashClosingPreview = async (req: SalonRequest, res: Response) =>
         const startOfDay = dayjs(today).startOf('day').toDate();
         const endOfDay = dayjs(today).endOf('day').toDate();
 
-        // Prüfen, ob für heute bereits ein Abschluss existiert
+        // Prüfung: Ignoriert stornierte Abschlüsse
         const existingClosing = await CashClosing.findOne({
             salon: salonId,
-            closingDate: { $gte: startOfDay, $lte: endOfDay }
+            closingDate: { $gte: startOfDay, $lte: endOfDay },
+            status: { $ne: 'cancelled' } // Nur nicht-stornierte prüfen
         });
 
         if (existingClosing) {
             return res.status(409).json({ 
                 message: 'Für heute wurde bereits ein Kassenabschluss erstellt.',
-                hasExistingClosing: true // Ein Flag für das Frontend
+                hasExistingClosing: true 
             });
         }
 
@@ -89,10 +90,11 @@ export const createCashClosing = async (req: SalonRequest, res: Response) => {
         const startOfDay = dayjs(today).startOf('day').toDate();
         const endOfDay = dayjs(today).endOf('day').toDate();
 
-        // Prüfen, ob bereits ein Abschluss für diesen Tag existiert
+        // Prüfung: Ignoriert stornierte Abschlüsse
         const existingClosing = await CashClosing.findOne({
             salon: salonId,
-            closingDate: { $gte: startOfDay, $lte: endOfDay }
+            closingDate: { $gte: startOfDay, $lte: endOfDay },
+            status: { $ne: 'cancelled' }
         });
 
         if (existingClosing) {
@@ -122,6 +124,7 @@ export const createCashClosing = async (req: SalonRequest, res: Response) => {
             actualCashOnHand,
             difference,
             notes,
+            status: 'completed',
         });
 
         await newCashClosing.save();
@@ -130,6 +133,31 @@ export const createCashClosing = async (req: SalonRequest, res: Response) => {
     } catch (error: any) {
         console.error("Fehler beim Erstellen des Kassenabschlusses:", error);
         res.status(500).json({ message: "Fehler beim Speichern des Abschlusses.", error: error.message });
+    }
+};
+
+// +++ STORNO-FUNKTION +++
+export const cancelCashClosing = async (req: SalonRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+        const closing = await CashClosing.findOne({ _id: id, salon: req.salonId });
+
+        if (!closing) {
+            return res.status(404).json({ success: false, message: 'Kassenabschluss nicht gefunden.' });
+        }
+
+        if (closing.status === 'cancelled') {
+            return res.status(400).json({ success: false, message: 'Dieser Abschluss wurde bereits storniert.' });
+        }
+
+        closing.status = 'cancelled';
+        await closing.save();
+
+        res.json({ success: true, message: 'Kassenabschluss erfolgreich storniert.', closing });
+
+    } catch (e) {
+        console.error("Fehler beim Stornieren des Kassenabschlusses:", e);
+        res.status(500).json({ success: false, message: 'Fehler beim Stornieren des Abschlusses.' });
     }
 };
 

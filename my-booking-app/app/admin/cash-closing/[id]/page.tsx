@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { fetchCashClosingById, type CashClosing } from '@/services/api';
-import { Container, Typography, Paper, Box, CircularProgress, Divider, List, ListItem, ListItemText, Grid, Stack } from '@mui/material';
+import { fetchCashClosingById, cancelCashClosing, type CashClosing } from '@/services/api';
+import { Container, Typography, Paper, Box, CircularProgress, Divider, List, ListItem, ListItemText, Grid, Stack, Chip, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
 import AdminBreadcrumbs from '@/components/AdminBreadcrumbs';
 import dayjs from 'dayjs';
 
@@ -14,6 +14,10 @@ export default function CashClosingDetailPage() {
   const { id } = params;
   const [closing, setClosing] = useState<CashClosing | null>(null);
   const [loading, setLoading] = useState(true);
+
+   // States für Storno-Dialog
+  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   useEffect(() => {
     if (token && id) {
@@ -25,6 +29,24 @@ export default function CashClosingDetailPage() {
         .finally(() => setLoading(false));
     }
   }, [token, id]);
+
+  // Storno-Funktion
+  const handleCancelClosing = async () => {
+    if (!token || !closing) return;
+    setIsCancelling(true);
+    try {
+      const updatedClosing = await cancelCashClosing(closing._id, token);
+      setClosing(updatedClosing); // UI mit dem stornierten Status aktualisieren
+      setConfirmCancelOpen(false);
+      // Optional: Nachricht an den Benutzer
+    } catch (error) {
+      console.error("Fehler beim Stornieren:", error);
+      // Optional: Fehlermeldung anzeigen
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+  // Storno-Funktion
 
   if (loading) {
     return <Box display="flex" justifyContent="center" mt={5}><CircularProgress /></Box>;
@@ -44,9 +66,14 @@ export default function CashClosingDetailPage() {
         { label: 'Kassenabschlüsse', href: '/admin/cash-closing' },
         { label: `Abschluss vom ${dayjs(closing.date).format('DD.MM.YYYY')}` }
       ]} />
-      <Typography variant="h4" fontWeight={800} gutterBottom sx={{ mb: 3 }}>
-        Detailansicht Kassenabschluss
-      </Typography>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+        <Typography variant="h4" fontWeight={800} gutterBottom sx={{ mb: 0 }}>
+            Detailansicht Kassenabschluss
+        </Typography>
+        {closing.status === 'cancelled' && (
+            <Chip label="Storniert" color="error" />
+        )}
+      </Stack>
 
       <Grid container spacing={4}>
         {/* Linke Spalte: Einnahmen */}
@@ -147,6 +174,37 @@ export default function CashClosingDetailPage() {
             </Paper>
           </Box>
       )}
+
+      <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
+          <Button
+              variant="contained"
+              color="error"
+              onClick={() => setConfirmCancelOpen(true)}
+              disabled={closing.status === 'cancelled'}
+          >
+              {closing.status === 'cancelled' ? 'Bereits storniert' : 'Abschluss stornieren'}
+          </Button>
+      </Box>
+
+      <Dialog
+        open={confirmCancelOpen}
+        onClose={() => setConfirmCancelOpen(false)}
+      >
+        <DialogTitle>Abschluss wirklich stornieren?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Diese Aktion markiert den Kassenabschluss als storniert und gibt den Tag für einen neuen Abschluss frei. Der ursprüngliche Abschluss bleibt aus Nachweisgründen erhalten.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmCancelOpen(false)} disabled={isCancelling}>
+            Abbrechen
+          </Button>
+          <Button onClick={handleCancelClosing} color="error" variant="contained" disabled={isCancelling}>
+            {isCancelling ? 'Wird storniert...' : 'Ja, stornieren'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }

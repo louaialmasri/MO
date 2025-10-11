@@ -142,6 +142,7 @@ export type CashClosing = {
   otherWithdrawal: number;
   actualCashOnHand: number;
   difference: number;
+  status: 'completed' | 'cancelled'; 
 }
 
 
@@ -727,6 +728,14 @@ export const createCashClosing = async (payload: any, token: string) => {
     headers: { Authorization: `Bearer ${token}` }
   });
   return res.data;
+};
+
+// Funktion zum Stornieren eines Kassenabschlusses
+export const cancelCashClosing = async (id: string, token: string): Promise<CashClosing> => {
+  const res = await api.patch(`/cash-closings/${id}/cancel`, {}, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data.closing;
 };
 
 export async function fetchCashClosingById(token: string, id: string): Promise<CashClosing> {

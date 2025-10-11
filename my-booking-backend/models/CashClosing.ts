@@ -18,6 +18,7 @@ export interface ICashClosing extends Document {
   actualCashOnHand: number;
   difference: number;
   notes?: string;
+  status: 'completed' | 'cancelled';
 }
 
 const cashClosingSchema = new Schema({
@@ -38,6 +39,7 @@ const cashClosingSchema = new Schema({
   actualCashOnHand: { type: Number, required: true },
   difference: { type: Number, required: true },
   notes: { type: String },
+  status: { type: String, enum: ['completed', 'cancelled'], default: 'completed' },
 }, { timestamps: true });
 
 export const CashClosing = mongoose.model<ICashClosing>('CashClosing', cashClosingSchema);

@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { listCashClosings, type CashClosing } from '@/services/api'; 
 import {
   Container, Typography, Paper, Stack, Button, CircularProgress, Box, Divider, List, ListItem, ListItemText,
-  ListItemButton,
+  ListItemButton, Chip
 } from '@mui/material';
 import AdminBreadcrumbs from '@/components/AdminBreadcrumbs';
 import dayjs from 'dayjs';
@@ -59,16 +59,25 @@ export default function AdminCashClosingPage() {
         <List>
           {closings.map((closing, index) => (
             <Box key={closing._id}>
-              <ListItemButton onClick={() => router.push(`/admin/cash-closing/${closing._id}`)}>
+               <ListItemButton 
+                onClick={() => router.push(`/admin/cash-closing/${closing._id}`)}
+                // Stornierte Einträge werden ausgegraut
+                sx={closing.status === 'cancelled' ? { opacity: 0.6, textDecoration: 'line-through' } : {}}
+              >
                 <ListItemText
                   primary={`Abschluss vom ${dayjs(closing.date).format('DD.MM.YYYY HH:mm')}`}
                   secondary={`Durchgeführt von: ${closing.employee?.firstName || ''} ${closing.employee?.lastName || ''}`}
                 />
-                <Stack alignItems="flex-end">
-                  <Typography variant="body1">Einnahmen (Bar): <strong>{(closing.expectedAmount || 0).toFixed(2)} €</strong></Typography>
-                  <Typography variant="body2" color='text.secondary'>
-                    Soll-Bestand: {(closing.finalExpectedAmount || 0).toFixed(2)} €
-                  </Typography>
+                <Stack direction="row" spacing={2} alignItems="center">
+                  {closing.status === 'cancelled' && (
+                    <Chip label="Storniert" color="error" size="small" />
+                  )}
+                  <Stack alignItems="flex-end">
+                     <Typography variant="body1">Einnahmen (Bar): <strong>{(closing.revenueServices + closing.revenueProducts + closing.soldVouchers - closing.redeemedVouchers).toFixed(2)} €</strong></Typography>
+                    <Typography variant="body2" color='text.secondary'>
+                      Soll-Bestand: {(closing.calculatedCashOnHand).toFixed(2)} €
+                    </Typography>
+                  </Stack>
                 </Stack>
               </ListItemButton>
               {index < closings.length - 1 && <Divider />}
