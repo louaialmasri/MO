@@ -42,6 +42,7 @@ import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
+import BarChartIcon from '@mui/icons-material/BarChart';
 
 
 export default function Navbar() {
@@ -128,6 +129,9 @@ export default function Navbar() {
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
       >
+        <MenuItem onClick={() => { setAdminMenuAnchor(null); router.push('/admin/dashboard') }}>
+            <BarChartIcon sx={{ mr: 1.5 }}/> Dashboard
+        </MenuItem>
         <Button color="inherit" onClick={(e) => setCashMenuAnchor(e.currentTarget)}>Kasse</Button>
                         <Menu
                             anchorEl={cashMenuAnchor}

@@ -22,6 +22,7 @@ import cashClosingRoutes from './routes/cashClosing';
 import productCategoryRoutes from './routes/productCategories'; // NEU
 import productRoutes from './routes/products'; // NEU
 import serviceCategoryRoutes from './routes/serviceCategories'; // NEU
+import dashboardRoutes from './routes/dashboard';
 
 
 const app = express()
@@ -62,6 +63,7 @@ app.use('/api/product-categories', activeSalon, productCategoryRoutes); // NEU
 app.use('/api/products', activeSalon, productRoutes); // NEU
 app.use('/api/service-categories', activeSalon, serviceCategoryRoutes); // NEU
 app.use('/api/invoices', activeSalon, invoiceRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 app.listen(PORT, () => {
   console.log(`🚀 Backend läuft auf http://localhost:${PORT}`)

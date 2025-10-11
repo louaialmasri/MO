@@ -11,13 +11,11 @@ export const getAllUsers = async (req: AuthRequest & { salonId?: string }, res: 
     const { role } = req.query as { role?: string };
     const sid = req.salonId;
 
-    // Nur Admins dürfen den Salon-Filter umgehen
     if (req.user?.role === 'admin' && (role === 'staff' || role === 'user')) {
       const users = await User.find({ role }).populate('skills').lean();
       return res.json({ success: true, users });
     }
 
-    // Für alle anderen (Staff, etc.) oder wenn kein spezieller Rollen-Filter gesetzt ist:
     if (!sid) return res.json({ success: true, users: [] });
 
     const q: any = { salon: sid };
@@ -40,7 +38,6 @@ export const updateUserRole = async (req: AuthRequest & { salonId?: string }, re
   }
 
   try {
-    // When promoting to staff, attach the current active salon; when demoting, remove salon
     const updateData: any = { role }
     if (role === 'staff') {
       if (req.salonId) updateData.salon = req.salonId
@@ -58,7 +55,7 @@ export const updateUserRole = async (req: AuthRequest & { salonId?: string }, re
 
 export const createUserManually = async (req: Request & { salonId?: string }, res: Response) => {
   try {
-    const { email, password, role, name, address, phone } = req.body
+    const { email, password, role, firstName, lastName, address, phone } = req.body
 
     const existing = await User.findOne({ email })
     if (existing) {
@@ -71,10 +68,11 @@ export const createUserManually = async (req: Request & { salonId?: string }, re
       email,
       password: hashedPassword,
       role: role || 'user',
-      name,
+      firstName, // Korrigiert von 'name'
+      lastName,  // Korrigiert
       address,
       phone,
-      salon: req.salonId ?? null, // <-- Patch: Salon aus Middleware!
+      salon: req.salonId ?? null,
     })
 
     await newUser.save()
@@ -95,7 +93,6 @@ export const deleteStaff = async (req: AuthRequest & { salonId?: string }, res: 
     if (!staff) return res.status(404).json({ success:false, message:'User nicht gefunden' })
     if (staff.role !== 'staff') return res.status(400).json({ success:false, message:'Nur Mitarbeiter können gelöscht werden' })
 
-    // darf nur im aktiven Salon gelöscht werden
     if (req.salonId && String(staff.salon) !== String(req.salonId)) {
       return res.status(403).json({ success:false, message:'Falscher Salon' })
     }
@@ -110,7 +107,6 @@ export const deleteStaff = async (req: AuthRequest & { salonId?: string }, res: 
       })
     }
 
-    // tatsächliche Löschung des Dokuments (statt nur Demote)
     await User.findByIdAndDelete(staff._id)
 
     return res.json({ success:true, message:'Mitarbeiter gelöscht' })
@@ -128,12 +124,10 @@ export const deleteUserById = async (req: AuthRequest & { salonId?: string }, re
     const user = await User.findById(id).select('role salon')
     if (!user) return res.status(404).json({ success:false, message:'User nicht gefunden' })
 
-    // nur innerhalb des aktiven Salons erlauben
     if (req.salonId && user.salon && String(user.salon) !== String(req.salonId)) {
       return res.status(403).json({ success:false, message:'Nicht autorisiert (Salon)' })
     }
 
-    // Verhindern, falls der User noch zukünftige Buchungen hat
     const now = new Date()
     const futureCount = await Booking.countDocuments({
       $or: [{ user: user._id }, { staff: user._id }],
@@ -154,7 +148,7 @@ export const deleteUserById = async (req: AuthRequest & { salonId?: string }, re
 export const updateUserSkills = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const { skills } = req.body // Array von Service-IDs
+    const { skills } = req.body
 
     if (!Array.isArray(skills)) {
       return res.status(400).json({ message: 'skills muss ein Array sein' })
@@ -185,17 +179,10 @@ export const getOrCreateWalkInCustomer = async (req: AuthRequest, res: Response)
       walkInCustomer = await User.create({
         email: walkInEmail,
         firstName: 'Laufkunde',
-        // Ein Leerzeichen oder ein Platzhalter wie '(Bar)' ist hier sinnvoll.
         lastName: ' - ',
         role: 'user',
         password: await bcrypt.hash(Math.random().toString(36).slice(-8), 10),
       });
-    }
-    
-    // Zukünftige Absicherung: Verhindern, dass der Nachname wieder geleert wird.
-    if (walkInCustomer.lastName === '( - )') {
-      // Diese Zeile ist für die Zukunft optional, falls du den Namen anpassen willst.
-      // Fürs Erste lassen wir sie unverändert, da die Erstellung nun klappt.
     }
     
     res.json(walkInCustomer);
@@ -204,17 +191,16 @@ export const getOrCreateWalkInCustomer = async (req: AuthRequest, res: Response)
   }
 };
 
-// Diese Funktion findet den letzten Termin eines Kunden
 export const getLastBookingForUser = async (req: AuthRequest, res: Response) => {
   try {
     const { userId } = req.params;
 
     const lastBooking = await Booking.findOne({
       user: userId,
-      status: { $in: ['confirmed', 'paid', 'completed'] } // Ignore cancelled bookings
+      status: { $in: ['confirmed', 'paid', 'completed'] }
     })
-    .sort({ dateTime: -1 }) // Get the most recent one
-    .select('service staff') // We only need service and staff IDs
+    .sort({ dateTime: -1 })
+    .select('service staff')
     .lean();
 
     if (!lastBooking) {
@@ -227,37 +213,51 @@ export const getLastBookingForUser = async (req: AuthRequest, res: Response) => 
   }
 };
 
-// Setzt oder ändert den Dashboard-PIN für einen Admin
 export const setDashboardPin = async (req: AuthRequest, res: Response) => {
   try {
     const { password, pin } = req.body;
     const userId = req.user?.userId;
 
+    if (!userId) {
+      return res.status(401).json({ message: 'Authentifizierungstoken fehlt oder ist ungültig.' });
+    }
+
     if (!password || !pin || !/^\d{4,6}$/.test(pin)) {
       return res.status(400).json({ message: 'Passwort und eine 4- bis 6-stellige PIN sind erforderlich.' });
     }
 
-    const user = await User.findById(userId).select('+password');
-    if (!user || user.role !== 'admin') {
+    const user = await User.findById(userId).select('+password +role');
+    if (!user) {
+      return res.status(404).json({ message: 'Benutzer nicht gefunden.' });
+    }
+
+    if (user.role !== 'admin') {
       return res.status(403).json({ message: 'Nicht autorisiert.' });
     }
 
-    const isPasswordCorrect = await bcrypt.compare(password, user.password as string);
+    if (!user.password) {
+      console.error(`Admin user ${userId} has no password in database.`);
+      return res.status(500).json({ message: 'Server-Konfigurationsfehler: Admin-Konto hat kein Passwort.' });
+    }
+
+    const isPasswordCorrect = await bcrypt.compare(password, user.password);
     if (!isPasswordCorrect) {
       return res.status(401).json({ message: 'Ungültiges Passwort.' });
     }
 
-    user.dashboardPin = await bcrypt.hash(pin, 10);
-    await user.save();
+    const pinHash = await bcrypt.hash(pin, 10);
+    
+    // KORREKTUR: Verwende findByIdAndUpdate statt .save()
+    await User.findByIdAndUpdate(userId, { dashboardPin: pinHash });
 
     res.json({ success: true, message: 'Dashboard-PIN erfolgreich gesetzt.' });
 
   } catch (error) {
+    console.error('Fehler in setDashboardPin:', error);
     res.status(500).json({ message: 'Serverfehler beim Setzen der PIN.' });
   }
 };
 
-// Überprüft den Dashboard-PIN
 export const verifyDashboardPin = async (req: AuthRequest, res: Response) => {
   try {
     const { pin } = req.body;
@@ -266,10 +266,17 @@ export const verifyDashboardPin = async (req: AuthRequest, res: Response) => {
     if (!pin) {
       return res.status(400).json({ message: 'PIN ist erforderlich.' });
     }
+     if (!userId) {
+      return res.status(401).json({ message: 'Authentifizierungstoken fehlt oder ist ungültig.' });
+    }
 
-    const user = await User.findById(userId).select('+dashboardPin');
-    if (!user || user.role !== 'admin' || !user.dashboardPin) {
-      return res.status(403).json({ message: 'Keine PIN für diesen Benutzer gesetzt oder nicht autorisiert.' });
+    const user = await User.findById(userId).select('+dashboardPin +role');
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({ message: 'Nicht autorisiert.' });
+    }
+    
+    if(!user.dashboardPin) {
+        return res.status(403).json({ message: 'Für diesen Benutzer ist keine PIN gesetzt.' });
     }
 
     const isPinCorrect = await bcrypt.compare(pin, user.dashboardPin);
@@ -277,11 +284,10 @@ export const verifyDashboardPin = async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ message: 'Ungültige PIN.' });
     }
 
-    // Hier könnte man später ein kurzlebiges JWT für den Dashboard-Zugang erstellen.
-    // Fürs Erste reicht ein Erfolgs-Status.
     res.json({ success: true, message: 'PIN verifiziert.' });
 
   } catch (error) {
+    console.error('Fehler in verifyDashboardPin:', error);
     res.status(500).json({ message: 'Serverfehler beim Überprüfen der PIN.' });
   }
 };

@@ -782,4 +782,12 @@ export const verifyDashboardPin = async (pin: string, token: string) => {
   return res.data;
 };
 
+export const getDashboardStats = async (from: string, to: string, token: string) => {
+  const res = await api.get('/dashboard/stats', {
+    params: { from, to },
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data;
+};
+
 export default api
