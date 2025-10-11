@@ -86,7 +86,7 @@ const calculatePercentageChange = (current: number, previous: number) => {
 };
 
 
-// --- Dashboard-Komponente ---
+// --- Dashboard-Komponente (unverändert) ---
 const DashboardContent = () => {
   const { token } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -97,7 +97,6 @@ const DashboardContent = () => {
     to: dayjs().endOf('month').format('YYYY-MM-DD'),
   });
 
-  // NEU: State für den Export-Zeitraum
   const [exportRange, setExportRange] = useState({
     from: dayjs().startOf('month').format('YYYY-MM-DD'),
     to: dayjs().endOf('month').format('YYYY-MM-DD'),
@@ -133,14 +132,12 @@ const DashboardContent = () => {
     fetchStats();
   }, [token, timeFilter, customDateRange]);
 
-  // NEU: Handler für den Download-Button
   const handleExport = async () => {
     if (token) {
       await downloadDatevExport(exportRange.from, exportRange.to, token);
     }
   };
 
-  // --- Diagrammdaten (unverändert) ---
   const lineChartData = {
     labels: stats?.dailyRevenue.map(d => dayjs(d.date).format('DD.MM')) || [],
     datasets: [{
@@ -299,8 +296,7 @@ const DashboardContent = () => {
               </Paper>
             </Grid>
           </Grid>
-
-          {/* NEUER ABSCHNITT: DATEV EXPORT */}
+          
           <Paper sx={{ p: 3, mt: 4, borderRadius: 2, boxShadow: CARD_SHADOW, ...cardHoverEffect }}>
             <Typography variant="h5" fontWeight={700} gutterBottom>DATEV-Export</Typography>
             <Typography color="text.secondary" sx={{ mb: 3 }}>
@@ -339,35 +335,32 @@ const DashboardContent = () => {
   );
 };
 
-// --- Hauptseite mit PIN-Sperre (unverändert) ---
+
+// --- Haupt-Seitenkomponente mit PIN-Sperre (ANGEPASST) ---
 export default function AdminDashboardPage() {
   const { token, loading: authLoading } = useAuth();
   const [isUnlocked, setIsUnlocked] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const sessionToken = sessionStorage.getItem('dashboard-unlocked');
-    if (sessionToken === 'true') setIsUnlocked(true);
-    setIsLoading(false);
-  }, []);
 
   const handlePinVerified = () => {
-    sessionStorage.setItem('dashboard-unlocked', 'true');
     setIsUnlocked(true);
   };
 
   const handleVerifyPin = async (pin: string) => {
-    if (!token) throw new Error('Nicht authentifiziert');
+    if (!token) throw new Error("Nicht authentifiziert");
     return await verifyDashboardPin(pin, token);
   };
 
-  if (isLoading || authLoading) {
+  if (authLoading) {
     return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 5 }}><CircularProgress /></Box>;
   }
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      {isUnlocked ? <DashboardContent /> : <PinLock onPinVerified={handlePinVerified} verifyPin={handleVerifyPin} />}
+      {isUnlocked ? (
+        <DashboardContent />
+      ) : (
+        <PinLock onPinVerified={handlePinVerified} verifyPin={handleVerifyPin} />
+      )}
     </Container>
   );
 }

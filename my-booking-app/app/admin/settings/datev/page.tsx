@@ -3,28 +3,33 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { updateDatevSettings, getActiveSalon } from '@/services/api';
-import { Container, Typography, Paper, Stack, TextField, Button, Snackbar, Alert, Grid } from '@mui/material';
+import { Container, Typography, Paper, Grid, TextField, Button, Snackbar, Alert } from '@mui/material';
 import AdminBreadcrumbs from '@/components/AdminBreadcrumbs';
+
+// KORREKTUR: Definiere einen initialen, leeren Zustand
+const initialSettingsState = {
+  consultantNumber: '',
+  clientNumber: '',
+  revenueAccountServices: '',
+  revenueAccountProducts: '',
+  cashAccount: '',
+  cardAccount: '',
+};
 
 export default function DatevSettingsPage() {
   const { token } = useAuth();
-  const [settings, setSettings] = useState({
-    consultantNumber: '',
-    clientNumber: '',
-    revenueAccountServices: '',
-    revenueAccountProducts: '',
-    cashAccount: '',
-    cardAccount: '',
-  });
+  const [settings, setSettings] = useState(initialSettingsState);
   const [toast, setToast] = useState<{ open: boolean; msg: string; sev: 'success' | 'error' }>({ open: false, msg: '', sev: 'success' });
 
   useEffect(() => {
     const fetchSettings = async () => {
       if (token) {
         try {
-          const response = await getActiveSalon(token); // Diese Funktion muss in api.ts hinzugefügt werden
-          if (response.salon.datevSettings) {
-            setSettings(response.salon.datevSettings);
+          const response = await getActiveSalon(token);
+          if (response.salon && response.salon.datevSettings) {
+            // KORREKTUR: Fülle die geladenen Daten in den initialen Zustand ein.
+            // Das stellt sicher, dass fehlende Felder als leere Strings erhalten bleiben.
+            setSettings(prev => ({ ...prev, ...response.salon.datevSettings }));
           }
         } catch (error) {
           console.error("Fehler beim Laden der DATEV-Einstellungen", error);
@@ -63,16 +68,16 @@ export default function DatevSettingsPage() {
           <Grid size={{ xs: 12, sm: 6 }}>
             <TextField fullWidth label="Mandantennummer" name="clientNumber" value={settings.clientNumber} onChange={handleChange} />
           </Grid>
-          <Grid size={{xs: 12, sm: 6}}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField fullWidth label="Erlöskonto Dienstleistungen" name="revenueAccountServices" value={settings.revenueAccountServices} onChange={handleChange} helperText="Standard: 8400 (SKR03)" />
           </Grid>
-          <Grid size={{xs: 12, sm: 6}}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField fullWidth label="Erlöskonto Produkte" name="revenueAccountProducts" value={settings.revenueAccountProducts} onChange={handleChange} helperText="Standard: 8400 (SKR03)" />
           </Grid>
-          <Grid size={{xs: 12, sm: 6}}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField fullWidth label="Kassenkonto" name="cashAccount" value={settings.cashAccount} onChange={handleChange} helperText="Standard: 1000 (SKR03)" />
           </Grid>
-          <Grid size={{xs: 12, sm: 6}}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <TextField fullWidth label="Geldtransitkonto (Karte)" name="cardAccount" value={settings.cardAccount} onChange={handleChange} helperText="Standard: 1360 (SKR03)" />
           </Grid>
         </Grid>
