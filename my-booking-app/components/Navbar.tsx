@@ -41,6 +41,7 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
+import VpnKeyIcon from '@mui/icons-material/VpnKey';
 
 
 export default function Navbar() {
@@ -142,6 +143,9 @@ export default function Navbar() {
         <MenuItem onClick={() => { setAdminMenuAnchor(null); router.push('/admin/availability/templates') }}><ScheduleIcon sx={{ mr: 1.5 }}/> Zeit-Vorlagen</MenuItem>
         <MenuItem onClick={() => { setAdminMenuAnchor(null); router.push('/admin/invoices') }}><ReceiptLongIcon sx={{ mr: 1.5 }}/> Rechnungen</MenuItem>
         <MenuItem onClick={() => { setAdminMenuAnchor(null); router.push('/admin/cash-closing') }}><PointOfSaleIcon sx={{ mr: 1.5 }}/> Kassenabschluss</MenuItem>
+        <MenuItem onClick={() => { setAdminMenuAnchor(null); router.push('/admin/settings/pin') }}>
+          <VpnKeyIcon sx={{ mr: 1.5 }}/> PIN-Verwaltung
+        </MenuItem>
         <ListItem disablePadding>
           <ListItemButton component="a" href="/admin/cash-register">
             <ListItemIcon><PointOfSaleIcon /></ListItemIcon>

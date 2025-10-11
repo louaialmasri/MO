@@ -767,4 +767,19 @@ export async function deleteProduct(id: string) {
   return res.data;
 }
 
+// PIN Management for Admin Dashboard
+export const setDashboardPin = async (password: string, pin: string, token: string) => {
+  const res = await api.post('/users/set-pin', { password, pin }, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data;
+};
+
+export const verifyDashboardPin = async (pin: string, token: string) => {
+  const res = await api.post('/users/verify-pin', { pin }, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data;
+};
+
 export default api
