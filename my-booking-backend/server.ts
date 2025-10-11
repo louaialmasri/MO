@@ -60,7 +60,7 @@ app.use('/api/admin', adminCatalogRoutes)
 app.use('/api/availability-templates', availabilityTemplateRoutes)
 app.use('/api/staff', activeSalon, staffRoutes);
 app.use('/api/invoices', activeSalon, invoiceRoutes);
-app.use('/api/cash-closing', cashClosingRoutes);
+app.use('/api/cash-closings', cashClosingRoutes);
 app.use('/api/product-categories', activeSalon, productCategoryRoutes); // NEU
 app.use('/api/products', activeSalon, productRoutes); // NEU
 app.use('/api/service-categories', activeSalon, serviceCategoryRoutes); // NEU

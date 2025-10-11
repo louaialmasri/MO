@@ -130,6 +130,7 @@ export type CashClosing = {
   notes?: string;
 }
 
+
 export type ServiceCategory = {
   _id: string;
   name: string;
@@ -693,11 +694,11 @@ export async function fetchAllInvoices(token: string): Promise<InvoiceListItem[]
 }
 
 // Holt die Liste aller bisherigen Abschlüsse
-export const listCashClosings = async (token: string): Promise<CashClosing[]> => {
-  const res = await api.get('/cash-closings', { // URL in Mehrzahl
+export const listCashClosings = async (token: string): Promise<any> => { 
+  const res = await api.get('/cash-closings', {
     headers: { Authorization: `Bearer ${token}` }
   });
-  return res.data; // Gibt das Array direkt zurück
+  return res.data; // Gib die gesamten Rohdaten zurück
 };
 
 export const getCashClosingPreview = async (token: string) => {

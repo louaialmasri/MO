@@ -2,11 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-// KORREKTUR: Importiere nur die eine, richtige Funktion
 import { listCashClosings, type CashClosing } from '@/services/api'; 
 import {
   Container, Typography, Paper, Stack, Button, CircularProgress, Box, Divider, List, ListItem, ListItemText,
-  ListItemButton
 } from '@mui/material';
 import AdminBreadcrumbs from '@/components/AdminBreadcrumbs';
 import dayjs from 'dayjs';
@@ -22,16 +20,15 @@ export default function AdminCashClosingPage() {
     const loadClosings = () => {
       if (token) {
         setLoading(true);
-        // KORREKTUR: Rufe die korrekte Funktion auf
         listCashClosings(token)
           .then(data => {
-            // Stelle sicher, dass data immer ein Array ist
-            if (Array.isArray(data)) {
-              setClosings(data);
+            if (data && Array.isArray(data.closings)) {
+              setClosings(data.closings); // Nimm das Array aus dem Objekt
+            } else if (Array.isArray(data)) {
+              setClosings(data); // Nimm direkt das Array
             } else {
-              // Fallback, falls die API unerwartet etwas anderes sendet
-              console.error("API hat kein Array zurückgegeben:", data);
-              setClosings([]);
+              console.error("Unerwartete Datenstruktur von der API:", data);
+              setClosings([]); // Im Fehlerfall ein leeres Array setzen
             }
           })
           .catch(console.error)
@@ -39,7 +36,7 @@ export default function AdminCashClosingPage() {
       }
     };
 
-    if (!authLoading) {
+    if (!authLoading && token) {
       loadClosings();
     }
   }, [token, authLoading]);
@@ -66,9 +63,8 @@ export default function AdminCashClosingPage() {
             <Box key={closing._id}>
               <ListItem>
                 <ListItemText
-                  // KORREKTUR: Verwende die Felder aus dem neuen Typ
                   primary={`Abschluss vom ${dayjs(closing.date).format('DD.MM.YYYY HH:mm')}`}
-                  secondary={`Durchgeführt von: ${closing.executedBy.firstName} ${closing.executedBy.lastName}`}
+                  secondary={`Durchgeführt von: ${closing.executedBy?.firstName || ''} ${closing.executedBy?.lastName || ''}`}
                 />
                 <Stack alignItems="flex-end">
                   <Typography variant="body1">Einnahmen (Bar): <strong>{closing.expectedAmount.toFixed(2)} €</strong></Typography>
