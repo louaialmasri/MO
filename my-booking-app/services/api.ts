@@ -512,6 +512,13 @@ export async function deleteSalonApi(id: string) {
   return res.data
 }
 
+export const getActiveSalon = async (token: string) => {
+  const res = await api.get('/salons/current', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data;
+};
+
 // --- Globale Listen (ohne Salon-Header) ---
 export async function fetchGlobalStaff(): Promise<GlobalStaff[]> {
   const res = await api.get('/admin/staff-all', { } as any);
@@ -788,6 +795,35 @@ export const getDashboardStats = async (from: string, to: string, token: string)
     headers: { Authorization: `Bearer ${token}` }
   });
   return res.data;
+};
+
+// Export Data
+export const updateDatevSettings = async (settings: any, token: string) => {
+  // Annahme: Es gibt eine Route, um den aktuellen Salon zu aktualisieren.
+  // Wir nutzen hier die /api/salons/:id Route. Du musst evtl. die ID des aktiven Salons übergeben.
+  // Fürs Erste gehen wir davon aus, dass das Backend den aktiven Salon aus dem Token kennt.
+  const res = await api.patch('/salons/current', { datevSettings: settings }, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data;
+};
+
+export const downloadDatevExport = async (from: string, to: string, token: string) => {
+  const res = await api.get('/export/datev', {
+    params: { from, to },
+    headers: { Authorization: `Bearer ${token}` },
+    responseType: 'blob', // WICHTIG: Sagt Axios, dass eine Datei erwartet wird
+  });
+
+  // Logik zum Auslösen des Downloads im Browser
+  const url = window.URL.createObjectURL(new Blob([res.data]));
+  const link = document.createElement('a');
+  link.href = url;
+  const filename = `DATEV_Export_${from}_-_${to}.csv`;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  link.parentNode?.removeChild(link);
 };
 
 export default api

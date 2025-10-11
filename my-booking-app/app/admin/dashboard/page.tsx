@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { getDashboardStats, verifyDashboardPin } from '@/services/api';
+import { getDashboardStats, verifyDashboardPin, downloadDatevExport } from '@/services/api';
 import {
   Container, Typography, Box, CircularProgress, Paper, Grid, Stack,
   Button, ButtonGroup, TextField, Collapse, List, ListItem, ListItemText, Tooltip
@@ -97,6 +97,12 @@ const DashboardContent = () => {
     to: dayjs().endOf('month').format('YYYY-MM-DD'),
   });
 
+  // NEU: State für den Export-Zeitraum
+  const [exportRange, setExportRange] = useState({
+    from: dayjs().startOf('month').format('YYYY-MM-DD'),
+    to: dayjs().endOf('month').format('YYYY-MM-DD'),
+  });
+
   useEffect(() => {
     const fetchStats = async () => {
       if (!token) return;
@@ -127,6 +133,13 @@ const DashboardContent = () => {
     fetchStats();
   }, [token, timeFilter, customDateRange]);
 
+  // NEU: Handler für den Download-Button
+  const handleExport = async () => {
+    if (token) {
+      await downloadDatevExport(exportRange.from, exportRange.to, token);
+    }
+  };
+
   // --- Diagrammdaten (unverändert) ---
   const lineChartData = {
     labels: stats?.dailyRevenue.map(d => dayjs(d.date).format('DD.MM')) || [],
@@ -144,8 +157,8 @@ const DashboardContent = () => {
   };
   const lineChartOptions: ChartOptions<'line'> = {
     responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `€ ${Number(ctx.parsed.y).toLocaleString('de-DE', { minimumFractionDigits: 2 })}` }}},
-    scales: { y: { beginAtZero: true, ticks: { callback: (val) => `€ ${Number(val).toLocaleString('de-DE')}` }}, x: { grid: { display: false }}}
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `€ ${Number(ctx.parsed.y).toLocaleString('de-DE', { minimumFractionDigits: 2 })}` } } },
+    scales: { y: { beginAtZero: true, ticks: { callback: (val) => `€ ${Number(val).toLocaleString('de-DE')}` } }, x: { grid: { display: false } } }
   };
 
   const barChartData = {
@@ -160,8 +173,8 @@ const DashboardContent = () => {
   };
   const barChartOptions: ChartOptions<'bar'> = {
     responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `€ ${Number(ctx.parsed.y).toLocaleString('de-DE', { minimumFractionDigits: 2 })}` }}},
-    scales: { y: { beginAtZero: true, ticks: { callback: (val) => `€ ${Number(val).toLocaleString('de-DE')}` } }, x: { grid: { display: false }}},
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `€ ${Number(ctx.parsed.y).toLocaleString('de-DE', { minimumFractionDigits: 2 })}` } } },
+    scales: { y: { beginAtZero: true, ticks: { callback: (val) => `€ ${Number(val).toLocaleString('de-DE')}` } }, x: { grid: { display: false } } },
   };
 
   const renderDateTitle = () => {
@@ -171,7 +184,7 @@ const DashboardContent = () => {
     if (timeFilter === 'custom') return `${dayjs(customDateRange.from).format('DD.MM.YYYY')} - ${dayjs(customDateRange.to).format('DD.MM.YYYY')}`;
     return '';
   };
-  
+
   const revenueChange = stats ? calculatePercentageChange(stats.totalRevenue, stats.previousPeriodRevenue) : { value: 0, isPositive: true };
   const bookingsChange = stats ? calculatePercentageChange(stats.totalBookings, stats.previousPeriodBookings) : { value: 0, isPositive: true };
 
@@ -248,11 +261,11 @@ const DashboardContent = () => {
               </Paper>
             </Grid>
           </Grid>
-          
+
           <Paper sx={{ p: 3, boxShadow: CARD_SHADOW, borderRadius: 2, mb: 4, ...cardHoverEffect }}>
             <Typography variant="h6" fontWeight={700}>Umsatzverlauf</Typography>
-             <Box sx={{ height: 300, mt: 2 }}>
-                <Line data={lineChartData} options={lineChartOptions} />
+            <Box sx={{ height: 300, mt: 2 }}>
+              <Line data={lineChartData} options={lineChartOptions} />
             </Box>
           </Paper>
 
@@ -266,7 +279,7 @@ const DashboardContent = () => {
               </Paper>
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
-               <Paper sx={{ p: 2.5, boxShadow: CARD_SHADOW, borderRadius: 2, height: '100%', ...cardHoverEffect }}>
+              <Paper sx={{ p: 2.5, boxShadow: CARD_SHADOW, borderRadius: 2, height: '100%', ...cardHoverEffect }}>
                 <Typography variant="h6" fontWeight={700} gutterBottom>Top 5 Dienstleistungen</Typography>
                 <List dense>
                   {stats.topServices.map((service, index) => (
@@ -275,10 +288,10 @@ const DashboardContent = () => {
                         €{service.totalRevenue.toLocaleString('de-DE', { minimumFractionDigits: 2 })}
                       </Typography>
                     }>
-                      <ListItemText 
+                      <ListItemText
                         primaryTypographyProps={{ fontWeight: 500, noWrap: true }}
-                        primary={service.name} 
-                        secondary={`${service.count} Mal gebucht`} 
+                        primary={service.name}
+                        secondary={`${service.count} Mal gebucht`}
                       />
                     </ListItem>
                   ))}
@@ -286,6 +299,40 @@ const DashboardContent = () => {
               </Paper>
             </Grid>
           </Grid>
+
+          {/* NEUER ABSCHNITT: DATEV EXPORT */}
+          <Paper sx={{ p: 3, mt: 4, borderRadius: 2, boxShadow: CARD_SHADOW, ...cardHoverEffect }}>
+            <Typography variant="h5" fontWeight={700} gutterBottom>DATEV-Export</Typography>
+            <Typography color="text.secondary" sx={{ mb: 3 }}>
+              Wähle einen Zeitraum, um die Rechnungsdaten als CSV-Datei für deinen Steuerberater zu exportieren.
+            </Typography>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
+              <TextField
+                label="Von"
+                type="date"
+                value={exportRange.from}
+                onChange={(e) => setExportRange(prev => ({ ...prev, from: e.target.value }))}
+                InputLabelProps={{ shrink: true }}
+                sx={{ width: { xs: '100%', sm: 'auto' } }}
+              />
+              <TextField
+                label="Bis"
+                type="date"
+                value={exportRange.to}
+                onChange={(e) => setExportRange(prev => ({ ...prev, to: e.target.value }))}
+                InputLabelProps={{ shrink: true }}
+                sx={{ width: { xs: '100%', sm: 'auto' } }}
+              />
+              <Button
+                variant="contained"
+                onClick={handleExport}
+                size="large"
+                sx={{ width: { xs: '100%', sm: 'auto' } }}
+              >
+                Herunterladen
+              </Button>
+            </Stack>
+          </Paper>
         </>
       )}
     </>

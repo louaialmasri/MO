@@ -8,11 +8,24 @@ import { Booking } from '../models/Booking'
 import { Availability } from '../models/Availability'
 import { ServiceSalon } from '../models/ServiceSalon'
 import { StaffSalon } from '../models/StaffSalon'
+import { SalonRequest } from '../middlewares/activeSalon'
 
 export const getMySalons = async (req: AuthRequest, res: Response) => {
   if (req.user?.role !== 'admin') return res.status(403).json({ success:false, message:'Nur Admin' })
   const salons = await Salon.find({ /* optional: owner: req.user.userId */ }).sort({ name: 1 })
   res.json({ success:true, salons })
+}
+
+export const getCurrentSalon = async (req: SalonRequest, res: Response) => {
+    try {
+        const salon = await Salon.findById(req.salonId);
+        if (!salon) {
+            return res.status(404).json({ message: 'Aktiver Salon nicht gefunden.' });
+        }
+        res.json({ success: true, salon });
+    } catch (error) {
+        res.status(500).json({ message: 'Serverfehler' });
+    }
 }
 
 export const createSalon = async (req: AuthRequest, res: Response) => {

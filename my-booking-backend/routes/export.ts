@@ -1,4 +1,3 @@
-// my-booking-backend/routes/export.ts
 import express from 'express';
 import { verifyToken } from '../middlewares/authMiddleware';
 import { verifyAdmin } from '../middlewares/adminMiddleware';

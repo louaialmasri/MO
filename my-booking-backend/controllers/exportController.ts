@@ -26,11 +26,10 @@ export const exportDatev = async (req: SalonRequest, res: Response) => {
         return res.status(404).json({ message: 'Salon nicht gefunden.' });
     }
     
-    // KORREKTUR: Sichere Fallback-Werte, falls datevSettings nicht existiert.
-    const settings = salon.datevSettings || {};
-    const revenueAccount = settings.revenueAccountServices ?? '8400';
-    const cashAccount = settings.cashAccount ?? '1000';
-    const cardAccount = settings.cardAccount ?? '1360';
+    // KORREKTUR: Optional Chaining für typsicheren Zugriff mit Fallback-Werten
+    const revenueAccount = salon.datevSettings?.revenueAccountServices ?? '8400';
+    const cashAccount = salon.datevSettings?.cashAccount ?? '1000';
+    const cardAccount = salon.datevSettings?.cardAccount ?? '1360';
 
     const datevData = [];
     for (const invoice of invoices) {
