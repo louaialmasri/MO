@@ -9,9 +9,9 @@ const router = express.Router();
 // Alle Routen sind nur für Admins im aktiven Salon zugänglich
 router.use(verifyToken, verifyAdmin, activeSalon);
 
-router.post('/', createCashClosing);
-router.get('/', listCashClosings);
 router.get('/:id', getCashClosingById);
 router.get('/preview', getCashClosingPreview);
+router.get('/', listCashClosings);
+router.post('/', createCashClosing);
 
 export default router;

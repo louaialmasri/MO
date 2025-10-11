@@ -694,14 +694,12 @@ export async function fetchAllInvoices(token: string): Promise<InvoiceListItem[]
 
 // Holt die Liste aller bisherigen Abschlüsse
 export const listCashClosings = async (token: string): Promise<CashClosing[]> => {
-  // KORREKTUR: Die URL lautet wieder auf /cash-closing (Einzahl)
-  const res = await api.get('/cash-closing', {
+  const res = await api.get('/cash-closings', { // URL in Mehrzahl
     headers: { Authorization: `Bearer ${token}` }
   });
-  return res.data; 
+  return res.data; // Gibt das Array direkt zurück
 };
 
-// Holt die Vorschau-Daten für einen neuen Abschluss
 export const getCashClosingPreview = async (token: string) => {
   const res = await api.get('/cash-closings/preview', {
     headers: { Authorization: `Bearer ${token}` }
@@ -709,7 +707,6 @@ export const getCashClosingPreview = async (token: string) => {
   return res.data;
 };
 
-// Erstellt und speichert einen neuen Abschluss
 export const createCashClosing = async (payload: any, token: string) => {
   const res = await api.post('/cash-closings', payload, {
     headers: { Authorization: `Bearer ${token}` }
@@ -717,8 +714,9 @@ export const createCashClosing = async (payload: any, token: string) => {
   return res.data;
 };
 
+
 export async function fetchAllCashClosings(token: string): Promise<CashClosing[]> {
-  const res = await api.get('/cash-closing', {
+  const res = await api.get('/cash-closings', {
     headers: { Authorization: `Bearer ${token}` }
   });
   return res.data.closings;

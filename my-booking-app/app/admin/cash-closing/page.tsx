@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { listCashClosings, type CashClosing } from '@/services/api';
+// KORREKTUR: Importiere nur die eine, richtige Funktion
+import { listCashClosings, type CashClosing } from '@/services/api'; 
 import {
   Container, Typography, Paper, Stack, Button, CircularProgress, Box, Divider, List, ListItem, ListItemText,
   ListItemButton
@@ -17,19 +18,28 @@ export default function AdminCashClosingPage() {
   const [closings, setClosings] = useState<CashClosing[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadClosings = () => {
-    if (token) {
-      setLoading(true);
-      // KORREKTUR: Wir rufen die korrigierte Funktion auf
-      listCashClosings(token)
-        .then(setClosings)
-        .catch(console.error)
-        .finally(() => setLoading(false));
-    }
-  };
-
   useEffect(() => {
-    if (!authLoading && token) {
+    const loadClosings = () => {
+      if (token) {
+        setLoading(true);
+        // KORREKTUR: Rufe die korrekte Funktion auf
+        listCashClosings(token)
+          .then(data => {
+            // Stelle sicher, dass data immer ein Array ist
+            if (Array.isArray(data)) {
+              setClosings(data);
+            } else {
+              // Fallback, falls die API unerwartet etwas anderes sendet
+              console.error("API hat kein Array zurückgegeben:", data);
+              setClosings([]);
+            }
+          })
+          .catch(console.error)
+          .finally(() => setLoading(false));
+      }
+    };
+
+    if (!authLoading) {
       loadClosings();
     }
   }, [token, authLoading]);
@@ -54,15 +64,13 @@ export default function AdminCashClosingPage() {
         <List>
           {closings.map((closing, index) => (
             <Box key={closing._id}>
-              {/* ListItemButton kann später zu einer Detailseite führen, falls gewünscht */}
               <ListItem>
                 <ListItemText
-                  // KORREKTUR: Die Felder heißen jetzt 'date' und 'executedBy'
+                  // KORREKTUR: Verwende die Felder aus dem neuen Typ
                   primary={`Abschluss vom ${dayjs(closing.date).format('DD.MM.YYYY HH:mm')}`}
                   secondary={`Durchgeführt von: ${closing.executedBy.firstName} ${closing.executedBy.lastName}`}
                 />
                 <Stack alignItems="flex-end">
-                  {/* KORREKTUR: Die Felder heißen jetzt 'expectedAmount' und 'finalExpectedAmount' */}
                   <Typography variant="body1">Einnahmen (Bar): <strong>{closing.expectedAmount.toFixed(2)} €</strong></Typography>
                   <Typography variant="body2" color='text.secondary'>
                     Soll-Bestand: {closing.finalExpectedAmount.toFixed(2)} €
