@@ -279,8 +279,9 @@ function AdminPage() {
         staffId: newStaffId || originalBooking.staff?._id,
       };
       const response = await updateBooking(event.id, payload, token!);
-      if (response.booking) { // KORREKTUR laut Anweisung
-        setBookings(prev => prev.map(b => b._id === event.id ? response.booking : b));
+      
+      if (response) { 
+        setBookings(prev => prev.map(b => b._id === event.id ? response : b));
         setToast({ open: true, msg: 'Termin verschoben!', sev: 'success' });
       } else {
         throw new Error("Ungültige Antwort vom Server");
@@ -290,6 +291,7 @@ function AdminPage() {
       setToast({ open: true, msg: `Verschieben fehlgeschlagen: ${e.response?.data?.message || e.message}`, sev: 'error' });
     }
   }
+
 
   // NEU: Funktion, die beim Klick auf einen leeren Slot ausgeführt wird
   const handleDateClick = async (arg: DateClickArg) => {
