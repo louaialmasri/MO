@@ -4,7 +4,15 @@ import { useState, useEffect } from 'react';
 import { 
     Container, Typography, Paper, Grid, Button, Autocomplete, TextField, 
     List, ListItem, ListItemText, IconButton, Divider, Select, MenuItem, 
-    FormControl, InputLabel, Box, Stack, Snackbar, Alert
+    FormControl, InputLabel, Box, Stack, Snackbar, Alert,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    FormControlLabel,
+    InputAdornment,
+    Radio,
+    RadioGroup
 } from '@mui/material';
 import { useAuth } from '@/context/AuthContext';
 import { 
@@ -35,6 +43,9 @@ export default function CashRegisterPage() {
   const [selectedServiceId, setSelectedServiceId] = useState<string>('');
   const [selectedCustomer, setSelectedCustomer] = useState<User | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [discount, setDiscount] = useState({ type: 'percentage' as 'percentage' | 'fixed', value: 0 });
+  const [isDiscountDialogOpen, setIsDiscountDialogOpen] = useState(false);
+  const [tempDiscount, setTempDiscount] = useState({ type: 'percentage', value: '' });
   const [toast, setToast] = useState<{ open: boolean; msg: string; sev: 'success' | 'error' }>({ open: false, msg: '', sev: 'success' });
 
   useEffect(() => {
@@ -121,8 +132,40 @@ export default function CashRegisterPage() {
     setCart(prevCart => prevCart.filter(item => item.cartItemId !== cartItemId));
   };
 
-  const total = cart.reduce((sum, item) => sum + item.price, 0);
-
+  const subTotal = cart.reduce((sum, item) => sum + item.price, 0);
+  let finalTotal = subTotal;
+  let discountAmount = 0;
+  if (discount.value > 0) {
+    if (discount.type === 'percentage') {
+      discountAmount = subTotal * (discount.value / 100);
+      finalTotal = subTotal - discountAmount;
+    } else {
+      discountAmount = discount.value;
+      finalTotal = subTotal - discountAmount;
+    }
+  }
+  finalTotal = Math.max(0, finalTotal);
+  
+  const handleOpenDiscountDialog = () => {
+    setTempDiscount({type: discount.type, value: discount.value > 0 ? String(discount.value) : ''})
+    setIsDiscountDialogOpen(true);
+  };
+  
+  const handleApplyDiscount = () => {
+    const value = parseFloat(tempDiscount.value);
+    if (!isNaN(value) && value >= 0) {
+      setDiscount({ type: tempDiscount.type as 'percentage' | 'fixed', value });
+    } else {
+      setDiscount({ type: 'percentage', value: 0 }); // Rabatt zurücksetzen bei ungültiger Eingabe
+    }
+    setIsDiscountDialogOpen(false);
+  };
+  
+  const handleRemoveDiscount = () => {
+    setDiscount({ type: 'percentage', value: 0 });
+    setIsDiscountDialogOpen(false);
+  }
+  
   const handleCheckout = async () => {
     if (!selectedCustomer || cart.length === 0) {
       setToast({ open: true, msg: 'Bitte einen Kunden und mindestens einen Artikel auswählen.', sev: 'error' });
@@ -146,6 +189,9 @@ export default function CashRegisterPage() {
       setToast({ open: true, msg: 'Verkauf erfolgreich abgeschlossen!', sev: 'success' });
       setCart([]);
       setSelectedCustomer(null);
+      // Lade die Produktliste neu, um den Lagerbestand zu aktualisieren.
+      const updatedProducts = await fetchProducts(token!);
+      setProducts(updatedProducts);
     } catch (error) {
       console.error('Fehler beim Verkauf:', error);
       setToast({ open: true, msg: 'Ein Fehler ist aufgetreten.', sev: 'error' });
@@ -206,6 +252,12 @@ export default function CashRegisterPage() {
               sx={{ mb: 2 }}
             />
             <Divider sx={{ my: 2 }} />
+
+            {/* --- BEREICH FÜR ZWISCHENSUMME UND RABATT --- */}
+          <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
+            <Typography>Zwischensumme</Typography>
+            <Typography>{subTotal.toFixed(2)}€</Typography>
+          </Stack>
             {cart.length === 0 ? (
               <Typography color="text.secondary" sx={{minHeight: 150}}>Warenkorb ist leer.</Typography>
             ) : (
@@ -235,7 +287,7 @@ export default function CashRegisterPage() {
             )}
             <Divider sx={{ my: 2 }} />
             <Typography variant="h5" align="right" sx={{ mb: 2 }}>
-              Gesamt: {total.toFixed(2)}€
+              Gesamt: {finalTotal.toFixed(2)}€
             </Typography>
             <Button
               variant="contained" color="primary" fullWidth
@@ -246,6 +298,37 @@ export default function CashRegisterPage() {
             </Button>
           </Paper>
         </Grid>
+        {/* --- DIALOG ZUR RABATTEINGABE --- */}
+      <Dialog open={isDiscountDialogOpen} onClose={() => setIsDiscountDialogOpen(false)}>
+        <DialogTitle>Rabatt hinzufügen/bearbeiten</DialogTitle>
+        <DialogContent>
+            <FormControl component="fieldset" sx={{ my: 2 }}>
+              <RadioGroup row value={tempDiscount.type} onChange={(e) => setTempDiscount(p => ({ ...p, type: e.target.value }))}>
+                <FormControlLabel value="percentage" control={<Radio />} label="Prozent (%)" />
+                <FormControlLabel value="fixed" control={<Radio />} label="Fester Betrag (€)" />
+              </RadioGroup>
+            </FormControl>
+            <TextField
+              autoFocus
+              margin="dense"
+              label="Rabattwert"
+              type="number"
+              fullWidth
+              variant="outlined"
+              value={tempDiscount.value}
+              onChange={(e) => setTempDiscount(p => ({ ...p, value: e.target.value }))}
+              InputProps={{
+                endAdornment: <InputAdornment position="end">{tempDiscount.type === 'percentage' ? '%' : '€'}</InputAdornment>,
+              }}
+            />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleRemoveDiscount} color="error">Rabatt entfernen</Button>
+          <Box sx={{flexGrow: 1}}/>
+          <Button onClick={() => setIsDiscountDialogOpen(false)}>Abbrechen</Button>
+          <Button onClick={handleApplyDiscount} variant="contained">Anwenden</Button>
+        </DialogActions>
+      </Dialog>
       </Grid>
       
       {/* --- Snackbar-Komponente für Benachrichtigungen --- */}

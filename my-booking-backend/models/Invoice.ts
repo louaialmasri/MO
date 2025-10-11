@@ -16,6 +16,10 @@ export interface IInvoice extends Document {
   status: 'paid' | 'unpaid' | 'cancelled';
   amountGiven?: number;
   change?: number;
+  discount?: {
+    type: 'percentage' | 'fixed';
+    value: number;
+  };
 }
 
 const invoiceSchema = new Schema({
@@ -29,6 +33,10 @@ const invoiceSchema = new Schema({
     description: String,
     price: Number,
   }],
+  discount: {
+    type: { type: String, enum: ['percentage', 'fixed'] },
+    value: { type: Number }
+  },
   amount: { type: Number, required: true },
   paymentMethod: { type: String, required: true, enum: ['cash', 'card'] },
   status: { type: String, required: true, enum: ['paid', 'unpaid', 'cancelled'], default: 'paid' },
