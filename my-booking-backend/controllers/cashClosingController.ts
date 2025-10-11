@@ -25,6 +25,9 @@ export const getCashClosingPreview = async (req: SalonRequest, res: Response) =>
             status: 'paid'
         });
 
+        // Summe der eingelösten Gutscheine *nur* aus Bar-Transaktionen
+        const redeemedVouchersInCash = cashInvoices.reduce((sum, invoice) => sum + (invoice.redeemedAmount || 0), 0);
+
         let revenueServices = 0;
         let revenueProducts = 0;
         let soldVouchers = 0;
@@ -41,14 +44,6 @@ export const getCashClosingPreview = async (req: SalonRequest, res: Response) =>
             });
         });
 
-        const allInvoicesToday = await Invoice.find({
-            salon: new mongoose.Types.ObjectId(salonId),
-            date: { $gte: startOfDay, $lte: endOfDay },
-            status: 'paid',
-        });
-
-        const redeemedVouchers = allInvoicesToday.reduce((sum, invoice) => sum + (invoice.redeemedAmount || 0), 0);
-
         res.json({
             success: true,
             preview: {
@@ -56,7 +51,7 @@ export const getCashClosingPreview = async (req: SalonRequest, res: Response) =>
                 revenueServices,
                 revenueProducts,
                 soldVouchers,
-                redeemedVouchers,
+                redeemedVouchers: redeemedVouchersInCash, // KORREKTUR: Nur eingelöste Gutscheine aus Barverkäufen
                 invoiceCount: cashInvoices.length,
             }
         });

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { fetchCashClosingById, type CashClosing } from '@/services/api';
-import { Container, Typography, Paper, Box, CircularProgress, Divider, List, ListItem, ListItemText, Grid } from '@mui/material';
+import { Container, Typography, Paper, Box, CircularProgress, Divider, List, ListItem, ListItemText, Grid, Stack } from '@mui/material';
 import AdminBreadcrumbs from '@/components/AdminBreadcrumbs';
 import dayjs from 'dayjs';
 
@@ -34,65 +34,118 @@ export default function CashClosingDetailPage() {
     return <Typography>Kassenabschluss nicht gefunden.</Typography>;
   }
 
-  const totalWithdrawals = closing.withdrawals.reduce((sum, w) => sum + w.amount, 0);
+  const totalWithdrawals = (closing.withdrawals || []).reduce((sum, w) => sum + w.amount, 0);
+  const totalRevenue = (closing.revenueServices || 0) + (closing.revenueProducts || 0) + (closing.soldVouchers || 0);
 
   return (
-    <Container maxWidth="sm" sx={{ py: 4 }}>
+    <Container maxWidth="md" sx={{ py: 4 }}>
       <AdminBreadcrumbs items={[
         { label: 'Mein Salon', href: '/admin' },
         { label: 'Kassenabschlüsse', href: '/admin/cash-closing' },
         { label: `Abschluss vom ${dayjs(closing.date).format('DD.MM.YYYY')}` }
       ]} />
-      <Typography variant="h4" fontWeight={800} gutterBottom>
+      <Typography variant="h4" fontWeight={800} gutterBottom sx={{ mb: 3 }}>
         Detailansicht Kassenabschluss
       </Typography>
 
-      <Paper variant="outlined" sx={{ p: 3, mt: 3 }}>
-        <Grid container spacing={2}>
-            <Grid size={{xs:6}}><Typography color="text.secondary">Datum:</Typography></Grid>
-            <Grid size={{xs:6}}><Typography align="right">{dayjs(closing.date).format('DD.MM.YYYY HH:mm')}</Typography></Grid>
-
-            <Grid size={{xs:6}}><Typography color="text.secondary">Mitarbeiter:</Typography></Grid>
-            <Grid size={{xs:6}}><Typography align="right">{closing.employee.firstName} {closing.employee.lastName}</Typography></Grid>
-
-            <Grid size={{xs:12}}><Divider sx={{ my: 1 }} /></Grid>
-
-            <Grid size={{xs:6}}><Typography>Einnahmen (Bar):</Typography></Grid>
-            <Grid size={{xs:6}}><Typography align="right" fontWeight="bold">€{closing.expectedAmount.toFixed(2)}</Typography></Grid>
-
-            <Grid size={{xs:6}}><Typography>Summe Entnahmen:</Typography></Grid>
-            <Grid size={{xs:6}}><Typography align="right" fontWeight="bold">- €{totalWithdrawals.toFixed(2)}</Typography></Grid>
-
-            <Grid size={{xs:12}}><Divider /></Grid>
-
-            <Grid size={{xs:6}}><Typography variant="h6">Soll-Bestand:</Typography></Grid>
-            <Grid size={{xs:6}}><Typography variant="h6" align="right" fontWeight="bold">€{closing.finalExpectedAmount.toFixed(2)}</Typography></Grid>
-        </Grid>
-      </Paper>
-
-      {closing.withdrawals.length > 0 && (
-        <>
-          <Typography variant="h6" sx={{ mt: 4, mb: 2 }}>Aufschlüsselung Entnahmen</Typography>
-          <Paper variant="outlined">
-            <List>
-              {closing.withdrawals.map((w, index) => (
-                <ListItem key={index}>
-                  <ListItemText primary={w.reason} />
-                  <Typography>€{w.amount.toFixed(2)}</Typography>
-                </ListItem>
-              ))}
-            </List>
+      <Grid container spacing={4}>
+        {/* Linke Spalte: Einnahmen */}
+        <Grid size={{ xs: 12, md: 6 }}>
+          <Paper variant="outlined" sx={{ p: 3, height: '100%' }}>
+            <Typography variant="h6" gutterBottom>Einnahmen gesamt:</Typography>
+            <Stack spacing={1.5} mt={2}>
+              <Stack direction="row" justifyContent="space-between">
+                <Typography color="text.secondary">Dienstleistungen:</Typography>
+                <Typography>{(closing.revenueServices || 0).toFixed(2)} €</Typography>
+              </Stack>
+              <Stack direction="row" justifyContent="space-between">
+                <Typography color="text.secondary">Produkte:</Typography>
+                <Typography>{(closing.revenueProducts || 0).toFixed(2)} €</Typography>
+              </Stack>
+              <Stack direction="row" justifyContent="space-between">
+                <Typography color="text.secondary">Verkaufte Gutscheine:</Typography>
+                <Typography>{(closing.soldVouchers || 0).toFixed(2)} €</Typography>
+              </Stack>
+              <Divider />
+              <Stack direction="row" justifyContent="space-between">
+                <Typography fontWeight="bold">Umsatz:</Typography>
+                <Typography fontWeight="bold">{totalRevenue.toFixed(2)} €</Typography>
+              </Stack>
+              <Stack direction="row" justifyContent="space-between">
+                <Typography color="text.secondary">Eingelöste Gutscheine:</Typography>
+                <Typography>-{(closing.redeemedVouchers || 0).toFixed(2)} €</Typography>
+              </Stack>
+            </Stack>
           </Paper>
-        </>
-      )}
-
-      {closing.notes && (
-          <>
-            <Typography variant="h6" sx={{ mt: 4, mb: 2 }}>Notizen</Typography>
-            <Paper variant="outlined" sx={{ p: 2 }}>
-                <Typography>{closing.notes}</Typography>
+        </Grid>
+        
+        {/* Rechte Spalte: Kassenbewegungen */}
+        <Grid size={{ xs: 12, md: 6 }}>
+           <Paper variant="outlined" sx={{ p: 3, height: '100%' }}>
+              <Typography variant="h6" gutterBottom>Kassenbewegungen:</Typography>
+              <Stack spacing={1.5} mt={2}>
+                 <Stack direction="row" justifyContent="space-between">
+                    <Typography color="text.secondary">Kasseneinlage:</Typography>
+                    <Typography>{(closing.cashDeposit || 0).toFixed(2)} €</Typography>
+                 </Stack>
+                 <Stack direction="row" justifyContent="space-between">
+                    <Typography color="text.secondary">Bankentnahme:</Typography>
+                    <Typography>-{(closing.bankWithdrawal || 0).toFixed(2)} €</Typography>
+                 </Stack>
+                 <Stack direction="row" justifyContent="space-between">
+                    <Typography color="text.secondary">Trinkgeldentnahme:</Typography>
+                    <Typography>-{(closing.tipsWithdrawal || 0).toFixed(2)} €</Typography>
+                 </Stack>
+                 <Stack direction="row" justifyContent="space-between">
+                    <Typography color="text.secondary">Andere Entnahmen:</Typography>
+                    <Typography>-{(closing.otherWithdrawal || 0).toFixed(2)} €</Typography>
+                 </Stack>
+                 <Divider />
+                 <Stack direction="row" justifyContent="space-between">
+                    <Typography fontWeight="bold">Kassenentnahme:</Typography>
+                    <Typography fontWeight="bold">-{(totalWithdrawals || 0).toFixed(2)} €</Typography>
+                 </Stack>
+              </Stack>
+           </Paper>
+        </Grid>
+        
+        {/* Untere Reihe: Zusammenfassung */}
+        <Grid size={{ xs: 12 }}>
+            <Paper variant="outlined" sx={{ p: 3, mt: 2, bgcolor: 'grey.50' }}>
+                <Stack spacing={1}>
+                    <Stack direction="row" justifyContent="space-between">
+                        <Typography>Soll-Bestand (berechnet):</Typography>
+                        <Typography>{(closing.calculatedCashOnHand || 0).toFixed(2)} €</Typography>
+                    </Stack>
+                     <Stack direction="row" justifyContent="space-between">
+                        <Typography>Ist-Bestand (gezählt):</Typography>
+                        <Typography>{(closing.actualCashOnHand || 0).toFixed(2)} €</Typography>
+                    </Stack>
+                     <Divider />
+                     <Stack direction="row" justifyContent="space-between">
+                        <Typography variant="h6" fontWeight="bold">Differenz:</Typography>
+                        <Typography variant="h6" fontWeight="bold" color={closing.difference === 0 ? 'inherit' : 'error'}>
+                            {(closing.difference || 0).toFixed(2)} €
+                        </Typography>
+                    </Stack>
+                    <Divider sx={{ my: 1 }} />
+                    <Stack direction="row" justifyContent="space-between">
+                        <Typography color="text.secondary">Durchgeführt von:</Typography>
+                        <Typography>{closing.employee?.firstName || ''} {closing.employee?.lastName || ''}</Typography>
+                    </Stack>
+                </Stack>
             </Paper>
-          </>
+        </Grid>
+
+      </Grid>
+      
+      {closing.notes && (
+          <Box mt={4}>
+            <Typography variant="h6" sx={{ mb: 2 }}>Notizen</Typography>
+            <Paper variant="outlined" sx={{ p: 2 }}>
+                <Typography sx={{ whiteSpace: 'pre-wrap' }}>{closing.notes}</Typography>
+            </Paper>
+          </Box>
       )}
     </Container>
   );
