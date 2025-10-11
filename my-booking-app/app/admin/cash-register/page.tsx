@@ -13,17 +13,18 @@ import {
     InputAdornment,
     Radio,
     RadioGroup,
-    Chip // Chip importiert
+    Chip
 } from '@mui/material';
 import { useAuth } from '@/context/AuthContext';
 import { 
-    fetchAllUsers, fetchProducts, fetchServices, createInvoice, validateVoucher, // validateVoucher importiert
+    fetchAllUsers, fetchProducts, fetchServices, createInvoice, validateVoucher,
     User, Product as ProductType, Service, InvoicePayload, getWalkInCustomer
 } from '@/services/api';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import CardGiftcardIcon from '@mui/icons-material/CardGiftcard';
 import LocalOfferIcon from '@mui/icons-material/LocalOffer';
+import PaymentDialog from '@/components/PaymentDialog';
 
 type CartItem = {
   cartItemId: string; 
@@ -45,96 +46,92 @@ export default function CashRegisterPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [toast, setToast] = useState<{ open: boolean; msg: string; sev: 'success' | 'error' }>({ open: false, msg: '', sev: 'success' });
 
-  // States für Rabatt
+  const [selectedStaffId, setSelectedStaffId] = useState<string>('');
+
   const [discount, setDiscount] = useState({ type: 'percentage' as 'percentage' | 'fixed', value: 0 });
   const [isDiscountDialogOpen, setIsDiscountDialogOpen] = useState(false);
   const [tempDiscount, setTempDiscount] = useState({ type: 'percentage', value: '' });
   
-  // States für Gutscheinverkauf
   const [isVoucherDialogOpen, setIsVoucherDialogOpen] = useState(false);
   const [voucherValue, setVoucherValue] = useState('');
 
-  // NEU: States für Gutschein-Einlösung
   const [voucherCodeInput, setVoucherCodeInput] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState<{ code: string, amount: number } | null>(null);
   const [voucherError, setVoucherError] = useState('');
 
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+
   useEffect(() => {
-    // ... (unverändert)
     if (!token) return;
-
     const loadData = async () => {
-      try {
-        const [customerUsers, staffUsers] = await Promise.all([
-          fetchAllUsers(token, 'user'),
-          fetchAllUsers(token, 'staff')
-        ]); 
-        const regularCustomers = customerUsers.filter(u => u.email !== 'laufkunde@shop.local');
-        setStaff(staffUsers);
-
         try {
-          const walkInCustomer = await getWalkInCustomer(token);
-          setCustomers([walkInCustomer, ...regularCustomers]);
+            const [customerUsers, staffUsers, fetchedProducts, fetchedServices, walkInCustomer] = await Promise.all([
+                fetchAllUsers(token, 'user'),
+                fetchAllUsers(token, 'staff'),
+                fetchProducts(token),
+                fetchServices(token),
+                getWalkInCustomer(token)
+            ]);
+            
+            const regularCustomers = customerUsers.filter(u => u.email !== 'laufkunde@shop.local');
+            setCustomers([walkInCustomer, ...regularCustomers]);
+            setStaff(staffUsers);
+            setProducts(fetchedProducts);
+            setServices(fetchedServices);
+
+            if (fetchedServices.length > 0) {
+                setSelectedServiceId(fetchedServices[0]._id);
+            }
         } catch (error) {
-          console.error("Laufkunde konnte nicht geladen werden:", error);
-          setCustomers(regularCustomers); 
+            console.error("Fehler beim Laden der Kassendaten:", error);
+            setToast({ open: true, msg: "Wichtige Daten konnten nicht geladen werden.", sev: 'error' });
         }
-        
-        const [fetchedProducts, fetchedServices] = await Promise.all([
-          fetchProducts(token),
-          fetchServices(token),
-        ]);
-
-        setProducts(fetchedProducts);
-        setServices(fetchedServices);
-
-        if (fetchedServices.length > 0) {
-          setSelectedServiceId(fetchedServices[0]._id);
-        }
-      } catch (error) {
-        console.error("Fehler beim Laden der Kassendaten:", error);
-        setToast({ open: true, msg: "Wichtige Daten konnten nicht geladen werden.", sev: 'error' });
-      }
     };
-
     loadData();
   }, [token]);
 
-  const handleAddItem = (item: ProductType | Service, type: 'product' | 'service') => {
-    // ... (unverändert)
-    const itemName = type === 'product' ? (item as ProductType).name : (item as Service).title;
-    const displayName = type === 'product' ? `Produkt: ${itemName}` : itemName;
-    const staffId = type === 'service' ? (staff.length > 0 ? staff[0]._id : undefined) : undefined;
-    
-    setCart(prevCart => [
-      ...prevCart,
-      { 
-        cartItemId: `${type}_${item._id}_${Date.now()}`,
-        id: item._id, 
-        name: displayName,
-        price: item.price, 
-        type: type,
-        staffId: staffId,
+  const handleAddToCart = (item: ProductType | Service, type: 'product' | 'service') => {
+    // ## Skill-Prüfung für Dienstleistungen
+    if (type === 'service') {
+      if (!selectedStaffId) {
+        setToast({ open: true, msg: 'Bitte wählen Sie zuerst einen Mitarbeiter aus.', sev: 'error' });
+        return;
       }
-    ]);
+      
+      const staffMember = staff.find(s => s._id === selectedStaffId);
+      const hasSkill = staffMember?.skills?.some(skill => skill._id === item._id);
+
+      if (!hasSkill) {
+        const serviceTitle = (item as Service).title;
+        setToast({ open: true, msg: `"${staffMember?.firstName}" kann "${serviceTitle}" nicht ausführen.`, sev: 'error' });
+        return;
+      }
+    }
+
+    const cartItem: CartItem = {
+      cartItemId: `${type}-${item._id}-${Date.now()}`,
+      id: item._id,
+      name: type === 'product' ? (item as ProductType).name : (item as Service).title,
+      price: item.price,
+      type,
+      staffId: type === 'service' ? selectedStaffId : undefined,
+    };
+    setCart(prevCart => [...prevCart, cartItem]);
   };
   
   const handleAddSelectedService = () => {
-    // ... (unverändert)
-      const serviceToAdd = services.find(s => s._id === selectedServiceId);
-      if (serviceToAdd) {
-          handleAddItem(serviceToAdd, 'service');
-      }
+    const serviceToAdd = services.find(s => s._id === selectedServiceId);
+    if (serviceToAdd) {
+        handleAddToCart(serviceToAdd, 'service');
+    }
   };
-
+  
   const handleAddVoucherClick = () => {
-    // ... (unverändert)
     setVoucherValue('');
     setIsVoucherDialogOpen(true);
   };
   
   const handleConfirmAddVoucher = () => {
-    // ... (unverändert)
     const value = parseFloat(voucherValue);
     if (!isNaN(value) && value > 0) {
       setCart(prevCart => [...prevCart, { 
@@ -148,44 +145,29 @@ export default function CashRegisterPage() {
     setIsVoucherDialogOpen(false);
   };
   
-  const handleUpdateCartStaff = (cartItemId: string, staffId: string) => {
-    // ... (unverändert)
-    setCart(cart => cart.map(item => item.cartItemId === cartItemId ? { ...item, staffId } : item));
-  };
-  
   const handleRemoveFromCart = (cartItemId: string) => {
-    // ... (unverändert)
     setCart(prevCart => prevCart.filter(item => item.cartItemId !== cartItemId));
   };
 
-  // --- BERECHNUNGSLOGIK ERWEITERT ---
   const subTotal = cart.reduce((sum, item) => sum + item.price, 0);
   let discountAmount = 0;
   if (discount.value > 0) {
-    if (discount.type === 'percentage') {
-      discountAmount = subTotal * (discount.value / 100);
-    } else {
-      discountAmount = discount.value;
-    }
+    discountAmount = discount.type === 'percentage' ? subTotal * (discount.value / 100) : discount.value;
   }
   const totalAfterDiscount = subTotal - discountAmount;
-
-  // NEU: Gutschein-Betrag abziehen
+  
   let redeemedAmount = 0;
   if (appliedVoucher) {
     redeemedAmount = Math.min(totalAfterDiscount, appliedVoucher.amount);
   }
-  let finalTotal = totalAfterDiscount - redeemedAmount;
-  finalTotal = Math.max(0, finalTotal);
+  let finalTotal = Math.max(0, totalAfterDiscount - redeemedAmount);
   
   const handleOpenDiscountDialog = () => {
-    // ... (unverändert)
     setTempDiscount({type: discount.type, value: discount.value > 0 ? String(discount.value) : ''})
     setIsDiscountDialogOpen(true);
   };
   
   const handleApplyDiscount = () => {
-    // ... (unverändert)
     const value = parseFloat(tempDiscount.value);
     if (!isNaN(value) && value >= 0) {
       setDiscount({ type: tempDiscount.type as 'percentage' | 'fixed', value });
@@ -196,12 +178,10 @@ export default function CashRegisterPage() {
   };
   
   const handleRemoveDiscount = () => {
-    // ... (unverändert)
     setDiscount({ type: 'percentage', value: 0 });
     setIsDiscountDialogOpen(false);
   }
 
-  // --- NEUE FUNKTIONEN ZUR GUTSCHEIN-EINLÖSUNG ---
   const handleApplyVoucher = async () => {
     if (!token || !voucherCodeInput) return;
     setVoucherError('');
@@ -222,14 +202,13 @@ export default function CashRegisterPage() {
     setVoucherError('');
   };
   
-  const handleCheckout = async () => {
+  const handleCheckout = async (amountGiven: number) => {
     if (!selectedCustomer || cart.length === 0) {
       setToast({ open: true, msg: 'Bitte einen Kunden und mindestens einen Artikel auswählen.', sev: 'error' });
       return;
     }
     const staffIdForInvoice = cart.find(item => item.type === 'service')?.staffId || user?._id;
 
-    // Payload um voucherCode erweitert
     const payload: InvoicePayload = {
       customerId: selectedCustomer._id,
       paymentMethod: 'cash',
@@ -240,24 +219,25 @@ export default function CashRegisterPage() {
         value: item.type === 'voucher' ? item.price : undefined,
       })),
       discount: discount.value > 0 ? discount : undefined,
-      voucherCode: appliedVoucher?.code, // NEU
+      voucherCode: appliedVoucher?.code,
+      amountGiven,
     };
 
     try {
       await createInvoice(payload, token!);
       setToast({ open: true, msg: 'Verkauf erfolgreich abgeschlossen!', sev: 'success' });
-      // Alle Zustände zurücksetzen
       setCart([]);
       setSelectedCustomer(null);
       setDiscount({ type: 'percentage', value: 0 });
-      handleRemoveVoucher(); // Setzt Gutschein-Felder zurück
-
+      handleRemoveVoucher();
       const updatedProducts = await fetchProducts(token!);
       setProducts(updatedProducts);
     } catch (error) {
       console.error('Fehler beim Verkauf:', error);
       const errorMessage = (error instanceof Error) ? error.message : 'Ein unbekannter Fehler ist aufgetreten.';
       setToast({ open: true, msg: `Fehler: ${errorMessage}`, sev: 'error' });
+    } finally {
+      setIsPaymentDialogOpen(false);
     }
   };
 
@@ -291,7 +271,7 @@ export default function CashRegisterPage() {
             <List dense sx={{ maxHeight: '50vh', overflowY: 'auto' }}>
               {products.map(product => (
                 <ListItem key={product._id} secondaryAction={
-                  <Button onClick={() => handleAddItem(product, 'product')} startIcon={<AddIcon />} disabled={product.stock < 1}>
+                  <Button onClick={() => handleAddToCart(product, 'product')} startIcon={<AddIcon />} disabled={product.stock < 1}>
                     Hinzufügen
                   </Button>
                 }>
@@ -314,6 +294,18 @@ export default function CashRegisterPage() {
               renderInput={(params) => <TextField {...params} label="Kunde auswählen" variant="outlined" fullWidth />}
               sx={{ mb: 2 }}
             />
+             <FormControl fullWidth>
+                <InputLabel>Mitarbeiter für Dienstleistung</InputLabel>
+                <Select
+                    value={selectedStaffId}
+                    label="Mitarbeiter für Dienstleistung"
+                    onChange={(e) => setSelectedStaffId(e.target.value)}
+                >
+                    {staff.map((s) => (
+                        <MenuItem key={s._id} value={s._id}>{s.firstName} {s.lastName}</MenuItem>
+                    ))}
+                </Select>
+            </FormControl>
             <Divider sx={{ my: 2 }} />
 
             {cart.length === 0 ? (
@@ -326,17 +318,7 @@ export default function CashRegisterPage() {
                   }>
                     <ListItemText 
                       primary={item.name}
-                      secondary={
-                        item.type === 'service' ? (
-                          <FormControl size="small" variant="standard" sx={{mt: 1, minWidth: 150}}>
-                            <InputLabel>Mitarbeiter</InputLabel>
-                            <Select value={item.staffId || ''} onChange={(e) => handleUpdateCartStaff(item.cartItemId, e.target.value)}>
-                              {staff.map(s => <MenuItem key={s._id} value={s._id}>{s.firstName} {s.lastName}</MenuItem>)}
-                            </Select>
-                          </FormControl>
-                        ) : `${item.price.toFixed(2)}€`
-                      }
-                      secondaryTypographyProps={{ component: 'div' }} 
+                      secondary={item.type === 'service' ? `durch ${staff.find(s => s._id === item.staffId)?.firstName || 'N/A'}`: `${item.price.toFixed(2)}€`}
                     />
                      <Typography sx={{ml: 2}}>{item.price.toFixed(2)}€</Typography>
                   </ListItem>
@@ -345,13 +327,8 @@ export default function CashRegisterPage() {
             )}
             <Divider sx={{ my: 2 }} />
             
-            {/* --- ZUSAMMENFASSUNG --- */}
             <Stack spacing={1}>
-                <Stack direction="row" justifyContent="space-between">
-                    <Typography>Zwischensumme</Typography>
-                    <Typography>{subTotal.toFixed(2)}€</Typography>
-                </Stack>
-                
+                <Stack direction="row" justifyContent="space-between"><Typography>Zwischensumme</Typography><Typography>{subTotal.toFixed(2)}€</Typography></Stack>
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ color: discountAmount > 0 ? 'success.main' : 'text.primary' }}>
                     <Typography>Rabatt</Typography>
                     <Typography>-{discountAmount.toFixed(2)}€</Typography>
@@ -362,7 +339,6 @@ export default function CashRegisterPage() {
 
                 <Divider sx={{pt: 1}}/>
 
-                {/* --- NEU: GUTSCHEIN-EINLÖSUNG --- */}
                 {!appliedVoucher ? (
                     <Box>
                         <Typography sx={{mt: 1}}>Gutschein einlösen</Typography>
@@ -394,13 +370,22 @@ export default function CashRegisterPage() {
                 <Divider sx={{ my: 2 }} variant="middle" />
 
                 <Typography variant="h5" align="right">Gesamt: {finalTotal.toFixed(2)}€</Typography>
-                <Button variant="contained" color="primary" fullWidth disabled={!selectedCustomer || cart.length === 0} onClick={handleCheckout}>Verkauf abschließen (Bar)</Button>
+                
+                <Button 
+                  variant="contained" 
+                  color="primary" 
+                  fullWidth 
+                  disabled={!selectedCustomer || cart.length === 0} 
+                  onClick={() => setIsPaymentDialogOpen(true)}
+                >
+                  Verkauf abschließen (Bar)
+                </Button>
             </Stack>
           </Paper>
         </Grid>
       </Grid>
       
-      {/* --- DIALOGE --- */}
+      {/* Dialogs */}
       <Dialog open={isDiscountDialogOpen} onClose={() => setIsDiscountDialogOpen(false)}>
         <DialogTitle>Rabatt hinzufügen/bearbeiten</DialogTitle>
         <DialogContent>
@@ -449,6 +434,13 @@ export default function CashRegisterPage() {
           <Button onClick={handleConfirmAddVoucher} variant="contained">Hinzufügen</Button>
         </DialogActions>
       </Dialog>
+      
+      <PaymentDialog
+        open={isPaymentDialogOpen}
+        onClose={() => setIsPaymentDialogOpen(false)}
+        onConfirm={handleCheckout}
+        totalAmount={finalTotal}
+      />
       
       <Snackbar 
         open={toast.open} 

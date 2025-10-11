@@ -21,8 +21,7 @@ function generateVoucherCode(): string {
 
 export const createInvoice = async (req: SalonRequest, res: Response) => {
   try {
-    // NEU: voucherCode wird aus dem Body extrahiert
-    const { bookingId, customerId, items, paymentMethod, staffId: providedStaffId, discount, voucherCode } = req.body;
+    const { bookingId, customerId, items, paymentMethod, staffId: providedStaffId, discount, voucherCode, amountGiven } = req.body;
 
     if (!req.user || !req.salonId) {
       throw new Error('Authentifizierung fehlgeschlagen.');
@@ -91,6 +90,11 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
     }
     finalAmount = Math.max(0, finalAmount);
 
+    let change = 0;
+    if (typeof amountGiven === 'number' && amountGiven >= finalAmount) {
+      change = amountGiven - finalAmount;
+    }
+
     // --- NEUE GUTSCHEIN-EINLÖSUNG ---
     let redeemedAmount = 0;
     let redeemedVoucherCode: string | undefined = undefined;
@@ -133,6 +137,8 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
       paymentMethod,
       date: today,
       status: 'paid',
+      amountGiven: amountGiven || finalAmount,
+      change: change,
     });
     await newInvoice.save();
 
@@ -231,7 +237,8 @@ export const getAllInvoices = async (req: AuthRequest & SalonRequest, res: Respo
 
 export const processPaymentForBooking = async (req: AuthRequest & SalonRequest, res: Response) => {
     try {
-        const { bookingId, paymentMethod, amountGiven } = req.body;
+        const { bookingId, paymentMethod, amountGiven, voucherCode } = req.body;
+
         if (!bookingId) {
             return res.status(400).json({ success: false, message: 'BookingID ist erforderlich.' });
         }
@@ -248,17 +255,38 @@ export const processPaymentForBooking = async (req: AuthRequest & SalonRequest, 
         const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
         const countToday = await Invoice.countDocuments({ date: { $gte: dayjs(today).startOf('day').toDate() } });
         const invoiceNumber = `${dateStr}-${countToday + 1}`;
-        const servicePrice = (booking.service as any).price;
-        const given = amountGiven ? Number(amountGiven) : servicePrice;
-        if (given < servicePrice) {
-            return res.status(400).json({ message: 'Der gegebene Betrag ist geringer als der Rechnungsbetrag.' });
-        }
-        const change = given - servicePrice;
-
+        
+        let finalAmount = (booking.service as any).price;
         const serviceItem = {
             description: (booking.service as any).title,
-            price: (booking.service as any).price,
+            price: finalAmount,
         };
+
+        let redeemedAmount = 0;
+        let redeemedVoucherCode: string | undefined = undefined;
+
+        if (voucherCode) {
+            const voucher = await Voucher.findOne({ code: voucherCode, salon: req.salonId });
+            if (voucher && voucher.isActive) {
+                redeemedAmount = Math.min(finalAmount, voucher.currentValue);
+                finalAmount -= redeemedAmount;
+
+                voucher.currentValue -= redeemedAmount;
+                if (voucher.currentValue <= 0) {
+                    voucher.isActive = false;
+                }
+                await voucher.save();
+                redeemedVoucherCode = voucher.code;
+            } else {
+                 return res.status(400).json({ message: 'Ungültiger oder inaktiver Gutscheincode.' });
+            }
+        }
+
+        const given = amountGiven ? Number(amountGiven) : finalAmount;
+        if (given < finalAmount) {
+            return res.status(400).json({ message: 'Der gegebene Betrag ist geringer als der Rechnungsbetrag.' });
+        }
+        const change = given - finalAmount;
 
         const newInvoice = new Invoice({
             invoiceNumber,
@@ -268,11 +296,13 @@ export const processPaymentForBooking = async (req: AuthRequest & SalonRequest, 
             salon: req.salonId,
             date: today,
             items: [serviceItem],
-            amount: servicePrice,
+            amount: finalAmount,
             paymentMethod,
             amountGiven: given,
             change: change,
             status: 'paid',
+            redeemedVoucher: redeemedVoucherCode,
+            redeemedAmount: redeemedAmount,
         });
 
         await newInvoice.save();

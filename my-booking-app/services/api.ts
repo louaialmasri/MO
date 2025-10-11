@@ -81,6 +81,7 @@ export type InvoicePayload = {
     value: number;
   };
   voucherCode?: string;
+  amountGiven?: number;
 };
 
 export type Invoice = {

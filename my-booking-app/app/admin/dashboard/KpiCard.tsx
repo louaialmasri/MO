@@ -1,34 +1,38 @@
-import { Paper, Typography, Box, Stack } from '@mui/material';
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+'use client'
 
-type KpiCardProps = {
+import { Card, CardContent, Typography, Avatar, Stack } from '@mui/material';
+
+interface KpiCardProps {
   title: string;
-  currentValue: number;
-  previousValue: number;
-  formatAsCurrency?: boolean;
-};
+  value: string;
+  icon: React.ReactElement;
+  color?: 'primary' | 'secondary' | 'error' | 'warning' | 'info' | 'success';
+}
 
-export default function KpiCard({ title, currentValue, previousValue, formatAsCurrency = false }: KpiCardProps) {
-  const difference = currentValue - previousValue;
-  const percentageChange = previousValue !== 0 ? (difference / previousValue) * 100 : 0;
-  const isPositive = difference >= 0;
-  const showPercentage = isFinite(percentageChange) && previousValue !== 0;
-
+// VIEL SCHLANKERER CODE - Die Komponente erbt Stil vom Theme
+export default function KpiCard({ title, value, icon, color = 'primary' }: KpiCardProps) {
   return (
-    <Paper sx={{ p: 2 }}>
-      <Typography variant="h6" color="text.secondary">{title}</Typography>
-      <Typography variant="h4" fontWeight="bold">
-        {formatAsCurrency ? `€${currentValue.toFixed(2)}` : currentValue}
-      </Typography>
-      {showPercentage && (
-        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ color: isPositive ? 'success.main' : 'error.main' }}>
-          {isPositive ? <ArrowUpwardIcon fontSize="small" /> : <ArrowDownwardIcon fontSize="small" />}
-          <Typography variant="body2" fontWeight="bold">
-            {`${percentageChange.toFixed(1)}%`}
-          </Typography>
+    <Card 
+        variant="outlined" 
+        sx={{ 
+            transition: 'transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out',
+            '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: (theme) => theme.shadows[2], // Nutzt den neuen, weichen Schatten
+            }
+        }}
+    >
+      <CardContent>
+        <Stack direction="row" spacing={2} alignItems="center">
+          <Avatar sx={{ bgcolor: `${color}.main`, width: 48, height: 48 }}>
+            {icon}
+          </Avatar>
+          <Stack>
+            <Typography variant="h5">{value}</Typography>
+            <Typography variant="subtitle1">{title}</Typography>
+          </Stack>
         </Stack>
-      )}
-    </Paper>
+      </CardContent>
+    </Card>
   );
 }
