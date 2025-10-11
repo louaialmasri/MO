@@ -56,11 +56,11 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
             if (!item.value || item.value <= 0) throw new Error('Ungültiger Gutscheinwert.');
             const voucherCode = generateVoucherCode();
             
-            // --- KORREKTUR WURDE HIER ANGEWENDET ---
+            // --- HIER IST DIE KORREKTUR ---
             const newVoucher = new Voucher({
               code: voucherCode,
-              initialValue: item.value, // Korrigiert von initialAmount
-              currentValue: item.value, // Korrigiert von currentBalance
+              initialValue: item.value, // Korrekt: initialValue
+              currentValue: item.value, // Korrekt: currentValue
               salon: salonId,
             });
             await newVoucher.save();
@@ -81,7 +81,6 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
       }
     }
 
-    // --- Rabattberechnung (bleibt gleich) ---
     let finalAmount = subTotal;
     if (discount && discount.value > 0) {
       if (discount.type === 'percentage') {

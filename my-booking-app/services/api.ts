@@ -68,12 +68,19 @@ export type InvoiceItem = {
 }
 
 export type InvoicePayload = {
-  bookingId?: string;
   customerId: string;
-  items: InvoiceItem[];
   paymentMethod: 'cash' | 'card';
   staffId?: string;
-}
+  items: {
+    type: 'product' | 'voucher' | 'service';
+    id?: string;
+    value?: number;
+  }[];
+  discount?: {
+    type: 'percentage' | 'fixed';
+    value: number;
+  };
+};
 
 export type Invoice = {
   _id: string;
@@ -671,10 +678,12 @@ export async function updateSalon(id: string, data: Partial<Salon>) {
   return res.data.salon as Salon;
 }
 
-export async function createInvoice(payload: InvoicePayload) {
-  const res = await api.post('/invoices', payload);
+export const createInvoice = async (payload: InvoicePayload, token: string) => {
+  const res = await api.post('/invoices', payload, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
   return res.data;
-}
+};
 
 export async function fetchAllInvoices(token: string): Promise<InvoiceListItem[]> {
   const res = await api.get('/invoices/all', {

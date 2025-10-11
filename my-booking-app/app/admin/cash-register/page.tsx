@@ -16,14 +16,14 @@ import {
 } from '@mui/material';
 import { useAuth } from '@/context/AuthContext';
 import { 
-    fetchAllUsersForAdmin, fetchProducts, fetchServices, createInvoice, 
-    User, Product as ProductType, Service, InvoicePayload, getWalkInCustomer, 
-    fetchAllUsers
-} from '@/services/api'; // fetchAllUsers wurde entfernt, da fetchAllUsersForAdmin bereits importiert ist
+    fetchAllUsers, fetchProducts, fetchServices, createInvoice, 
+    User, Product as ProductType, Service, InvoicePayload, getWalkInCustomer
+} from '@/services/api';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import CardGiftcardIcon from '@mui/icons-material/CardGiftcard';
+import LocalOfferIcon from '@mui/icons-material/LocalOffer';
 
-// ... (CartItem Typ bleibt gleich)
 type CartItem = {
   cartItemId: string; 
   id: string;        
@@ -32,7 +32,6 @@ type CartItem = {
   type: 'product' | 'voucher' | 'service';
   staffId?: string;
 };
-
 
 export default function CashRegisterPage() {
   const { token, user } = useAuth();
@@ -43,10 +42,16 @@ export default function CashRegisterPage() {
   const [selectedServiceId, setSelectedServiceId] = useState<string>('');
   const [selectedCustomer, setSelectedCustomer] = useState<User | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [toast, setToast] = useState<{ open: boolean; msg: string; sev: 'success' | 'error' }>({ open: false, msg: '', sev: 'success' });
+
+  // States für Rabatt
   const [discount, setDiscount] = useState({ type: 'percentage' as 'percentage' | 'fixed', value: 0 });
   const [isDiscountDialogOpen, setIsDiscountDialogOpen] = useState(false);
   const [tempDiscount, setTempDiscount] = useState({ type: 'percentage', value: '' });
-  const [toast, setToast] = useState<{ open: boolean; msg: string; sev: 'success' | 'error' }>({ open: false, msg: '', sev: 'success' });
+  
+  // NEU: States für Gutscheinverkauf-Dialog
+  const [isVoucherDialogOpen, setIsVoucherDialogOpen] = useState(false);
+  const [voucherValue, setVoucherValue] = useState('');
 
   useEffect(() => {
       if (!token) return;
@@ -54,11 +59,11 @@ export default function CashRegisterPage() {
       const loadData = async () => {
         try {
           const [customerUsers, staffUsers] = await Promise.all([
-          fetchAllUsers(token, 'user'),
-          fetchAllUsers(token, 'staff')
-        ]); 
-        const regularCustomers = customerUsers.filter(u => u.email !== 'laufkunde@shop.local');
-        setStaff(staffUsers);
+            fetchAllUsers(token, 'user'),
+            fetchAllUsers(token, 'staff')
+          ]); 
+          const regularCustomers = customerUsers.filter(u => u.email !== 'laufkunde@shop.local');
+          setStaff(staffUsers);
   
           try {
             const walkInCustomer = await getWalkInCustomer(token);
@@ -113,17 +118,27 @@ export default function CashRegisterPage() {
       }
   };
 
-  const handleAddVoucher = () => {
-    const value = prompt('Wert des Gutscheins eingeben:');
-    const voucherValue = Number(value);
-    if (value && !isNaN(voucherValue) && voucherValue > 0) {
+  // KORREKTUR: Öffnet jetzt den Dialog anstatt prompt()
+  const handleAddVoucherClick = () => {
+    setVoucherValue('');
+    setIsVoucherDialogOpen(true);
+  };
+  
+  // NEU: Logik, wenn der Gutschein aus dem Dialog hinzugefügt wird
+  const handleConfirmAddVoucher = () => {
+    const value = parseFloat(voucherValue);
+    if (!isNaN(value) && value > 0) {
       setCart(prevCart => [...prevCart, { 
-        cartItemId: `voucher_${Date.now()}`, id: `voucher_${Date.now()}`, 
-        name: `Gutschein`, price: voucherValue, type: 'voucher' 
+        cartItemId: `voucher_${Date.now()}`, 
+        id: `voucher_val_${value}`, // Eindeutige ID für den Warenkorb
+        name: `Gutschein im Wert von ${value.toFixed(2)}€`, 
+        price: value, 
+        type: 'voucher' 
       }]);
     }
+    setIsVoucherDialogOpen(false);
   };
-
+  
   const handleUpdateCartStaff = (cartItemId: string, staffId: string) => {
     setCart(cart => cart.map(item => item.cartItemId === cartItemId ? { ...item, staffId } : item));
   };
@@ -182,19 +197,21 @@ export default function CashRegisterPage() {
         id: item.type !== 'voucher' ? item.id : undefined,
         value: item.type === 'voucher' ? item.price : undefined,
       })),
+      discount: discount.value > 0 ? discount : undefined,
     };
 
     try {
-      await createInvoice(payload);
+      await createInvoice(payload, token!);
       setToast({ open: true, msg: 'Verkauf erfolgreich abgeschlossen!', sev: 'success' });
       setCart([]);
       setSelectedCustomer(null);
-      // Lade die Produktliste neu, um den Lagerbestand zu aktualisieren.
+      setDiscount({ type: 'percentage', value: 0 });
       const updatedProducts = await fetchProducts(token!);
       setProducts(updatedProducts);
     } catch (error) {
       console.error('Fehler beim Verkauf:', error);
-      setToast({ open: true, msg: 'Ein Fehler ist aufgetreten.', sev: 'error' });
+      const errorMessage = (error instanceof Error) ? error.message : 'Ein unbekannter Fehler ist aufgetreten.';
+      setToast({ open: true, msg: `Fehler: ${errorMessage}`, sev: 'error' });
     }
   };
 
@@ -224,8 +241,9 @@ export default function CashRegisterPage() {
           </Paper>
           <Paper sx={{ p: 2 }}>
             <Typography variant="h6" gutterBottom>Produkte & Gutscheine</Typography>
-            <Button onClick={handleAddVoucher} variant="outlined" startIcon={<AddIcon />} sx={{ mb: 2, width: '100%'}}>Gutschein hinzufügen</Button>
-            <List dense>
+            {/* KORREKTUR: Button ruft jetzt handleAddVoucherClick auf */}
+            <Button onClick={handleAddVoucherClick} variant="outlined" startIcon={<CardGiftcardIcon />} sx={{ mb: 2, width: '100%'}}>Gutschein verkaufen</Button>
+            <List dense sx={{ maxHeight: '50vh', overflowY: 'auto' }}>
               {products.map(product => (
                 <ListItem key={product._id} secondaryAction={
                   <Button onClick={() => handleAddItem(product, 'product')} startIcon={<AddIcon />} disabled={product.stock < 1}>
@@ -253,11 +271,6 @@ export default function CashRegisterPage() {
             />
             <Divider sx={{ my: 2 }} />
 
-            {/* --- BEREICH FÜR ZWISCHENSUMME UND RABATT --- */}
-          <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
-            <Typography>Zwischensumme</Typography>
-            <Typography>{subTotal.toFixed(2)}€</Typography>
-          </Stack>
             {cart.length === 0 ? (
               <Typography color="text.secondary" sx={{minHeight: 150}}>Warenkorb ist leer.</Typography>
             ) : (
@@ -285,6 +298,21 @@ export default function CashRegisterPage() {
                 ))}
               </List>
             )}
+            <Divider sx={{ my: 1 }} />
+            
+            <Stack direction="row" justifyContent="space-between" sx={{ mb: 1, p: 1 }}>
+                <Typography>Zwischensumme</Typography>
+                <Typography>{subTotal.toFixed(2)}€</Typography>
+            </Stack>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ p: 1, borderRadius: 1, bgcolor: discount.value > 0 ? 'action.hover' : 'transparent' }}>
+                <Button onClick={handleOpenDiscountDialog} startIcon={<LocalOfferIcon />} size="small">
+                    {discount.value > 0 ? 'Rabatt bearbeiten' : 'Rabatt hinzufügen'}
+                </Button>
+                <Typography color={discount.value > 0 ? 'text.primary' : 'text.secondary'}>
+                    - {discountAmount.toFixed(2)}€
+                </Typography>
+            </Stack>
+
             <Divider sx={{ my: 2 }} />
             <Typography variant="h5" align="right" sx={{ mb: 2 }}>
               Gesamt: {finalTotal.toFixed(2)}€
@@ -298,7 +326,8 @@ export default function CashRegisterPage() {
             </Button>
           </Paper>
         </Grid>
-        {/* --- DIALOG ZUR RABATTEINGABE --- */}
+      </Grid>
+      
       <Dialog open={isDiscountDialogOpen} onClose={() => setIsDiscountDialogOpen(false)}>
         <DialogTitle>Rabatt hinzufügen/bearbeiten</DialogTitle>
         <DialogContent>
@@ -309,13 +338,8 @@ export default function CashRegisterPage() {
               </RadioGroup>
             </FormControl>
             <TextField
-              autoFocus
-              margin="dense"
-              label="Rabattwert"
-              type="number"
-              fullWidth
-              variant="outlined"
-              value={tempDiscount.value}
+              autoFocus margin="dense" label="Rabattwert" type="number"
+              fullWidth variant="outlined" value={tempDiscount.value}
               onChange={(e) => setTempDiscount(p => ({ ...p, value: e.target.value }))}
               InputProps={{
                 endAdornment: <InputAdornment position="end">{tempDiscount.type === 'percentage' ? '%' : '€'}</InputAdornment>,
@@ -329,9 +353,31 @@ export default function CashRegisterPage() {
           <Button onClick={handleApplyDiscount} variant="contained">Anwenden</Button>
         </DialogActions>
       </Dialog>
-      </Grid>
+
+      {/* NEU: DIALOG ZUM GUTSCHEINVERKAUF */}
+      <Dialog open={isVoucherDialogOpen} onClose={() => setIsVoucherDialogOpen(false)}>
+        <DialogTitle>Gutschein verkaufen</DialogTitle>
+        <DialogContent>
+            <TextField
+              autoFocus
+              margin="dense"
+              label="Gutscheinwert"
+              type="number"
+              fullWidth
+              variant="outlined"
+              value={voucherValue}
+              onChange={(e) => setVoucherValue(e.target.value)}
+              InputProps={{
+                startAdornment: <InputAdornment position="start">€</InputAdornment>,
+              }}
+            />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setIsVoucherDialogOpen(false)}>Abbrechen</Button>
+          <Button onClick={handleConfirmAddVoucher} variant="contained">Hinzufügen</Button>
+        </DialogActions>
+      </Dialog>
       
-      {/* --- Snackbar-Komponente für Benachrichtigungen --- */}
       <Snackbar 
         open={toast.open} 
         autoHideDuration={4000} 

@@ -1,4 +1,3 @@
-// my-booking-app/app/admin/cash-transactions/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react';
