@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { SalonRequest } from '../middlewares/activeSalon';
 import { Invoice } from '../models/Invoice';
-import { User } from '../models/User';
+import mongoose from 'mongoose';
 import dayjs from 'dayjs';
 
 export const getDashboardStats = async (req: SalonRequest, res: Response) => {
@@ -18,26 +18,19 @@ export const getDashboardStats = async (req: SalonRequest, res: Response) => {
 
     const startDate = dayjs(from).startOf('day').toDate();
     const endDate = dayjs(to).endOf('day').toDate();
+    const salonObjectId = new mongoose.Types.ObjectId(salonId);
 
-    const stats = await Invoice.aggregate([
+    // Aggregation für Umsatz pro Mitarbeiter
+    const revenueByStaff = await Invoice.aggregate([
       {
         $match: {
-          salon: salonId,
+          salon: salonObjectId,
           date: { $gte: startDate, $lte: endDate },
           status: 'paid'
         }
       },
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'staff',
-          foreignField: '_id',
-          as: 'staffDetails'
-        }
-      },
-      {
-        $unwind: '$staffDetails'
-      },
+      { $lookup: { from: 'users', localField: 'staff', foreignField: '_id', as: 'staffDetails' } },
+      { $unwind: '$staffDetails' },
       {
         $group: {
           _id: '$staffDetails',
@@ -56,21 +49,47 @@ export const getDashboardStats = async (req: SalonRequest, res: Response) => {
       }
     ]);
 
-    const totalRevenue = stats.reduce((sum, s) => sum + s.totalRevenue, 0);
-    const totalBookings = stats.reduce((sum, s) => sum + s.totalBookings, 0);
+    // NEU: Aggregation für Umsatz nach Quelle (Dienstleistung vs. Produkt)
+    const revenueBySource = await Invoice.aggregate([
+        {
+          $match: {
+            salon: salonObjectId,
+            date: { $gte: startDate, $lte: endDate },
+            status: 'paid'
+          }
+        },
+        { $unwind: '$items' },
+        {
+          $group: {
+            _id: {
+              $cond: [
+                { $regexMatch: { input: '$items.description', regex: /^Produkt:/ } },
+                'Produkte',
+                'Dienstleistungen'
+              ]
+            },
+            totalRevenue: { $sum: '$items.price' }
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            source: '$_id',
+            totalRevenue: 1,
+          }
+        }
+    ]);
 
-    // Platzhalter für weitere KPIs
-    const previousPeriodRevenue = 0; // TODO
-    const newCustomers = 0; // TODO
+    const totalRevenue = revenueByStaff.reduce((sum, s) => sum + s.totalRevenue, 0);
+    const totalBookings = revenueByStaff.reduce((sum, s) => sum + s.totalBookings, 0);
 
     res.json({
       success: true,
       stats: {
         totalRevenue,
         totalBookings,
-        previousPeriodRevenue,
-        newCustomers,
-        revenueByStaff: stats,
+        revenueByStaff,
+        revenueBySource // NEU
       }
     });
 
