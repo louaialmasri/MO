@@ -698,7 +698,7 @@ export const listCashClosings = async (token: string): Promise<any> => {
   const res = await api.get('/cash-closings', {
     headers: { Authorization: `Bearer ${token}` }
   });
-  return res.data; // Gib die gesamten Rohdaten zurück
+  return res.data.closings;
 };
 
 export const getCashClosingPreview = async (token: string) => {

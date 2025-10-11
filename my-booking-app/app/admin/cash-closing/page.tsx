@@ -22,21 +22,19 @@ export default function AdminCashClosingPage() {
         setLoading(true);
         listCashClosings(token)
           .then(data => {
-            if (data && Array.isArray(data.closings)) {
-              setClosings(data.closings); // Nimm das Array aus dem Objekt
-            } else if (Array.isArray(data)) {
-              setClosings(data); // Nimm direkt das Array
-            } else {
-              console.error("Unerwartete Datenstruktur von der API:", data);
-              setClosings([]); // Im Fehlerfall ein leeres Array setzen
-            }
+            // KORREKTUR: Wir wissen jetzt, dass 'data' ein Array ist.
+            setClosings(data);
           })
-          .catch(console.error)
+          .catch(err => {
+            console.error(err);
+            // Im Fehlerfall explizit leeres Array setzen, um Abstürze zu verhindern
+            setClosings([]); 
+          })
           .finally(() => setLoading(false));
       }
     };
 
-    if (!authLoading && token) {
+    if (!authLoading) {
       loadClosings();
     }
   }, [token, authLoading]);
@@ -59,23 +57,27 @@ export default function AdminCashClosingPage() {
 
       <Paper variant="outlined" sx={{ borderRadius: 2 }}>
         <List>
-          {closings.map((closing, index) => (
+          {closings.length > 0 ? closings.map((closing, index) => (
             <Box key={closing._id}>
               <ListItem>
                 <ListItemText
                   primary={`Abschluss vom ${dayjs(closing.date).format('DD.MM.YYYY HH:mm')}`}
+                  // Sicherheitsprüfung mit '?' für den Fall, dass 'executedBy' mal null ist
                   secondary={`Durchgeführt von: ${closing.executedBy?.firstName || ''} ${closing.executedBy?.lastName || ''}`}
                 />
                 <Stack alignItems="flex-end">
-                  <Typography variant="body1">Einnahmen (Bar): <strong>{closing.expectedAmount.toFixed(2)} €</strong></Typography>
+                  {/* Sicherheitsprüfung mit '|| 0', falls der Wert mal fehlt */}
+                  <Typography variant="body1">Einnahmen (Bar): <strong>{(closing.expectedAmount || 0).toFixed(2)} €</strong></Typography>
                   <Typography variant="body2" color='text.secondary'>
-                    Soll-Bestand: {closing.finalExpectedAmount.toFixed(2)} €
+                    Soll-Bestand: {(closing.finalExpectedAmount || 0).toFixed(2)} €
                   </Typography>
                 </Stack>
               </ListItem>
               {index < closings.length - 1 && <Divider />}
             </Box>
-          ))}
+          )) : (
+            <ListItem><ListItemText primary="Noch keine Kassenabschlüsse vorhanden." /></ListItem>
+          )}
         </List>
       </Paper>
     </Container>
