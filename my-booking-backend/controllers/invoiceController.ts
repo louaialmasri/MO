@@ -5,11 +5,9 @@ import { SalonRequest } from '../middlewares/activeSalon';
 import { Invoice } from '../models/Invoice';
 import { Booking } from '../models/Booking';
 import { Voucher } from '../models/Voucher';
-import { Product, IProduct } from '../models/Product';
-import { User } from '../models/User';
+import { Product } from '../models/Product';
 import dayjs from 'dayjs';
 import { Service } from '../models/Service';
-
 
 // Hilfsfunktion zum Generieren eines Gutschein-Codes
 function generateVoucherCode(): string {
@@ -22,60 +20,87 @@ function generateVoucherCode(): string {
 }
 
 export const createInvoice = async (req: SalonRequest, res: Response) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
     const { bookingId, customerId, items, paymentMethod, staffId: providedStaffId } = req.body;
 
     if (!req.user || !req.salonId) {
-      return res.status(401).json({ message: 'Authentifizierung fehlgeschlagen.' });
+      throw new Error('Authentifizierung fehlgeschlagen.');
     }
     const salonId = req.salonId;
-    // Verwende den übergebenen Mitarbeiter oder den eingeloggten Admin/Mitarbeiter als Fallback
     const staffId = providedStaffId || req.user.userId;
 
     if (!customerId) {
-      return res.status(400).json({ message: 'Kunde ist erforderlich.' });
+      throw new Error('Kunde ist erforderlich.');
     }
 
     const invoiceItems: { description: string, price: number }[] = [];
     let totalAmount = 0;
 
-    if (bookingId) {
-      const booking = await Booking.findById(bookingId).populate('service');
-      if (booking && booking.service) {
-        const serviceItem = {
-          description: (booking.service as any).title,
-          price: (booking.service as any).price,
-        };
-        invoiceItems.push(serviceItem);
-        totalAmount += serviceItem.price;
-      }
-    }
-
+    // --- Verarbeitung der Artikel ---
     if (items && Array.isArray(items)) {
       for (const item of items) {
-        if (item.type === 'product') {
-          // ... (bestehende Logik für Produkte)
-        } else if (item.type === 'voucher') {
-          // ... (bestehende Logik für Gutscheine)
-        } else if (item.type === 'service') { // --- NEUE LOGIK FÜR SERVICES ---
-          const service = await Service.findById(item.id);
-          if (!service) throw new Error(`Dienstleistung mit ID ${item.id} nicht gefunden.`);
+        switch (item.type) {
           
-          invoiceItems.push({ description: `Dienstleistung: ${service.title}`, price: service.price });
-          totalAmount += service.price;
+          // KORREKTUR & ERWEITERUNG: Logik für Produkte und Bestandsreduzierung
+          case 'product':
+            if (!item.id) throw new Error('Produkt-ID fehlt.');
+            const product = await Product.findById(item.id).session(session);
+            if (!product) throw new Error(`Produkt mit ID ${item.id} nicht gefunden.`);
+            
+            // Prüfen, ob genügend Lagerbestand vorhanden ist
+            if (product.stock < 1) {
+              throw new Error(`Produkt "${product.name}" ist nicht mehr auf Lager.`);
+            }
+            
+            invoiceItems.push({ description: `Produkt: ${product.name}`, price: product.price });
+            totalAmount += product.price;
+
+            // Lagerbestand reduzieren
+            product.stock -= 1;
+            await product.save({ session });
+            break;
+
+          // KORREKTUR & ERWEITERUNG: Logik für Gutscheinverkauf
+          case 'voucher':
+            if (!item.value || item.value <= 0) throw new Error('Ungültiger Gutscheinwert.');
+            const voucherCode = generateVoucherCode();
+            const newVoucher = new Voucher({
+              code: voucherCode,
+              initialAmount: item.value,
+              currentBalance: item.value,
+              salon: salonId,
+            });
+            await newVoucher.save({ session });
+
+            invoiceItems.push({ description: `Gutschein: ${voucherCode}`, price: item.value });
+            totalAmount += item.value;
+            break;
+
+          case 'service':
+            if (!item.id) throw new Error('Dienstleistungs-ID fehlt.');
+            const service = await Service.findById(item.id).session(session);
+            if (!service) throw new Error(`Dienstleistung mit ID ${item.id} nicht gefunden.`);
+            
+            invoiceItems.push({ description: `${service.title}`, price: service.price });
+            totalAmount += service.price;
+            break;
         }
       }
     }
 
     if (invoiceItems.length === 0) {
-        return res.status(400).json({ message: 'Keine Artikel für die Rechnung vorhanden.' });
+      throw new Error('Keine Artikel für die Rechnung vorhanden.');
     }
     
+    // --- Rechnungsnummer generieren ---
     const today = new Date();
     const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
     const countToday = await Invoice.countDocuments({ date: { $gte: dayjs(today).startOf('day').toDate() } });
     const invoiceNumber = `${dateStr}-${countToday + 1}`;
 
+    // --- Rechnung erstellen ---
     const newInvoice = new Invoice({
       invoiceNumber,
       booking: bookingId || null,
@@ -88,17 +113,24 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
       date: today,
       status: 'paid',
     });
-    await newInvoice.save();
+    await newInvoice.save({ session });
 
     if (bookingId) {
-      await Booking.findByIdAndUpdate(bookingId, { status: 'completed', invoiceNumber: newInvoice.invoiceNumber });
+      await Booking.findByIdAndUpdate(bookingId, { status: 'completed', invoiceNumber: newInvoice.invoiceNumber }).session(session);
     }
 
+    // Wenn alles gut gelaufen ist, die Transaktion bestätigen
+    await session.commitTransaction();
     res.status(201).json(newInvoice);
 
   } catch (error: any) {
+    // Wenn ein Fehler auftritt, die Transaktion abbrechen
+    await session.abortTransaction();
     console.error('Fehler beim Erstellen der Rechnung:', error);
-    res.status(500).json({ message: 'Fehler beim Erstellen der Rechnung', error: error.message });
+    res.status(400).json({ message: error.message || 'Fehler beim Erstellen der Rechnung' });
+  } finally {
+    // Die Session immer beenden
+    session.endSession();
   }
 };
 
@@ -155,31 +187,28 @@ export const getAllInvoices = async (req: AuthRequest & SalonRequest, res: Respo
             .populate('salon', 'name')
             .populate('staff', 'firstName lastName')
             .sort({ date: -1 })
-            .lean(); // .lean() für bessere Performance und einfachere Bearbeitung
+            .lean(); 
 
-        // NEUE LOGIK: Transformiere die Daten für das Frontend
         const transformedInvoices = invoices.map(invoice => {
             let itemsSummary = 'Unbekannter Posten';
             if (invoice.booking && (invoice.booking as any).service) {
                 itemsSummary = (invoice.booking as any).service.title;
             } else if (invoice.items && invoice.items.length > 0) {
-                // Nimmt den ersten Posten als Zusammenfassung für die Liste
                 itemsSummary = invoice.items[0].description;
                 if (invoice.items.length > 1) {
                     itemsSummary += ` (+${invoice.items.length - 1} weitere)`;
                 }
             }
             
-            // Entferne das alte 'service' Objekt aus der obersten Ebene, um Konsistenz zu schaffen
             const { service, ...rest } = invoice as any;
 
             return {
                 ...rest,
-                itemsSummary, // Füge die neue Zusammenfassung hinzu
+                itemsSummary, 
             };
         });
 
-        res.json(transformedInvoices); // Sende die transformierten Daten
+        res.json(transformedInvoices); 
 
     } catch (error) {
         res.status(500).json({ message: 'Serverfehler beim Abrufen aller Rechnungen' });
@@ -246,4 +275,3 @@ export const processPaymentForBooking = async (req: AuthRequest & SalonRequest, 
         res.status(500).json({ success: false, message: 'Serverfehler' });
     }
 };
-
