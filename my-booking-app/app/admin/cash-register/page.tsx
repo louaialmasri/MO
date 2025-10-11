@@ -12,11 +12,12 @@ import {
     FormControlLabel,
     InputAdornment,
     Radio,
-    RadioGroup
+    RadioGroup,
+    Chip // Chip importiert
 } from '@mui/material';
 import { useAuth } from '@/context/AuthContext';
 import { 
-    fetchAllUsers, fetchProducts, fetchServices, createInvoice, 
+    fetchAllUsers, fetchProducts, fetchServices, createInvoice, validateVoucher, // validateVoucher importiert
     User, Product as ProductType, Service, InvoicePayload, getWalkInCustomer
 } from '@/services/api';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -49,51 +50,58 @@ export default function CashRegisterPage() {
   const [isDiscountDialogOpen, setIsDiscountDialogOpen] = useState(false);
   const [tempDiscount, setTempDiscount] = useState({ type: 'percentage', value: '' });
   
-  // NEU: States für Gutscheinverkauf-Dialog
+  // States für Gutscheinverkauf
   const [isVoucherDialogOpen, setIsVoucherDialogOpen] = useState(false);
   const [voucherValue, setVoucherValue] = useState('');
 
+  // NEU: States für Gutschein-Einlösung
+  const [voucherCodeInput, setVoucherCodeInput] = useState('');
+  const [appliedVoucher, setAppliedVoucher] = useState<{ code: string, amount: number } | null>(null);
+  const [voucherError, setVoucherError] = useState('');
+
   useEffect(() => {
-      if (!token) return;
-  
-      const loadData = async () => {
+    // ... (unverändert)
+    if (!token) return;
+
+    const loadData = async () => {
+      try {
+        const [customerUsers, staffUsers] = await Promise.all([
+          fetchAllUsers(token, 'user'),
+          fetchAllUsers(token, 'staff')
+        ]); 
+        const regularCustomers = customerUsers.filter(u => u.email !== 'laufkunde@shop.local');
+        setStaff(staffUsers);
+
         try {
-          const [customerUsers, staffUsers] = await Promise.all([
-            fetchAllUsers(token, 'user'),
-            fetchAllUsers(token, 'staff')
-          ]); 
-          const regularCustomers = customerUsers.filter(u => u.email !== 'laufkunde@shop.local');
-          setStaff(staffUsers);
-  
-          try {
-            const walkInCustomer = await getWalkInCustomer(token);
-            setCustomers([walkInCustomer, ...regularCustomers]);
-          } catch (error) {
-            console.error("Laufkunde konnte nicht geladen werden:", error);
-            setCustomers(regularCustomers); 
-          }
-          
-          const [fetchedProducts, fetchedServices] = await Promise.all([
-            fetchProducts(token),
-            fetchServices(token),
-          ]);
-  
-          setProducts(fetchedProducts);
-          setServices(fetchedServices);
-  
-          if (fetchedServices.length > 0) {
-            setSelectedServiceId(fetchedServices[0]._id);
-          }
+          const walkInCustomer = await getWalkInCustomer(token);
+          setCustomers([walkInCustomer, ...regularCustomers]);
         } catch (error) {
-          console.error("Fehler beim Laden der Kassendaten:", error);
-          setToast({ open: true, msg: "Wichtige Daten konnten nicht geladen werden.", sev: 'error' });
+          console.error("Laufkunde konnte nicht geladen werden:", error);
+          setCustomers(regularCustomers); 
         }
-      };
-  
-      loadData();
-    }, [token]);
+        
+        const [fetchedProducts, fetchedServices] = await Promise.all([
+          fetchProducts(token),
+          fetchServices(token),
+        ]);
+
+        setProducts(fetchedProducts);
+        setServices(fetchedServices);
+
+        if (fetchedServices.length > 0) {
+          setSelectedServiceId(fetchedServices[0]._id);
+        }
+      } catch (error) {
+        console.error("Fehler beim Laden der Kassendaten:", error);
+        setToast({ open: true, msg: "Wichtige Daten konnten nicht geladen werden.", sev: 'error' });
+      }
+    };
+
+    loadData();
+  }, [token]);
 
   const handleAddItem = (item: ProductType | Service, type: 'product' | 'service') => {
+    // ... (unverändert)
     const itemName = type === 'product' ? (item as ProductType).name : (item as Service).title;
     const displayName = type === 'product' ? `Produkt: ${itemName}` : itemName;
     const staffId = type === 'service' ? (staff.length > 0 ? staff[0]._id : undefined) : undefined;
@@ -112,25 +120,26 @@ export default function CashRegisterPage() {
   };
   
   const handleAddSelectedService = () => {
+    // ... (unverändert)
       const serviceToAdd = services.find(s => s._id === selectedServiceId);
       if (serviceToAdd) {
           handleAddItem(serviceToAdd, 'service');
       }
   };
 
-  // KORREKTUR: Öffnet jetzt den Dialog anstatt prompt()
   const handleAddVoucherClick = () => {
+    // ... (unverändert)
     setVoucherValue('');
     setIsVoucherDialogOpen(true);
   };
   
-  // NEU: Logik, wenn der Gutschein aus dem Dialog hinzugefügt wird
   const handleConfirmAddVoucher = () => {
+    // ... (unverändert)
     const value = parseFloat(voucherValue);
     if (!isNaN(value) && value > 0) {
       setCart(prevCart => [...prevCart, { 
         cartItemId: `voucher_${Date.now()}`, 
-        id: `voucher_val_${value}`, // Eindeutige ID für den Warenkorb
+        id: `voucher_val_${value}`,
         name: `Gutschein im Wert von ${value.toFixed(2)}€`, 
         price: value, 
         type: 'voucher' 
@@ -140,46 +149,78 @@ export default function CashRegisterPage() {
   };
   
   const handleUpdateCartStaff = (cartItemId: string, staffId: string) => {
+    // ... (unverändert)
     setCart(cart => cart.map(item => item.cartItemId === cartItemId ? { ...item, staffId } : item));
   };
   
   const handleRemoveFromCart = (cartItemId: string) => {
+    // ... (unverändert)
     setCart(prevCart => prevCart.filter(item => item.cartItemId !== cartItemId));
   };
 
+  // --- BERECHNUNGSLOGIK ERWEITERT ---
   const subTotal = cart.reduce((sum, item) => sum + item.price, 0);
-  let finalTotal = subTotal;
   let discountAmount = 0;
   if (discount.value > 0) {
     if (discount.type === 'percentage') {
       discountAmount = subTotal * (discount.value / 100);
-      finalTotal = subTotal - discountAmount;
     } else {
       discountAmount = discount.value;
-      finalTotal = subTotal - discountAmount;
     }
   }
+  const totalAfterDiscount = subTotal - discountAmount;
+
+  // NEU: Gutschein-Betrag abziehen
+  let redeemedAmount = 0;
+  if (appliedVoucher) {
+    redeemedAmount = Math.min(totalAfterDiscount, appliedVoucher.amount);
+  }
+  let finalTotal = totalAfterDiscount - redeemedAmount;
   finalTotal = Math.max(0, finalTotal);
   
   const handleOpenDiscountDialog = () => {
+    // ... (unverändert)
     setTempDiscount({type: discount.type, value: discount.value > 0 ? String(discount.value) : ''})
     setIsDiscountDialogOpen(true);
   };
   
   const handleApplyDiscount = () => {
+    // ... (unverändert)
     const value = parseFloat(tempDiscount.value);
     if (!isNaN(value) && value >= 0) {
       setDiscount({ type: tempDiscount.type as 'percentage' | 'fixed', value });
     } else {
-      setDiscount({ type: 'percentage', value: 0 }); // Rabatt zurücksetzen bei ungültiger Eingabe
+      setDiscount({ type: 'percentage', value: 0 });
     }
     setIsDiscountDialogOpen(false);
   };
   
   const handleRemoveDiscount = () => {
+    // ... (unverändert)
     setDiscount({ type: 'percentage', value: 0 });
     setIsDiscountDialogOpen(false);
   }
+
+  // --- NEUE FUNKTIONEN ZUR GUTSCHEIN-EINLÖSUNG ---
+  const handleApplyVoucher = async () => {
+    if (!token || !voucherCodeInput) return;
+    setVoucherError('');
+    try {
+      const { voucher } = await validateVoucher(voucherCodeInput, token);
+      setAppliedVoucher({ code: voucher.code, amount: voucher.currentValue });
+      setToast({ open: true, msg: `Gutschein ${voucher.code} mit ${voucher.currentValue.toFixed(2)}€ Guthaben angewendet!`, sev: 'success' });
+    } catch (error: any) {
+      const msg = error.response?.data?.message || 'Fehler bei der Gutscheinprüfung.';
+      setVoucherError(msg);
+      setAppliedVoucher(null);
+    }
+  };
+
+  const handleRemoveVoucher = () => {
+    setAppliedVoucher(null);
+    setVoucherCodeInput('');
+    setVoucherError('');
+  };
   
   const handleCheckout = async () => {
     if (!selectedCustomer || cart.length === 0) {
@@ -188,6 +229,7 @@ export default function CashRegisterPage() {
     }
     const staffIdForInvoice = cart.find(item => item.type === 'service')?.staffId || user?._id;
 
+    // Payload um voucherCode erweitert
     const payload: InvoicePayload = {
       customerId: selectedCustomer._id,
       paymentMethod: 'cash',
@@ -198,14 +240,18 @@ export default function CashRegisterPage() {
         value: item.type === 'voucher' ? item.price : undefined,
       })),
       discount: discount.value > 0 ? discount : undefined,
+      voucherCode: appliedVoucher?.code, // NEU
     };
 
     try {
       await createInvoice(payload, token!);
       setToast({ open: true, msg: 'Verkauf erfolgreich abgeschlossen!', sev: 'success' });
+      // Alle Zustände zurücksetzen
       setCart([]);
       setSelectedCustomer(null);
       setDiscount({ type: 'percentage', value: 0 });
+      handleRemoveVoucher(); // Setzt Gutschein-Felder zurück
+
       const updatedProducts = await fetchProducts(token!);
       setProducts(updatedProducts);
     } catch (error) {
@@ -216,7 +262,7 @@ export default function CashRegisterPage() {
   };
 
   return (
-    <Container maxWidth="xl">
+    <Container maxWidth="xl" sx={{ pb: 4 }}>
       <Typography variant="h4" sx={{ my: 4 }}>Kasse / Sofortverkauf</Typography>
       <Grid container spacing={4}>
         {/* Linke Spalte */}
@@ -241,7 +287,6 @@ export default function CashRegisterPage() {
           </Paper>
           <Paper sx={{ p: 2 }}>
             <Typography variant="h6" gutterBottom>Produkte & Gutscheine</Typography>
-            {/* KORREKTUR: Button ruft jetzt handleAddVoucherClick auf */}
             <Button onClick={handleAddVoucherClick} variant="outlined" startIcon={<CardGiftcardIcon />} sx={{ mb: 2, width: '100%'}}>Gutschein verkaufen</Button>
             <List dense sx={{ maxHeight: '50vh', overflowY: 'auto' }}>
               {products.map(product => (
@@ -259,7 +304,7 @@ export default function CashRegisterPage() {
 
         {/* Rechte Spalte: Warenkorb */}
         <Grid size={{ xs: 12, md: 5 }}>
-          <Paper sx={{ p: 2, position: 'sticky', top: '20px' }}>
+          <Paper sx={{ p: 2, position: 'sticky', top: '80px' }}>
             <Typography variant="h6" gutterBottom>Warenkorb</Typography>
             <Autocomplete
               options={customers}
@@ -298,36 +343,64 @@ export default function CashRegisterPage() {
                 ))}
               </List>
             )}
-            <Divider sx={{ my: 1 }} />
-            
-            <Stack direction="row" justifyContent="space-between" sx={{ mb: 1, p: 1 }}>
-                <Typography>Zwischensumme</Typography>
-                <Typography>{subTotal.toFixed(2)}€</Typography>
-            </Stack>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ p: 1, borderRadius: 1, bgcolor: discount.value > 0 ? 'action.hover' : 'transparent' }}>
-                <Button onClick={handleOpenDiscountDialog} startIcon={<LocalOfferIcon />} size="small">
-                    {discount.value > 0 ? 'Rabatt bearbeiten' : 'Rabatt hinzufügen'}
-                </Button>
-                <Typography color={discount.value > 0 ? 'text.primary' : 'text.secondary'}>
-                    - {discountAmount.toFixed(2)}€
-                </Typography>
-            </Stack>
-
             <Divider sx={{ my: 2 }} />
-            <Typography variant="h5" align="right" sx={{ mb: 2 }}>
-              Gesamt: {finalTotal.toFixed(2)}€
-            </Typography>
-            <Button
-              variant="contained" color="primary" fullWidth
-              disabled={!selectedCustomer || cart.length === 0}
-              onClick={handleCheckout}
-            >
-              Verkauf abschließen (Bar)
-            </Button>
+            
+            {/* --- ZUSAMMENFASSUNG --- */}
+            <Stack spacing={1}>
+                <Stack direction="row" justifyContent="space-between">
+                    <Typography>Zwischensumme</Typography>
+                    <Typography>{subTotal.toFixed(2)}€</Typography>
+                </Stack>
+                
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ color: discountAmount > 0 ? 'success.main' : 'text.primary' }}>
+                    <Typography>Rabatt</Typography>
+                    <Typography>-{discountAmount.toFixed(2)}€</Typography>
+                </Stack>
+                <Button startIcon={<LocalOfferIcon />} onClick={handleOpenDiscountDialog} size="small" sx={{justifyContent: 'flex-start'}}>
+                  {discount.value > 0 ? 'Rabatt bearbeiten' : 'Rabatt hinzufügen'}
+                </Button>
+
+                <Divider sx={{pt: 1}}/>
+
+                {/* --- NEU: GUTSCHEIN-EINLÖSUNG --- */}
+                {!appliedVoucher ? (
+                    <Box>
+                        <Typography sx={{mt: 1}}>Gutschein einlösen</Typography>
+                        <Stack direction="row" spacing={1} sx={{mt: 1}}>
+                            <TextField 
+                                size="small" 
+                                label="Gutschein-Code" 
+                                value={voucherCodeInput}
+                                onChange={(e) => setVoucherCodeInput(e.target.value.toUpperCase())}
+                                error={!!voucherError}
+                                helperText={voucherError}
+                                fullWidth
+                            />
+                            <Button onClick={handleApplyVoucher} variant="outlined">Prüfen</Button>
+                        </Stack>
+                    </Box>
+                ) : (
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ color: 'success.main', mt: 1 }}>
+                        <Typography>Gutschein eingelöst</Typography>
+                        <Chip 
+                            label={`-${redeemedAmount.toFixed(2)}€ (${appliedVoucher.code})`}
+                            onDelete={handleRemoveVoucher}
+                            color="success"
+                            size="small"
+                        />
+                    </Stack>
+                )}
+
+                <Divider sx={{ my: 2 }} variant="middle" />
+
+                <Typography variant="h5" align="right">Gesamt: {finalTotal.toFixed(2)}€</Typography>
+                <Button variant="contained" color="primary" fullWidth disabled={!selectedCustomer || cart.length === 0} onClick={handleCheckout}>Verkauf abschließen (Bar)</Button>
+            </Stack>
           </Paper>
         </Grid>
       </Grid>
       
+      {/* --- DIALOGE --- */}
       <Dialog open={isDiscountDialogOpen} onClose={() => setIsDiscountDialogOpen(false)}>
         <DialogTitle>Rabatt hinzufügen/bearbeiten</DialogTitle>
         <DialogContent>
@@ -353,8 +426,7 @@ export default function CashRegisterPage() {
           <Button onClick={handleApplyDiscount} variant="contained">Anwenden</Button>
         </DialogActions>
       </Dialog>
-
-      {/* NEU: DIALOG ZUM GUTSCHEINVERKAUF */}
+      
       <Dialog open={isVoucherDialogOpen} onClose={() => setIsVoucherDialogOpen(false)}>
         <DialogTitle>Gutschein verkaufen</DialogTitle>
         <DialogContent>

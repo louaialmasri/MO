@@ -80,6 +80,7 @@ export type InvoicePayload = {
     type: 'percentage' | 'fixed';
     value: number;
   };
+  voucherCode?: string;
 };
 
 export type Invoice = {
@@ -833,6 +834,14 @@ export const downloadDatevExport = async (from: string, to: string, token: strin
   document.body.appendChild(link);
   link.click();
   link.parentNode?.removeChild(link);
+};
+
+// Voucher API
+export const validateVoucher = async (code: string, token: string) => {
+  const res = await api.get(`/vouchers/validate/${code}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data; // Erwarten { success: true, voucher: { ... } }
 };
 
 export default api

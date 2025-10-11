@@ -21,7 +21,8 @@ function generateVoucherCode(): string {
 
 export const createInvoice = async (req: SalonRequest, res: Response) => {
   try {
-    const { bookingId, customerId, items, paymentMethod, staffId: providedStaffId, discount } = req.body;
+    // NEU: voucherCode wird aus dem Body extrahiert
+    const { bookingId, customerId, items, paymentMethod, staffId: providedStaffId, discount, voucherCode } = req.body;
 
     if (!req.user || !req.salonId) {
       throw new Error('Authentifizierung fehlgeschlagen.');
@@ -54,18 +55,17 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
 
           case 'voucher':
             if (!item.value || item.value <= 0) throw new Error('Ungültiger Gutscheinwert.');
-            const voucherCode = generateVoucherCode();
+            const generatedVoucherCode = generateVoucherCode();
             
-            // --- HIER IST DIE KORREKTUR ---
             const newVoucher = new Voucher({
-              code: voucherCode,
-              initialValue: item.value, // Korrekt: initialValue
-              currentValue: item.value, // Korrekt: currentValue
+              code: generatedVoucherCode,
+              initialValue: item.value,
+              currentValue: item.value,
               salon: salonId,
             });
             await newVoucher.save();
 
-            invoiceItems.push({ description: `Gutschein: ${voucherCode}`, price: item.value });
+            invoiceItems.push({ description: `Gutschein: ${generatedVoucherCode}`, price: item.value });
             subTotal += item.value;
             break;
 
@@ -91,6 +91,24 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
     }
     finalAmount = Math.max(0, finalAmount);
 
+    // --- NEUE GUTSCHEIN-EINLÖSUNG ---
+    let redeemedAmount = 0;
+    let redeemedVoucherCode: string | undefined = undefined;
+
+    if (voucherCode) {
+      const voucher = await Voucher.findOne({ code: voucherCode, salon: req.salonId });
+
+      if (!voucher || voucher.currentValue <= 0) {
+        throw new Error('Gutschein ist ungültig oder hat kein Guthaben.');
+      }
+
+      redeemedAmount = Math.min(finalAmount, voucher.currentValue);
+      finalAmount -= redeemedAmount;
+
+      voucher.currentValue -= redeemedAmount;
+      await voucher.save();
+      redeemedVoucherCode = voucher.code;
+    }
 
     if (invoiceItems.length === 0) {
       throw new Error('Keine Artikel für die Rechnung vorhanden.');
@@ -109,7 +127,8 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
       staff: staffId,
       items: invoiceItems,
       discount: discount,
-      amount: finalAmount,
+      redeemedVoucher: redeemedVoucherCode, // NEU: Eingelöster Gutschein wird gespeichert
+      amount: finalAmount, 
       paymentMethod,
       date: today,
       status: 'paid',

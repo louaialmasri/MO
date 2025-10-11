@@ -19,11 +19,12 @@ import availabilityTemplateRoutes from './routes/availabilityTemplates'
 import staffRoutes from './routes/staff';
 import invoiceRoutes from './routes/invoice';
 import cashClosingRoutes from './routes/cashClosing';
-import productCategoryRoutes from './routes/productCategories'; // NEU
-import productRoutes from './routes/products'; // NEU
-import serviceCategoryRoutes from './routes/serviceCategories'; // NEU
+import productCategoryRoutes from './routes/productCategories';
+import productRoutes from './routes/products';
+import serviceCategoryRoutes from './routes/serviceCategories';
 import dashboardRoutes from './routes/dashboard';
-import exportRoutes from './routes/export'; 
+import exportRoutes from './routes/export';
+import voucherRoutes from './routes/voucher';
 
 
 const app = express()
@@ -66,6 +67,7 @@ app.use('/api/service-categories', activeSalon, serviceCategoryRoutes); // NEU
 app.use('/api/invoices', activeSalon, invoiceRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/export', exportRoutes);
+app.use('/api/vouchers', voucherRoutes);
 
 app.listen(PORT, () => {
   console.log(`🚀 Backend läuft auf http://localhost:${PORT}`)

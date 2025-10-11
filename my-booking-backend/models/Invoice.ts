@@ -11,6 +11,7 @@ export interface IInvoice extends Document {
     description: string;
     price: number;
   }[];
+  redeemedVoucher?: string;
   amount: number;
   paymentMethod: 'cash' | 'card';
   status: 'paid' | 'unpaid' | 'cancelled';
