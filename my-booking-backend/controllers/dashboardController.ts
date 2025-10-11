@@ -9,87 +9,84 @@ export const getDashboardStats = async (req: SalonRequest, res: Response) => {
     const { from, to } = req.query as { from?: string, to?: string };
     const salonId = req.salonId;
 
-    if (!salonId) {
-      return res.status(400).json({ message: 'Kein Salon ausgewählt.' });
-    }
-    if (!from || !to) {
-        return res.status(400).json({ message: 'Start- und Enddatum sind erforderlich.' });
+    if (!salonId || !from || !to) {
+      return res.status(400).json({ message: 'Salon-ID, Start- und Enddatum sind erforderlich.' });
     }
 
+    // Aktueller Zeitraum
     const startDate = dayjs(from).startOf('day').toDate();
     const endDate = dayjs(to).endOf('day').toDate();
     const salonObjectId = new mongoose.Types.ObjectId(salonId);
 
-    // Aggregation für Umsatz pro Mitarbeiter
-    const revenueByStaff = await Invoice.aggregate([
-      {
-        $match: {
-          salon: salonObjectId,
-          date: { $gte: startDate, $lte: endDate },
-          status: 'paid'
-        }
-      },
-      { $lookup: { from: 'users', localField: 'staff', foreignField: '_id', as: 'staffDetails' } },
-      { $unwind: '$staffDetails' },
-      {
-        $group: {
-          _id: '$staffDetails',
-          totalRevenue: { $sum: '$amount' },
-          totalBookings: { $sum: 1 }
-        }
-      },
-      {
-        $project: {
-          _id: 0,
-          staffId: '$_id._id',
-          staffName: { $concat: ['$_id.firstName', ' ', '$_id.lastName'] },
-          totalRevenue: 1,
-          totalBookings: 1
-        }
-      }
+    // NEU: Vorherigen Zeitraum berechnen
+    const duration = dayjs(endDate).diff(dayjs(startDate), 'day');
+    const previousStartDate = dayjs(startDate).subtract(duration + 1, 'day').toDate();
+    const previousEndDate = dayjs(startDate).subtract(1, 'day').endOf('day').toDate();
+    
+    // Alle Abfragen parallel ausführen
+    const [
+        currentPeriodStats,
+        previousPeriodStats,
+        revenueByStaff,
+        revenueBySource,
+        dailyRevenue,
+        topServices
+    ] = await Promise.all([
+        // KPI für aktuellen Zeitraum
+        Invoice.aggregate([
+            { $match: { salon: salonObjectId, date: { $gte: startDate, $lte: endDate }, status: 'paid' } },
+            { $group: { _id: null, totalRevenue: { $sum: '$amount' }, totalBookings: { $sum: 1 } } }
+        ]),
+        // NEU: KPI für vorherigen Zeitraum
+        Invoice.aggregate([
+            { $match: { salon: salonObjectId, date: { $gte: previousStartDate, $lte: previousEndDate }, status: 'paid' } },
+            { $group: { _id: null, totalRevenue: { $sum: '$amount' }, totalBookings: { $sum: 1 } } }
+        ]),
+        // Umsatz pro Mitarbeiter
+        Invoice.aggregate([
+            { $match: { salon: salonObjectId, date: { $gte: startDate, $lte: endDate }, status: 'paid' } },
+            { $lookup: { from: 'users', localField: 'staff', foreignField: '_id', as: 'staffDetails' } },
+            { $unwind: { path: '$staffDetails', preserveNullAndEmptyArrays: true } },
+            { $group: { _id: '$staffDetails', totalRevenue: { $sum: '$amount' } } },
+            { $project: { _id: 0, staffName: { $concat: ['$_id.firstName', ' ', '$_id.lastName'] }, totalRevenue: 1 } }
+        ]),
+        // Umsatz nach Quelle
+        Invoice.aggregate([
+            { $match: { salon: salonObjectId, date: { $gte: startDate, $lte: endDate }, status: 'paid' } },
+            { $unwind: '$items' },
+            { $group: { _id: { $cond: [{ $regexMatch: { input: '$items.description', regex: /^Produkt:/ } }, 'Produkte', 'Dienstleistungen'] }, totalRevenue: { $sum: '$items.price' } } },
+            { $project: { _id: 0, source: '$_id', totalRevenue: 1 } }
+        ]),
+        // Täglicher Umsatz
+        Invoice.aggregate([
+            { $match: { salon: salonObjectId, date: { $gte: startDate, $lte: endDate }, status: 'paid' } },
+            { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$date' } }, dailyRevenue: { $sum: '$amount' } } },
+            { $sort: { _id: 1 } },
+            { $project: { _id: 0, date: '$_id', totalRevenue: '$dailyRevenue' } }
+        ]),
+        // NEU: Top 5 Dienstleistungen
+        Invoice.aggregate([
+            { $match: { salon: salonObjectId, date: { $gte: startDate, $lte: endDate }, status: 'paid' } },
+            { $unwind: '$items' },
+            { $match: { 'items.description': { $not: /^Produkt:/ } } }, // Nur Dienstleistungen
+            { $group: { _id: '$items.description', totalRevenue: { $sum: '$items.price' }, count: { $sum: 1 } } },
+            { $sort: { totalRevenue: -1 } },
+            { $limit: 5 },
+            { $project: { _id: 0, name: '$_id', totalRevenue: 1, count: 1 } }
+        ])
     ]);
-
-    // NEU: Aggregation für Umsatz nach Quelle (Dienstleistung vs. Produkt)
-    const revenueBySource = await Invoice.aggregate([
-        {
-          $match: {
-            salon: salonObjectId,
-            date: { $gte: startDate, $lte: endDate },
-            status: 'paid'
-          }
-        },
-        { $unwind: '$items' },
-        {
-          $group: {
-            _id: {
-              $cond: [
-                { $regexMatch: { input: '$items.description', regex: /^Produkt:/ } },
-                'Produkte',
-                'Dienstleistungen'
-              ]
-            },
-            totalRevenue: { $sum: '$items.price' }
-          }
-        },
-        {
-          $project: {
-            _id: 0,
-            source: '$_id',
-            totalRevenue: 1,
-          }
-        }
-    ]);
-
-    const totalRevenue = revenueByStaff.reduce((sum, s) => sum + s.totalRevenue, 0);
-    const totalBookings = revenueByStaff.reduce((sum, s) => sum + s.totalBookings, 0);
 
     res.json({
       success: true,
       stats: {
-        totalRevenue,
-        totalBookings,
+        totalRevenue: currentPeriodStats[0]?.totalRevenue || 0,
+        totalBookings: currentPeriodStats[0]?.totalBookings || 0,
+        previousPeriodRevenue: previousPeriodStats[0]?.totalRevenue || 0,
+        previousPeriodBookings: previousPeriodStats[0]?.totalBookings || 0,
         revenueByStaff,
-        revenueBySource // NEU
+        revenueBySource,
+        dailyRevenue,
+        topServices
       }
     });
 
