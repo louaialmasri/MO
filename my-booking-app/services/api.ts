@@ -116,18 +116,17 @@ export type InvoiceListItem = {
 
 export type CashClosing = {
   _id: string;
-  closingDate: string;
-  startPeriod: string;
-  endPeriod: string;
-  employee: { firstName: string; lastName: string; };
-  cashSales: number;
-  cashDeposit: number;
-  bankWithdrawal: number;
-  tipsWithdrawal: number;
-  otherWithdrawal: number;
-  calculatedCashOnHand: number;
-  actualCashOnHand: number;
-  difference: number;
+  date: string;
+  executedBy: { 
+    firstName: string; 
+    lastName: string; 
+  };
+  expectedAmount: number;
+  withdrawals: { 
+    reason: string; 
+    amount: number 
+  }[];
+  finalExpectedAmount: number;
   notes?: string;
 }
 
@@ -692,6 +691,14 @@ export async function fetchAllInvoices(token: string): Promise<InvoiceListItem[]
   });
   return res.data;
 }
+
+// Holt die Liste aller bisherigen Abschlüsse
+export const listCashClosings = async (token: string): Promise<CashClosing[]> => {
+  const res = await api.get('/cash-closings', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data;
+};
 
 export const getCashClosingPreview = async (token: string) => {
   const res = await api.get('/cash-closings/preview', {
