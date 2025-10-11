@@ -18,6 +18,24 @@ type PreviewData = {
     redeemedVouchers: number;
 };
 
+// Komponente für den Fall, dass bereits ein Abschluss existiert
+const AlreadyClosedDisplay = ({ onBack }: { onBack: () => void }) => (
+    <Container maxWidth="sm" sx={{ py: 4, textAlign: 'center' }}>
+        <AdminBreadcrumbs items={[{ label: 'Mein Salon', href: '/admin' }, { label: 'Kassenabschlüsse', href: '/admin/cash-closing'}, { label: 'Neuer Abschluss' }]} />
+        <Paper variant="outlined" sx={{ p: 4, mt: 4 }}>
+            <Typography variant="h5" fontWeight={700} gutterBottom>
+                Tagesabschluss bereits erfolgt
+            </Typography>
+            <Typography color="text.secondary" sx={{ mt: 2, mb: 3 }}>
+                Für den heutigen Tag wurde bereits ein Kassenabschluss erstellt. Sie können keine weiteren Abschlüsse für heute anlegen.
+            </Typography>
+            <Button variant="contained" onClick={onBack}>
+                Zurück zur Übersicht
+            </Button>
+        </Paper>
+    </Container>
+);
+
 export default function NewCashClosingPage() {
     const { token, user } = useAuth();
     const router = useRouter();
@@ -32,6 +50,8 @@ export default function NewCashClosingPage() {
     const [notes, setNotes] = useState('');
     const [loading, setLoading] = useState(true);
     const [toast, setToast] = useState<{ open: boolean; msg: string; sev: 'success' | 'error' }>({ open: false, msg: '', sev: 'success' });
+
+    const [alreadyClosed, setAlreadyClosed] = useState(false);
 
     useEffect(() => {
         if (token) {
@@ -48,8 +68,12 @@ export default function NewCashClosingPage() {
                 }
                 setLoading(false);
             }).catch(err => {
-                console.error(err);
-                setToast({ open: true, msg: "Daten für den Kassenabschluss konnten nicht geladen werden.", sev: 'error' });
+                if (err.response?.status === 409) {
+                    setAlreadyClosed(true);
+                } else {
+                    console.error(err);
+                    setToast({ open: true, msg: "Daten für den Kassenabschluss konnten nicht geladen werden.", sev: 'error' });
+                }
                 setLoading(false);
             });
         }
@@ -99,6 +123,11 @@ export default function NewCashClosingPage() {
     
     if (loading) {
         return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 5 }}><CircularProgress /></Box>;
+    }
+
+    // Zeigt die neue Komponente an, wenn der Tag bereits abgeschlossen ist
+    if (alreadyClosed) {
+        return <AlreadyClosedDisplay onBack={() => router.push('/admin/cash-closing')} />;
     }
 
     return (

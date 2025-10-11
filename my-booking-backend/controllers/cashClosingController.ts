@@ -18,6 +18,19 @@ export const getCashClosingPreview = async (req: SalonRequest, res: Response) =>
         const startOfDay = dayjs(today).startOf('day').toDate();
         const endOfDay = dayjs(today).endOf('day').toDate();
 
+        // Prüfen, ob für heute bereits ein Abschluss existiert
+        const existingClosing = await CashClosing.findOne({
+            salon: salonId,
+            closingDate: { $gte: startOfDay, $lte: endOfDay }
+        });
+
+        if (existingClosing) {
+            return res.status(409).json({ 
+                message: 'Für heute wurde bereits ein Kassenabschluss erstellt.',
+                hasExistingClosing: true // Ein Flag für das Frontend
+            });
+        }
+
         const cashInvoices = await Invoice.find({
             salon: new mongoose.Types.ObjectId(salonId),
             date: { $gte: startOfDay, $lte: endOfDay },
@@ -51,7 +64,7 @@ export const getCashClosingPreview = async (req: SalonRequest, res: Response) =>
                 revenueServices,
                 revenueProducts,
                 soldVouchers,
-                redeemedVouchers: redeemedVouchersInCash, // KORREKTUR: Nur eingelöste Gutscheine aus Barverkäufen
+                redeemedVouchers: redeemedVouchersInCash, // Nur eingelöste Gutscheine aus Barverkäufen
                 invoiceCount: cashInvoices.length,
             }
         });
@@ -75,6 +88,16 @@ export const createCashClosing = async (req: SalonRequest, res: Response) => {
         const today = dayjs().toDate();
         const startOfDay = dayjs(today).startOf('day').toDate();
         const endOfDay = dayjs(today).endOf('day').toDate();
+
+        // Prüfen, ob bereits ein Abschluss für diesen Tag existiert
+        const existingClosing = await CashClosing.findOne({
+            salon: salonId,
+            closingDate: { $gte: startOfDay, $lte: endOfDay }
+        });
+
+        if (existingClosing) {
+            return res.status(409).json({ message: 'Für diesen Salon wurde heute bereits ein Kassenabschluss erstellt.' });
+        }
 
         const totalRevenue = revenueServices + revenueProducts + soldVouchers;
         const totalWithdrawals = bankWithdrawal + tipsWithdrawal + otherWithdrawal;
