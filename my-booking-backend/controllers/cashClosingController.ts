@@ -4,96 +4,69 @@ import { SalonRequest } from '../middlewares/activeSalon';
 import { CashClosing } from '../models/CashClosing';
 import { Invoice } from '../models/Invoice';
 import mongoose from 'mongoose'; // Import Mongoose
+import dayjs from 'dayjs';
 
-// Holt die Daten für die Vorschau im Dialog
-export const getPreCalculationData = async (req: SalonRequest, res: Response) => {
+// Eine Funktion, die nur die Daten für den Abschluss vorbereitet
+export const getCashClosingPreview = async (req: SalonRequest, res: Response) => {
     try {
-        if (!req.salonId) {
-            return res.status(400).json({ success: false, message: 'Kein Salon ausgewählt.' });
-        }
+        const salonId = req.salonId;
+        const today = dayjs().toDate();
 
-        const lastClosing = await CashClosing.findOne({ salon: new mongoose.Types.ObjectId(req.salonId) }).sort({ closingDate: -1 });
-        const startPeriod = lastClosing ? lastClosing.endPeriod : new Date(0); // Start from the last closing or from the beginning of time
-        const endPeriod = new Date();
+        const startOfDay = dayjs(today).startOf('day').toDate();
+        const endOfDay = dayjs(today).endOf('day').toDate();
 
-        const result = await Invoice.aggregate([
-            {
-                $match: {
-                    salon: new mongoose.Types.ObjectId(req.salonId),
-                    paymentMethod: 'cash',
-                    date: { $gte: startPeriod, $lt: endPeriod }
-                }
-            },
-            {
-                $group: {
-                    _id: null,
-                    total: { $sum: "$amount" }
-                }
+        const cashInvoices = await Invoice.find({
+            salon: salonId,
+            date: { $gte: startOfDay, $lte: endOfDay },
+            paymentMethod: 'cash',
+            status: 'paid'
+        });
+
+        const expectedAmount = cashInvoices.reduce((sum, invoice) => sum + invoice.amount, 0);
+
+        res.json({
+            success: true,
+            preview: {
+                date: today,
+                expectedAmount: expectedAmount,
+                invoiceCount: cashInvoices.length,
             }
-        ]);
+        });
 
-        const cashSales = result.length > 0 ? result[0].total : 0;
-        res.json({ success: true, cashSales, startPeriod: startPeriod.toISOString() });
-
-    } catch (e) {
-        console.error("Pre-calculation error:", e);
-        res.status(500).json({ success: false, message: 'Fehler bei der Berechnung der Einnahmen.' });
+    } catch (error) {
+        console.error("Fehler bei Kassenabschluss-Vorschau:", error);
+        res.status(500).json({ message: "Fehler bei der Vorschau." });
     }
 };
 
 // Speichert den neuen Kassenabschluss
 export const createCashClosing = async (req: SalonRequest, res: Response) => {
     try {
-        if (!req.salonId) {
-            return res.status(400).json({ success: false, message: 'Kein Salon ausgewählt.' });
-        }
-        const {
-            employee,
-            cashDeposit,
-            // Neue Entnahme-Felder
-            bankWithdrawal,
-            tipsWithdrawal,
-            otherWithdrawal,
-            actualCashOnHand,
-            notes
-        } = req.body;
-        
-        const lastClosing = await CashClosing.findOne({ salon: new mongoose.Types.ObjectId(req.salonId) }).sort({ closingDate: -1 });
-        const startPeriod = lastClosing ? lastClosing.endPeriod : new Date(0);
-        const endPeriod = new Date();
+        const salonId = req.salonId;
+        const userId = req.user?.userId;
+        const { expectedAmount, withdrawals, notes } = req.body;
 
-        const result = await Invoice.aggregate([
-            { $match: { salon: new mongoose.Types.ObjectId(req.salonId), paymentMethod: 'cash', date: { $gte: startPeriod, $lt: endPeriod } } },
-            { $group: { _id: null, total: { $sum: "$amount" } } }
-        ]);
-        const cashSales = result.length > 0 ? result[0].total : 0;
+        const totalWithdrawals = withdrawals.reduce((sum: number, w: { amount: number }) => sum + w.amount, 0);
+        const finalExpectedAmount = expectedAmount - totalWithdrawals;
 
-        // Gesamte Entnahme berechnen
-        const totalWithdrawal = (bankWithdrawal || 0) + (tipsWithdrawal || 0) + (otherWithdrawal || 0);
-        const calculatedCashOnHand = (cashDeposit + cashSales) - totalWithdrawal;
-        const difference = actualCashOnHand - calculatedCashOnHand;
-
-        const newClosing = await CashClosing.create({
-            salon: req.salonId,
-            employee,
-            startPeriod,
-            endPeriod,
-            cashSales,
-            cashDeposit,
-            bankWithdrawal,
-            tipsWithdrawal,
-            otherWithdrawal,
-            actualCashOnHand,
-            calculatedCashOnHand,
-            difference,
+        const newCashClosing = new CashClosing({
+            date: new Date(),
+            executedBy: userId,
+            salon: salonId,
+            expectedAmount, // Die ursprünglichen Einnahmen
+            withdrawals, // Die neuen Entnahmen
+            finalExpectedAmount, // Der Soll-Betrag nach Entnahmen
+            countedAmount: finalExpectedAmount, // Du bestätigst ja diesen Betrag
+            difference: 0, // Ist also immer 0
             notes,
         });
 
-        res.status(201).json({ success: true, closing: newClosing });
+        await newCashClosing.save();
+        res.status(201).json({ success: true, cashClosing: newCashClosing });
 
-    } catch (e) {
-        console.error("Create cash closing error:", e);
-        res.status(500).json({ success: false, message: 'Fehler beim Speichern des Kassenabschlusses.' });
+    } catch (error) {
+        console.error("Fehler beim Erstellen des Kassenabschlusses:", error);
+        res.status(500).json({ message: "Fehler beim Speichern des Abschlusses." });
     }
 };
 

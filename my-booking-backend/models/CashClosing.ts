@@ -15,6 +15,8 @@ export interface ICashClosing extends Document {
   actualCashOnHand: number;
   difference: number;
   notes?: string;
+  withdrawals: { reason: string; amount: number }[];
+  finalExpectedAmount: number;
 }
 
 const cashClosingSchema = new Schema({
@@ -28,9 +30,16 @@ const cashClosingSchema = new Schema({
   bankWithdrawal: { type: Number, required: true, default: 0 },
   tipsWithdrawal: { type: Number, required: true, default: 0 },
   otherWithdrawal: { type: Number, required: true, default: 0 },
-  calculatedCashOnHand: { type: Number, required: true },
-  actualCashOnHand: { type: Number, required: true },
+  expectedAmount: { type: Number, required: true },
+  countedAmount: { type: Number, required: true },
   difference: { type: Number, required: true },
+  
+  withdrawals: [{
+    reason: { type: String, required: true },
+    amount: { type: Number, required: true }
+  }],
+  
+  finalExpectedAmount: { type: Number, required: true },
   notes: { type: String },
 }, { timestamps: true });
 

@@ -54,9 +54,9 @@ export default function AdminCashClosingPage() {
           <Typography variant="h4" fontWeight={800} sx={{ flexGrow: 1 }}>
             Kassenabschlüsse
           </Typography>
-          <Button variant="contained" onClick={() => setDialogOpen(true)}>
-            Neuer Kassenabschluss
-          </Button>
+          <Button variant="contained" onClick={() => router.push('/admin/cash-closing/new')}>
+          Neuer Tagesabschluss
+        </Button> 
         </Stack>
 
         <Paper variant="outlined" sx={{ borderRadius: 2 }}>

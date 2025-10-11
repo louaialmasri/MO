@@ -693,19 +693,19 @@ export async function fetchAllInvoices(token: string): Promise<InvoiceListItem[]
   return res.data;
 }
 
-export async function getCashClosingPreCalculation(token: string) {
-  const res = await api.get('/cash-closing/pre-calculation', {
+export const getCashClosingPreview = async (token: string) => {
+  const res = await api.get('/cash-closings/preview', {
     headers: { Authorization: `Bearer ${token}` }
   });
   return res.data;
-}
+};
 
-export async function createCashClosing(token: string, data: any) {
-  const res = await api.post('/cash-closing', data, {
+export const createCashClosing = async (payload: any, token: string) => {
+  const res = await api.post('/cash-closings', payload, {
     headers: { Authorization: `Bearer ${token}` }
   });
   return res.data;
-}
+};
 
 export async function fetchAllCashClosings(token: string): Promise<CashClosing[]> {
   const res = await api.get('/cash-closing', {
