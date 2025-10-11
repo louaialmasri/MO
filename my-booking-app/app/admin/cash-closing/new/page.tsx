@@ -188,10 +188,42 @@ export default function NewCashClosingPage() {
                      <Box>
                         <Typography variant="h6" sx={{ mb: 2 }}>Kassenbewegungen:</Typography>
                          <Stack spacing={2}>
-                             <TextField label="Kasseneinlage" type="number" value={cashDeposit} onChange={(e) => setCashDeposit(e.target.value)} fullWidth InputProps={{ endAdornment: '€' }} />
-                             <TextField label="Bankentnahme" type="number" value={bankWithdrawal} onChange={(e) => setBankWithdrawal(e.target.value)} fullWidth InputProps={{ endAdornment: '€' }} />
-                             <TextField label="Trinkgeldentnahme" type="number" value={tipsWithdrawal} onChange={(e) => setTipsWithdrawal(e.target.value)} fullWidth InputProps={{ endAdornment: '€' }} />
-                            <TextField label="Andere Entnahmen" type="number" value={otherWithdrawal} onChange={(e) => setOtherWithdrawal(e.target.value)} fullWidth InputProps={{ endAdornment: '€' }} />
+                              <TextField 
+                                label="Kasseneinlage" 
+                                type="number" 
+                                value={cashDeposit} 
+                                onChange={(e) => setCashDeposit(e.target.value)} 
+                                fullWidth 
+                                InputProps={{ endAdornment: '€' }} 
+                                onWheel={(e) => (e.target as HTMLInputElement).blur()} // Verhindert Scrollen
+                             />
+                             <TextField 
+                                label="Bankentnahme" 
+                                type="number" 
+                                value={bankWithdrawal} 
+                                onChange={(e) => setBankWithdrawal(e.target.value)} 
+                                fullWidth 
+                                InputProps={{ endAdornment: '€' }} 
+                                onWheel={(e) => (e.target as HTMLInputElement).blur()} // Verhindert Scrollen
+                             />
+                             <TextField 
+                                label="Trinkgeldentnahme" 
+                                type="number" 
+                                value={tipsWithdrawal} 
+                                onChange={(e) => setTipsWithdrawal(e.target.value)} 
+                                fullWidth 
+                                InputProps={{ endAdornment: '€' }} 
+                                onWheel={(e) => (e.target as HTMLInputElement).blur()} // Verhindert Scrollen
+                             />
+                            <TextField 
+                                label="Andere Entnahmen" 
+                                type="number" 
+                                value={otherWithdrawal} 
+                                onChange={(e) => setOtherWithdrawal(e.target.value)} 
+                                fullWidth 
+                                InputProps={{ endAdornment: '€' }} 
+                                onWheel={(e) => (e.target as HTMLInputElement).blur()} // Verhindert Scrollen
+                            />
                          </Stack>
                     </Box>
 
@@ -205,7 +237,7 @@ export default function NewCashClosingPage() {
                          <Stack direction="row" justifyContent="space-between"><Typography variant="h6">Soll-Bestand in Kasse:</Typography><Typography variant="h6">{calculatedCashOnHand.toFixed(2)} €</Typography></Stack>
                     </Paper>
 
-                     <TextField label="Tatsächlicher Kassenbestand (gezählt)" type="number" value={actualCashOnHand} onChange={(e) => setActualCashOnHand(e.target.value)} fullWidth InputProps={{ endAdornment: '€' }}/>
+                     <TextField label="Tatsächlicher Kassenbestand (gezählt)" type="number" value={actualCashOnHand} onChange={(e) => setActualCashOnHand(e.target.value)} fullWidth InputProps={{ endAdornment: '€' }} onWheel={(e) => (e.target as HTMLInputElement).blur()}/>
 
                      <Paper variant="outlined" sx={{ p: 2, borderColor: difference !== 0 ? 'error.main' : 'success.main', borderWidth: 2 }}>
                           <Stack direction="row" justifyContent="space-between">

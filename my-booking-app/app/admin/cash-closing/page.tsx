@@ -73,9 +73,13 @@ export default function AdminCashClosingPage() {
                     <Chip label="Storniert" color="error" size="small" />
                   )}
                   <Stack alignItems="flex-end">
-                     <Typography variant="body1">Einnahmen (Bar): <strong>{(closing.revenueServices + closing.revenueProducts + closing.soldVouchers - closing.redeemedVouchers).toFixed(2)} €</strong></Typography>
+                     <Typography variant="body1">
+                        Einnahmen (Bar): <strong>
+                            {((closing.revenueServices || 0) + (closing.revenueProducts || 0) + (closing.soldVouchers || 0) - (closing.redeemedVouchers || 0)).toFixed(2)} €
+                        </strong>
+                    </Typography>
                     <Typography variant="body2" color='text.secondary'>
-                      Soll-Bestand: {(closing.calculatedCashOnHand).toFixed(2)} €
+                      Soll-Bestand: {(closing.calculatedCashOnHand || 0).toFixed(2)} €
                     </Typography>
                   </Stack>
                 </Stack>

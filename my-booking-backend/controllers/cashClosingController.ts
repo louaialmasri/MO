@@ -140,20 +140,20 @@ export const createCashClosing = async (req: SalonRequest, res: Response) => {
 export const cancelCashClosing = async (req: SalonRequest, res: Response) => {
     try {
         const { id } = req.params;
-        const closing = await CashClosing.findOne({ _id: id, salon: req.salonId });
 
-        if (!closing) {
+        // Wir verwenden findOneAndUpdate, um das Dokument direkt in der Datenbank zu aktualisieren.
+        // Das ist sicherer gegen alte Daten, da es keine Validierung für das gesamte Dokument auslöst.
+        const updatedClosing = await CashClosing.findOneAndUpdate(
+            { _id: id, salon: req.salonId },    // Suchkriterien: Finde den Abschluss mit dieser ID im aktuellen Salon
+            { $set: { status: 'cancelled' } },  // Update-Operation: Setze nur das Status-Feld
+            { new: true }                       // Option: Gib das aktualisierte Dokument zurück
+        ).populate('employee', 'firstName lastName'); // Wir brauchen die Mitarbeiter-Infos für die Antwort
+
+        if (!updatedClosing) {
             return res.status(404).json({ success: false, message: 'Kassenabschluss nicht gefunden.' });
         }
 
-        if (closing.status === 'cancelled') {
-            return res.status(400).json({ success: false, message: 'Dieser Abschluss wurde bereits storniert.' });
-        }
-
-        closing.status = 'cancelled';
-        await closing.save();
-
-        res.json({ success: true, message: 'Kassenabschluss erfolgreich storniert.', closing });
+        res.json({ success: true, message: 'Kassenabschluss erfolgreich storniert.', closing: updatedClosing });
 
     } catch (e) {
         console.error("Fehler beim Stornieren des Kassenabschlusses:", e);

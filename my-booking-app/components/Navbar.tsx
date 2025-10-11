@@ -34,6 +34,8 @@ import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
 import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import BuildIcon from '@mui/icons-material/Build';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import DashboardIcon from '@mui/icons-material/Dashboard';
 
 import { useAuth } from '@/context/AuthContext';
 import { fetchSalons, type Salon } from '@/services/api';
@@ -41,16 +43,30 @@ import { fetchSalons, type Salon } from '@/services/api';
 export default function Navbar() {
   const router = useRouter();
   const { user, logout } = useAuth();
-  const isMobile = useMediaQuery('(max-width:999px)', { noSsr: true });
+  const isMobile = useMediaQuery('(max-width:1099px)', { noSsr: true });
 
+  // --- ANGEPASSTE STATES FÜR MENÜS ---
   const [mobileMenuAnchor, setMobileMenuAnchor] = useState<null | HTMLElement>(null);
   const [salonMenuAnchor, setSalonMenuAnchor] = useState<null | HTMLElement>(null);
-  const [cashMenuAnchor, setCashMenuAnchor] = useState<null | HTMLElement>(null);
-  const [managementMenuAnchor, setManagementMenuAnchor] = useState<null | HTMLElement>(null);
-  const [settingsMenuAnchor, setSettingsMenuAnchor] = useState<null | HTMLElement>(null);
+  const [anchorElKasse, setAnchorElKasse] = useState<null | HTMLElement>(null);
+  const [anchorElVerwaltung, setAnchorElVerwaltung] = useState<null | HTMLElement>(null);
+  const [anchorElSettings, setAnchorElSettings] = useState<null | HTMLElement>(null);
 
   const [salons, setSalons] = useState<Salon[]>([]);
   const [activeSalonId, setActiveSalonId] = useState<string | null>(null);
+
+  // --- NEUE HANDLER FÜR HOVER-MENÜS ---
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, menu: 'kasse' | 'verwaltung' | 'settings') => {
+    if (menu === 'kasse') setAnchorElKasse(event.currentTarget);
+    else if (menu === 'verwaltung') setAnchorElVerwaltung(event.currentTarget);
+    else if (menu === 'settings') setAnchorElSettings(event.currentTarget);
+  };
+  
+  const handleMenuClose = () => {
+    setAnchorElKasse(null);
+    setAnchorElVerwaltung(null);
+    setAnchorElSettings(null);
+  };
 
   useEffect(() => {
     if (user?.role !== 'admin') return;
@@ -75,6 +91,7 @@ export default function Navbar() {
 
   const handleLogout = () => {
     logout();
+    setMobileMenuAnchor(null);
     router.push('/login');
   };
 
@@ -88,9 +105,8 @@ export default function Navbar() {
   const activeSalon = salons.find(s => s._id === activeSalonId);
 
   const handleNavigate = (path: string) => {
-    setCashMenuAnchor(null);
-    setManagementMenuAnchor(null);
-    setSettingsMenuAnchor(null);
+    handleMenuClose();
+    setMobileMenuAnchor(null);
     router.push(path);
   };
 
@@ -105,31 +121,72 @@ export default function Navbar() {
       <Button color="inherit" onClick={() => router.push('/admin/dashboard')}>Dashboard</Button>
       <Button color="inherit" onClick={() => router.push('/admin')}>Kalender</Button>
 
-      {/* --- Kassen-Menü (korrigiert) --- */}
-      <Button color="inherit" onClick={(e) => setCashMenuAnchor(e.currentTarget)}>Kasse</Button>
-      <Menu anchorEl={cashMenuAnchor} open={Boolean(cashMenuAnchor)} onClose={() => setCashMenuAnchor(null)}>
-        <MenuItem onClick={() => handleNavigate('/admin/cash-register')}><PointOfSaleIcon fontSize="small" sx={{ mr: 1.5 }}/>Sofortverkauf</MenuItem>
-        <MenuItem onClick={() => handleNavigate('/admin/cash-closing')}><ReceiptLongIcon fontSize="small" sx={{ mr: 1.5 }}/>Kassenabschluss</MenuItem>
-      </Menu>
+      {/* --- Kassen-Menü (mit Hover) --- */}
+      <Box onMouseLeave={handleMenuClose}>
+        <Button
+          color="inherit"
+          onMouseEnter={(e) => handleMenuOpen(e, 'kasse')}
+        >
+          Kasse
+        </Button>
+        <Menu
+          anchorEl={anchorElKasse}
+          open={Boolean(anchorElKasse)}
+          onClose={handleMenuClose}
+          MenuListProps={{ onMouseLeave: handleMenuClose }}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+          transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        >
+          <MenuItem onClick={() => handleNavigate('/admin/cash-register')}><PointOfSaleIcon fontSize="small" sx={{ mr: 1.5 }}/>Sofortverkauf</MenuItem>
+          <MenuItem onClick={() => handleNavigate('/admin/cash-closing')}><ReceiptLongIcon fontSize="small" sx={{ mr: 1.5 }}/>Kassenabschluss</MenuItem>
+        </Menu>
+      </Box>
 
-      {/* --- Verwaltungs-Menü (korrigiert) --- */}
-      <Button color="inherit" onClick={(e) => setManagementMenuAnchor(e.currentTarget)}>Verwaltung</Button>
-      <Menu anchorEl={managementMenuAnchor} open={Boolean(managementMenuAnchor)} onClose={() => setManagementMenuAnchor(null)}>
-        <MenuItem onClick={() => handleNavigate('/admin/catalog')}><CategoryIcon fontSize="small" sx={{ mr: 1.5 }}/>Katalog</MenuItem>
-        <MenuItem onClick={() => handleNavigate('/admin/products')}><ShoppingBagIcon fontSize="small" sx={{ mr: 1.5 }}/>Produkte</MenuItem>
-        <MenuItem onClick={() => handleNavigate('/admin/invoices')}><ReceiptLongIcon fontSize="small" sx={{ mr: 1.5 }}/>Rechnungen</MenuItem>
-      </Menu>
+      {/* --- Verwaltungs-Menü (mit Hover) --- */}
+      <Box onMouseLeave={handleMenuClose}>
+        <Button
+          color="inherit"
+          onMouseEnter={(e) => handleMenuOpen(e, 'verwaltung')}
+        >
+          Verwaltung
+        </Button>
+        <Menu
+          anchorEl={anchorElVerwaltung}
+          open={Boolean(anchorElVerwaltung)}
+          onClose={handleMenuClose}
+          MenuListProps={{ onMouseLeave: handleMenuClose }}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+          transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        >
+          <MenuItem onClick={() => handleNavigate('/admin/catalog')}><CategoryIcon fontSize="small" sx={{ mr: 1.5 }}/>Katalog</MenuItem>
+          <MenuItem onClick={() => handleNavigate('/admin/products')}><ShoppingBagIcon fontSize="small" sx={{ mr: 1.5 }}/>Produkte</MenuItem>
+          <MenuItem onClick={() => handleNavigate('/admin/invoices')}><ReceiptLongIcon fontSize="small" sx={{ mr: 1.5 }}/>Rechnungen</MenuItem>
+        </Menu>
+      </Box>
 
-      <Button color="inherit" onClick={(e) => setSettingsMenuAnchor(e.currentTarget)}>
-        <SettingsIcon />
-      </Button>
-      <Menu anchorEl={settingsMenuAnchor} open={Boolean(settingsMenuAnchor)} onClose={() => setSettingsMenuAnchor(null)}>
-        <MenuItem onClick={() => handleNavigate('/admin/availability')}><ScheduleIcon fontSize="small" sx={{ mr: 1.5 }}/>Arbeitszeiten</MenuItem>
-        <MenuItem onClick={() => handleNavigate('/admin/availability/templates')}><BuildIcon fontSize="small" sx={{ mr: 1.5 }}/>Zeit-Vorlagen</MenuItem>
-        <Divider />
-        <MenuItem onClick={() => handleNavigate('/admin/settings/pin')}><VpnKeyIcon fontSize="small" sx={{ mr: 1.5 }}/>PIN-Verwaltung</MenuItem>
-        <MenuItem onClick={() => handleNavigate('/admin/settings/datev')}><ReceiptLongIcon fontSize="small" sx={{ mr: 1.5 }}/>DATEV-Export</MenuItem>
-      </Menu>
+      {/* --- Einstellungs-Menü (mit Hover) --- */}
+      <Box onMouseLeave={handleMenuClose}>
+        <Button
+          color="inherit"
+          onMouseEnter={(e) => handleMenuOpen(e, 'settings')}
+          sx={{ minWidth: 'auto', px: 1 }}
+        >
+          <SettingsIcon />
+        </Button>
+        <Menu
+          anchorEl={anchorElSettings}
+          open={Boolean(anchorElSettings)}
+          onClose={handleMenuClose}
+          MenuListProps={{ onMouseLeave: handleMenuClose }}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        >
+          <MenuItem onClick={() => handleNavigate('/admin/availability')}><ScheduleIcon fontSize="small" sx={{ mr: 1.5 }}/>Arbeitszeiten</MenuItem>
+          <MenuItem onClick={() => handleNavigate('/admin/availability/templates')}><BuildIcon fontSize="small" sx={{ mr: 1.5 }}/>Zeit-Vorlagen</MenuItem>
+          <Divider />
+          <MenuItem onClick={() => handleNavigate('/admin/settings/pin')}><VpnKeyIcon fontSize="small" sx={{ mr: 1.5 }}/>PIN-Verwaltung</MenuItem>
+        </Menu>
+      </Box>
 
       <Button color="inherit" onClick={(e) => setSalonMenuAnchor(e.currentTarget)} endIcon={<ArrowDropDownIcon />}>
         <Stack direction="row" spacing={1} alignItems="center">
@@ -159,6 +216,33 @@ export default function Navbar() {
       )}
     </>
   );
+  
+  const mobileMenuItems = (
+    user ? [
+        user.role === 'admin' && <MenuItem key="dash" onClick={() => handleNavigate('/admin/dashboard')}><DashboardIcon fontSize="small" sx={{mr: 1.5}}/>Dashboard</MenuItem>,
+        user.role === 'admin' && <MenuItem key="cal" onClick={() => handleNavigate('/admin')}><CalendarMonthIcon fontSize="small" sx={{mr: 1.5}}/>Kalender</MenuItem>,
+        user.role === 'admin' && <Divider key="div1"/>,
+        user.role === 'admin' && <MenuItem key="cash-reg" onClick={() => handleNavigate('/admin/cash-register')}><PointOfSaleIcon fontSize="small" sx={{mr: 1.5}}/>Sofortverkauf</MenuItem>,
+        user.role === 'admin' && <MenuItem key="cash-close" onClick={() => handleNavigate('/admin/cash-closing')}><ReceiptLongIcon fontSize="small" sx={{mr: 1.5}}/>Kassenabschluss</MenuItem>,
+        user.role === 'admin' && <Divider key="div2"/>,
+        user.role === 'admin' && <MenuItem key="cat" onClick={() => handleNavigate('/admin/catalog')}><CategoryIcon fontSize="small" sx={{mr: 1.5}}/>Katalog</MenuItem>,
+        user.role === 'admin' && <MenuItem key="prod" onClick={() => handleNavigate('/admin/products')}><ShoppingBagIcon fontSize="small" sx={{mr: 1.5}}/>Produkte</MenuItem>,
+        user.role === 'admin' && <MenuItem key="inv" onClick={() => handleNavigate('/admin/invoices')}><ReceiptLongIcon fontSize="small" sx={{mr: 1.5}}/>Rechnungen</MenuItem>,
+        user.role === 'admin' && <Divider key="div3"/>,
+        user.role === 'admin' && <MenuItem key="avail" onClick={() => handleNavigate('/admin/availability')}><ScheduleIcon fontSize="small" sx={{mr: 1.5}}/>Arbeitszeiten</MenuItem>,
+        user.role === 'admin' && <MenuItem key="pin" onClick={() => handleNavigate('/admin/settings/pin')}><VpnKeyIcon fontSize="small" sx={{mr: 1.5}}/>PIN-Verwaltung</MenuItem>,
+        <Divider key="div4"/>,
+        
+        user.role !== 'admin' && <MenuItem key="book" onClick={() => handleNavigate('/booking')}>Termin buchen</MenuItem>,
+        user.role === 'user' && <MenuItem key="user-dash" onClick={() => handleNavigate('/dashboard')}>Meine Termine</MenuItem>,
+        user.role === 'staff' && <MenuItem key="staff-dash" onClick={() => handleNavigate('/staff-dashboard')}>Meine Termine</MenuItem>,
+        <MenuItem key="logout" onClick={handleLogout}><LogoutIcon fontSize="small" sx={{mr: 1.5}}/>Logout</MenuItem>
+      ] : [
+        <MenuItem key="login" onClick={() => handleNavigate('/login')}><LoginIcon fontSize="small" sx={{mr: 1.5}}/>Login</MenuItem>,
+        <MenuItem key="register" onClick={() => handleNavigate('/register')}><PersonAddIcon fontSize="small" sx={{mr: 1.5}}/>Registrieren</MenuItem>
+      ]
+  );
+
 
   return (
     <AppBar position="sticky" color="transparent" elevation={0} sx={{ borderBottom: '1px solid #EFEBE9', backdropFilter: 'blur(8px)', backgroundColor: 'rgba(253, 251, 247, 0.8)' }}>
@@ -177,7 +261,7 @@ export default function Navbar() {
                   <Button startIcon={<PersonAddIcon />} variant="contained" onClick={() => router.push('/register')}>Registrieren</Button>
                 </>
               ) : (
-                <Button variant="outlined" onClick={handleLogout}>Logout</Button>
+                <Button variant="outlined" onClick={handleLogout} startIcon={<LogoutIcon/>}>Logout</Button>
               )}
             </Box>
           )}
@@ -186,7 +270,7 @@ export default function Navbar() {
              <Box>
               <IconButton color="inherit" onClick={(e) => setMobileMenuAnchor(e.currentTarget)}><MenuIcon /></IconButton>
               <Menu anchorEl={mobileMenuAnchor} open={Boolean(mobileMenuAnchor)} onClose={() => setMobileMenuAnchor(null)}>
-                 {/* TODO: Mobile Links hier einfügen */}
+                 {mobileMenuItems}
               </Menu>
             </Box>
           )}
