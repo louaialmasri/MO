@@ -50,12 +50,31 @@ export default function BookingPage() {
 
   useEffect(() => {
     if (user) {
-      const isAdmin = user.role === 'admin'
-      const isStaff = user.role === 'staff'
-      setIsAdminOrStaff(isAdmin || isStaff)
-      setActiveStep(isAdmin || isStaff ? 0 : 1)
+      const isAdmin = user.role === 'admin';
+      const isStaff = user.role === 'staff';
+      setIsAdminOrStaff(isAdmin || isStaff);
+      
+      // Start-Step für alle eingeloggten User anpassen
+      if (isAdmin || isStaff) {
+        setActiveStep(0); // Admins und Staff starten bei der Kundenauswahl
+      } else {
+        setActiveStep(1); // Normale Kunden starten bei der Service-Auswahl
+      }
+    } else if (!authLoading) {
+      // Wenn nicht eingeloggt und nicht auf der Lade-Seite, zur Service-Auswahl
+      setActiveStep(1);
     }
-  }, [user])
+  }, [user, authLoading]);
+
+  // Wenn ein Mitarbeiter eingeloggt ist, sich selbst direkt auswählen
+  useEffect(() => {
+    if (user?.role === 'staff' && allStaff.length > 0) {
+        const self = allStaff.find(s => s._id === user._id);
+        if (self) {
+            setSelectedStaff(self);
+        }
+    }
+  }, [user, allStaff]);
 
   // Initiale Daten laden
   useEffect(() => {
@@ -130,7 +149,14 @@ export default function BookingPage() {
     loadSlots()
   }, [selectedService, selectedStaff, selectedDate, token])
 
-  const handleNext = () => setActiveStep(prev => prev + 1)
+  const handleNext = () => {
+    // Wenn ein Mitarbeiter einen Service ausgewählt hat, überspringe die Mitarbeiterauswahl
+    if (activeStep === 1 && user?.role === 'staff' && selectedStaff) {
+      setActiveStep(3); // Springe direkt zur Datumsauswahl
+    } else {
+      setActiveStep(prev => prev + 1);
+    }
+  };
   const handleBack = () => setActiveStep(prev => prev - 1)
 
   // Vorschlag übernehmen
@@ -247,6 +273,15 @@ export default function BookingPage() {
         )
 
       case 2:
+        // Für Staff wird dieser Schritt übersprungen und daher nicht gerendert
+      if (user?.role === 'staff') {
+        return (
+          <Box sx={{ display: 'flex', justifyContent: 'center', my: 5 }}>
+            <CircularProgress />
+            <Typography sx={{ ml: 2 }}>Mitarbeiter wird geladen...</Typography>
+          </Box>
+        );
+      }
         return (
           <Grid container spacing={2}>
             {staffForService.length === 0 ? (

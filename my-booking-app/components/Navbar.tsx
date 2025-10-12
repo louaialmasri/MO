@@ -234,6 +234,10 @@ export default function Navbar() {
       {user && user.role !== 'admin' && (
         <Button sx={navButtonStyle('termine')} onMouseEnter={() => setHoveredButton('termine')} onClick={() => router.push(user.role === 'staff' ? '/staff-dashboard' : '/dashboard')}>Meine Termine</Button>
       )}
+       {/* Button "Termin buchen" speziell für Staff hinzufügen */}
+      {user && user.role === 'staff' && (
+        <Button sx={navButtonStyle('booking')} onMouseEnter={() => setHoveredButton('booking')} onClick={() => router.push('/booking')}>Termin buchen</Button>
+      )}
     </Box>
   );
 

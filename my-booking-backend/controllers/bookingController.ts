@@ -252,24 +252,24 @@ export const getAllBookings = async (req: AuthRequest, res: Response) => {
 
 // GET /api/bookings/staff (Bestellungen eines einzelnen Mitarbeiters)
 export const getStaffBookings = async (req: AuthRequest, res: Response) => {
-  const staffId = req.user?.userId
+  const staffId = req.user?.userId;
 
   if (!staffId) {
-    return res.status(401).json({ success: false, message: 'Nicht autorisiert' })
+    return res.status(401).json({ success: false, message: 'Nicht autorisiert' });
   }
 
   try {
     const bookings = await Booking.find({ staff: staffId })
-      .populate('user', 'email')
-      .populate('service', 'name duration')
-      .sort({ dateTime: 1 })
+      .populate('user', 'firstName lastName email') 
+      .populate('service', 'title duration') 
+      .sort({ dateTime: 1 });
 
-    res.status(200).json({ success: true, bookings })
+    res.status(200).json({ success: true, bookings });
   } catch (error) {
-    console.error('Fehler beim Laden der Mitarbeiter-Buchungen:', error)
-    res.status(500).json({ success: false, message: 'Fehler beim Laden der Buchungen' })
+    console.error('Fehler beim Laden der Mitarbeiter-Buchungen:', error);
+    res.status(500).json({ success: false, message: 'Fehler beim Laden der Buchungen' });
   }
-}
+};
 
 // PATCH /api/bookings/:id/admin (Admin-/Drag&Drop-Update)
 export const updateBookingController = async (req: AuthRequest, res: Response) => {

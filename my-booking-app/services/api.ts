@@ -43,6 +43,8 @@ export type StaffBooking  = {
   _id: string
   user: {
     email: string
+    firstName?: string
+    lastName?: string
   }
   service: {
     _id: string

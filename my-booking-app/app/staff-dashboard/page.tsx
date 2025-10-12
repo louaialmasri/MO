@@ -100,16 +100,18 @@ export default function StaffDashboardPage() {
         const start = new Date(b.dateTime)
         const end = new Date(start.getTime() + duration * 60000)
 
+         const customerName = `${b.user.firstName || ''} ${b.user.lastName || ''}`.trim() || b.user.email;
+
         return {
           id: b._id,
           title: b.service!.title,
           start: start.toISOString(),
           end: end.toISOString(),
-          resourceId: user?._id, // Assign to the logged-in staff member
+          resourceId: user?._id,
           extendedProps: {
-            customer: b.user!.email,
+            customer: customerName,
           },
-          backgroundColor: '#A1887F', // Single color for staff view
+          backgroundColor: '#A1887F',
           borderColor: '#A1887F',
         }
       })
