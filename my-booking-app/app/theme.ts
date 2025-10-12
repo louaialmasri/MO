@@ -1,93 +1,128 @@
-// my-booking-app/app/theme.ts
+'use client';
+import { createTheme, responsiveFontSizes } from '@mui/material/styles';
+import { Roboto } from 'next/font/google';
+import { Shadows } from '@mui/material/styles';
 
-import { createTheme } from '@mui/material/styles';
+const roboto = Roboto({
+  weight: ['300', '400', '500', '700'],
+  subsets: ['latin'],
+  display: 'swap',
+});
 
-// Eine verfeinerte, moderne Erdton-Palette
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#e2673aff', // Ein tieferes, satteres Braun
-    },
-    secondary: {
-      main: '#FFA726', // Ein warmer, kräftiger Bernstein-Ton
-    },
-    background: {
-      default: '#F9F6F2', // Ein sehr helles, neutrales Off-White
-      paper: '#FFFFFF',
-    },
-    text: {
-      primary: '#424242',
-      secondary: '#757575',
-    },
-    divider: '#EAE3DA', // Passend zur Farbpalette
+// === ORANGE PALETTE (wie in page.tsx) ===
+const palette = {
+  primary: {
+    main: '#E2673A',           // kräftiges, modernes Orange
+    light: 'rgba(226,103,58,0.12)',
+    dark: '#B04E28',
+    contrastText: '#fff',
   },
+  secondary: {
+    main: '#1976d2',           // klares Blau als Kontrast
+  },
+  background: {
+    default: '#f6f8fa',        // sehr hellgrauer Grund
+    paper: '#ffffff',
+  },
+  text: {
+    primary: '#172b4d',
+    secondary: '#5e6c84',
+  },
+};
+
+// Temporäres Theme für Default-Shadows
+const defaultTheme = createTheme();
+
+let theme = createTheme({
+  palette,
   typography: {
-    fontFamily: '"Poppins", "Helvetica", "Arial", sans-serif',
-    h4: {
-      fontWeight: 700,
-    },
-    h5: {
-      fontWeight: 600,
-    },
-    h6: {
-      fontWeight: 600,
-    },
+    fontFamily: roboto.style.fontFamily,
+    h4: { fontWeight: 800, color: palette.text.primary },
+    h5: { fontWeight: 700, color: palette.text.primary },
+    h6: { fontWeight: 600, color: palette.text.primary },
+    subtitle1: { color: palette.text.secondary },
+    body1: { color: palette.text.primary },
+    body2: { color: palette.text.secondary },
+    button: { fontWeight: 600 },
   },
+  shape: { borderRadius: 12 },
+  shadows: [
+    'none',
+    '0px 2px 4px -1px rgba(0,0,0,0.06), 0px 4px 5px 0px rgba(0,0,0,0.04), 0px 1px 10px 0px rgba(0,0,0,0.04)',
+    '0px 3px 5px -1px rgba(0,0,0,0.06), 0px 6px 10px 0px rgba(0,0,0,0.04), 0px 1px 18px 0px rgba(0,0,0,0.04)',
+    ...defaultTheme.shadows.slice(3),
+  ] as Shadows,
   components: {
     MuiPaper: {
       styleOverrides: {
-        root: {
-          borderRadius: 12, // Weichere, modernere Ecken
-          boxShadow: '0 8px 16px rgba(0,0,0,0.05)', // Ein sehr subtiler Schatten
-          border: '1px solid #EAE3DA',
-        },
+        root: { backgroundImage: 'none' },
+        outlined: { border: '1px solid rgba(145, 158, 171, 0.2)' },
       },
     },
     MuiButton: {
       styleOverrides: {
         root: {
-          borderRadius: 10,
           textTransform: 'none',
           fontWeight: 600,
-          padding: '8px 20px',
           boxShadow: 'none',
-          transition: 'background-color 0.2s ease-in-out, transform 0.1s ease-in-out',
+          borderRadius: 8,
+          transition: 'all 0.2s ease',
           '&:hover': {
-            boxShadow: 'none',
-            transform: 'translateY(-1px)', // Subtiler Schwebe-Effekt
+            boxShadow: '0px 2px 6px rgba(226,103,58,0.25)',
           },
         },
         containedPrimary: {
-          color: '#FFFFFF',
-        },
-      },
-    },
-    MuiChip: {
-      styleOverrides: {
-        root: {
-          borderRadius: 8,
-          fontWeight: 500,
-        },
-      },
-    },
-    MuiTab: {
-      styleOverrides: {
-        root: {
-          textTransform: 'none',
-          fontWeight: 600,
+          backgroundColor: palette.primary.main,
+          boxShadow: '0 8px 16px 0 rgba(226,103,58,0.24)',
+          '&:hover': {
+            backgroundColor: '#d55c30',
+            boxShadow: '0 4px 8px rgba(226,103,58,0.25)',
+          },
         },
       },
     },
     MuiAppBar: {
-        styleOverrides: {
-            root: {
-                // "Frosted Glass" Effekt
-                backgroundColor: 'rgba(249, 246, 242, 0.85)', 
-                backdropFilter: 'blur(10px)',
-            }
-        }
-    }
+      styleOverrides: {
+        root: {
+          backgroundColor: 'rgba(255, 255, 255, 0.8)',
+          backdropFilter: 'blur(8px)',
+          boxShadow: 'none',
+          borderBottom: '1px solid rgba(145, 158, 171, 0.2)',
+        },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        head: {
+          color: palette.text.secondary,
+          backgroundColor: palette.background.default,
+          fontWeight: 600,
+        },
+      },
+    },
+    MuiListItemButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: 8,
+          '&:hover': { backgroundColor: 'rgba(226,103,58,0.08)' },
+          '&.Mui-selected': {
+            backgroundColor: 'rgba(226,103,58,0.15)',
+            color: palette.primary.main,
+          },
+        },
+      },
+    },
+    MuiIconButton: {
+      styleOverrides: {
+        root: {
+          color: palette.text.secondary,
+          '&:hover': { color: palette.primary.main, backgroundColor: 'rgba(226,103,58,0.08)' },
+        },
+      },
+    },
   },
 });
+
+theme = responsiveFontSizes(theme);
 
 export default theme;

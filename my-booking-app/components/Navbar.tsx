@@ -231,29 +231,58 @@ export default function Navbar() {
 
   // --- Render ---
   return (
-    <AppBar position="sticky" elevation={0} color="transparent"
-      sx={{ borderBottom: '1px solid #EAE3DA', backdropFilter: 'blur(10px)', backgroundColor: 'rgba(249, 246, 242, 0.85)' }}
+    <AppBar
+      position="fixed" // Oben fixieren
+      elevation={0}
+      color="transparent"
+      sx={{
+        top: '20px', // Abstand von oben
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: 'calc(100% - 40px)', // Breite anpassen
+        maxWidth: '1200px', // Maximale Breite
+        borderRadius: '25px', // Abgerundete Ecken
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        backdropFilter: 'blur(10px)',
+        backgroundColor: 'rgba(28, 28, 28, 0.5)',
+      }}
     >
       <Container maxWidth="xl">
         <Toolbar disableGutters>
-          {Brand}
+          {Brand} {/* Dein bestehendes Logo */}
           <Box sx={{ flexGrow: 1 }} />
 
+          {/* Desktop Navigation */}
           {!isMobile && (
-            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
               {user && user.role !== 'admin' && userNav}
               {adminNav}
               {!user ? (
                 <>
-                  <Button startIcon={<LoginIcon />} color="inherit" onClick={() => router.push('/login')}>Login</Button>
-                  <Button startIcon={<PersonAddIcon />} variant="contained" onClick={() => router.push('/register')}>Registrieren</Button>
+                  <Button
+                    color="inherit"
+                    onClick={() => router.push('/login')}
+                    sx={{ color: 'text.primary', borderRadius: '20px' }}
+                  >
+                    Login
+                  </Button>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={() => router.push('/register')}
+                  >
+                    Registrieren
+                  </Button>
                 </>
               ) : (
-                <Button variant="outlined" onClick={handleLogout} startIcon={<LogoutIcon />}>Logout</Button>
+                <Button variant="outlined" color="secondary" onClick={handleLogout} startIcon={<LogoutIcon />}>
+                  Logout
+                </Button>
               )}
             </Box>
           )}
 
+          {/* Mobile Navigation (unverändert) */}
           {isMobile && (
             <Box>
               <IconButton color="inherit" onClick={(e) => setMobileMenuAnchor(e.currentTarget)}><MenuIcon /></IconButton>

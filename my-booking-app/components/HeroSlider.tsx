@@ -1,34 +1,40 @@
+// my-booking-app/components/HeroSlider.tsx
+
 'use client'
 
 import Slider from 'react-slick'
 import { Box, Typography, Button, Container } from '@mui/material'
+import { useRouter } from 'next/navigation';
 
 const sliderImages = [
-  '/image1.jpg', // Passe die Dateinamen an deine Bilder an
+  '/image1.jpg',
   '/image2.jpg',
   '/image3.jpg',
   '/image4.jpg'
 ];
 
 export default function HeroSlider() {
+  const router = useRouter();
   const settings = {
-    dots: true,
+    dots: false,
+    arrows: false,
     infinite: true,
-    speed: 500,
+    speed: 1500, // Langsamerer, sanfterer Übergang
     slidesToShow: 1,
     slidesToScroll: 1,
     autoplay: true,
-    autoplaySpeed: 3000,
+    autoplaySpeed: 4000,
     fade: true,
+    pauseOnHover: false,
   };
 
   return (
-    <Box className="hero-slider" sx={{ position: 'relative', height: { xs: '60vh', md: '80vh' } }}>
+    <Box sx={{ position: 'relative', height: '100vh', width: '100vw', overflow: 'hidden' }}>
       <Slider {...settings}>
         {sliderImages.map((img, index) => (
           <Box key={index}>
             <Box sx={{
-              height: { xs: '60vh', md: '80vh' },
+              height: '100vh',
               backgroundImage: `url(${img})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
@@ -37,28 +43,43 @@ export default function HeroSlider() {
         ))}
       </Slider>
 
+      {/* Verdunkelungs-Overlay */}
       <Box sx={{
           position: 'absolute',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        }}
+      />
+
+      {/* Text-Inhalt */}
+      <Box sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           color: 'white',
           textAlign: 'center',
-          textShadow: '0 2px 8px rgba(0,0,0,0.7)',
         }}>
          <Container maxWidth="md">
-            <Typography variant="h2" component="h1" fontWeight={800} gutterBottom>
+            <Typography variant="h1" component="h1" gutterBottom>
               Präzision in jedem Schnitt
             </Typography>
-            <Typography variant="h5" sx={{ mb: 4, opacity: 0.9 }}>
+            <Typography variant="h5" sx={{ mb: 4, opacity: 0.9, maxWidth: '700px', margin: '0 auto 32px' }}>
               Buchen Sie Ihren nächsten Termin einfach online.
             </Typography>
-            <Button variant="contained" color="secondary" size="large" onClick={() => (window.location.href = '/booking')}>
+            <Button
+              variant="contained"
+              color="primary"
+              size="large"
+              onClick={() => router.push('/booking')}
+            >
               Jetzt Termin buchen
             </Button>
           </Container>
