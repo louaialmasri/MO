@@ -1,17 +1,17 @@
 'use client'
 
 import { ReactNode, useEffect, useState } from 'react'
-import { usePathname } from 'next/navigation' // NEU: Importiert
+import { usePathname } from 'next/navigation'
 import { AuthProvider } from '@/context/AuthContext'
 import Navbar from '@/components/Navbar'
-import { Box } from '@mui/material' // NEU: Importiert
+import { Box } from '@mui/material'
 
 export default function Providers({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
 
-  const pathname = usePathname() // NEU: Ermittelt den aktuellen Pfad
-  const isHomePage = pathname === '/' // NEU: Prüft, ob es die Startseite ist
+  const pathname = usePathname()
+  const isHomePage = pathname === '/'
 
   return (
     <AuthProvider>

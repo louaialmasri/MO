@@ -39,9 +39,12 @@ let theme = createTheme({
   palette,
   typography: {
     fontFamily: roboto.style.fontFamily,
-    h4: { fontWeight: 800, color: palette.text.primary },
-    h5: { fontWeight: 700, color: palette.text.primary },
-    h6: { fontWeight: 600, color: palette.text.primary },
+    h1: { fontWeight: 800, fontSize: '3.5rem', letterSpacing: '-1.5px' },
+    h2: { fontWeight: 800, fontSize: '3rem', letterSpacing: '-1px' },
+    h3: { fontWeight: 700, fontSize: '2.5rem' },
+    h4: { fontWeight: 800, color: palette.text.primary }, // Beibehalten
+    h5: { fontWeight: 700, color: palette.text.primary }, // Beibehalten
+    h6: { fontWeight: 600, color: palette.text.primary }, // Beibehalten
     subtitle1: { color: palette.text.secondary },
     body1: { color: palette.text.primary },
     body2: { color: palette.text.secondary },
@@ -60,6 +63,15 @@ let theme = createTheme({
         root: { backgroundImage: 'none' },
         outlined: { border: '1px solid rgba(145, 158, 171, 0.2)' },
       },
+    },
+    MuiDialog: {
+      styleOverrides: {
+        paper: {
+          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: 16,
+        }
+      }
     },
     MuiButton: {
       styleOverrides: {
