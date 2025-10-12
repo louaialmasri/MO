@@ -252,6 +252,17 @@ export const fetchServices = async (token?: string | null, options: { global?: b
   }
 };
 
+// Funktion zum Abrufen von Mitarbeitern für einen bestimmten Service
+export const fetchStaffForService = async (serviceId: string): Promise<User[]> => {
+  try {
+    // Diese Route benötigt keinen Token und ist öffentlich
+    const res = await api.get(`/staff/service/${serviceId}`);
+    return res.data || [];
+  } catch (error) {
+    console.error("API Error in fetchStaffForService:", error);
+    return [];
+  }
+};
 
 export async function createService(
   payload: { title: string; description?: string; price: number; duration: number; salonId?: string | null },

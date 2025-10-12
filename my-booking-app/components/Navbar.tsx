@@ -168,6 +168,8 @@ export default function Navbar() {
       <Button sx={navButtonStyle('dashboard')} onMouseEnter={() => setHoveredButton('dashboard')} onClick={() => router.push('/admin/dashboard')}>Dashboard</Button>
       <Button sx={navButtonStyle('kalender')} onMouseEnter={() => setHoveredButton('kalender')} onClick={() => router.push('/admin')}>Kalender</Button>
 
+      <Button sx={navButtonStyle('booking')} onMouseEnter={() => setHoveredButton('booking')} onClick={() => router.push('/booking')}>Termin buchen</Button>
+
       <Box onMouseEnter={(e) => { handleMenuOpen(e, 'kasse'); setHoveredButton('kasse'); }} onMouseLeave={handleMenuLeave} sx={{ position: 'relative', display: 'inline-block' }}>
         <Button sx={navButtonStyle('kasse')}>Kasse</Button>
         {renderDropdown(anchorElKasse, [

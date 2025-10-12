@@ -1,16 +1,18 @@
 'use client'
-import { useRouter, useSearchParams } from 'next/navigation' 
+
+import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import {
   Container, Box, Stepper, Step, StepLabel, Button, Typography, CircularProgress,
   Card, CardActionArea, Avatar, Chip, Alert, TextField, MenuItem, Paper, Stack, Grid
 } from '@mui/material'
-import api, {
+import {
   fetchServices as fetchGlobalServices,
   fetchAllUsers,
   createBooking,
   fetchTimeslots,
   fetchLastBookingForUser,
+  fetchStaffForService, // NEUER IMPORT
   type Service,
   type User
 } from '@/services/api'
@@ -28,17 +30,15 @@ const getInitials = (name = '') => name ? name.split(' ').map(n => n[0]).join(''
 export default function BookingPage() {
   const { user, token, loading: authLoading } = useAuth()
   const router = useRouter()
-  const searchParams = useSearchParams()
 
   const [isAdminOrStaff, setIsAdminOrStaff] = useState(false)
   const [activeStep, setActiveStep] = useState(0)
 
   const [services, setServices] = useState<Service[]>([])
   const [allCustomers, setAllCustomers] = useState<User[]>([])
-  const [allStaff, setAllStaff] = useState<Staff[]>([])
   const [staffForService, setStaffForService] = useState<Staff[]>([])
   const [availableSlots, setAvailableSlots] = useState<string[]>([])
-  const [loading, setLoading] = useState({ initial: true, slots: false })
+  const [loading, setLoading] = useState({ initial: true, slots: false, staff: false }) // NEU: staff loading
   const [error, setError] = useState('')
 
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
@@ -48,59 +48,41 @@ export default function BookingPage() {
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
   const [suggestion, setSuggestion] = useState<{ service: string; staff: string } | null>(null)
 
+  // Logik zur Bestimmung der Rolle und des initialen Zustands vereinfacht
   useEffect(() => {
-    if (user) {
-      const isAdmin = user.role === 'admin';
-      const isStaff = user.role === 'staff';
-      setIsAdminOrStaff(isAdmin || isStaff);
-      
-      // Start-Step für alle eingeloggten User anpassen
-      if (isAdmin || isStaff) {
-        setActiveStep(0); // Admins und Staff starten bei der Kundenauswahl
-      } else {
-        setActiveStep(1); // Normale Kunden starten bei der Service-Auswahl
+    if (authLoading) return;
+    if (user && (user.role === 'admin' || user.role === 'staff')) {
+      setIsAdminOrStaff(true);
+    } else {
+      setIsAdminOrStaff(false);
+      // Wenn ein normaler User eingeloggt ist, seine ID für spätere Buchung setzen
+      if (user) {
+        setSelectedCustomerId(user._id);
       }
-    } else if (!authLoading) {
-      // Wenn nicht eingeloggt und nicht auf der Lade-Seite, zur Service-Auswahl
-      setActiveStep(1);
     }
+    setActiveStep(0);
   }, [user, authLoading]);
 
-  // Wenn ein Mitarbeiter eingeloggt ist, sich selbst direkt auswählen
+  // Initiale Daten laden (ohne alle Mitarbeiter)
   useEffect(() => {
-    if (user?.role === 'staff' && allStaff.length > 0) {
-        const self = allStaff.find(s => s._id === user._id);
-        if (self) {
-            setSelectedStaff(self);
-        }
-    }
-  }, [user, allStaff]);
-
-  // Initiale Daten laden
-  useEffect(() => {
-    if (authLoading || !token) return
-
     const loadInitialData = async () => {
-      setLoading({ initial: true, slots: false })
+      setLoading(p => ({ ...p, initial: true }))
       try {
         const promises = [
-          fetchGlobalServices(token),
-          isAdminOrStaff ? fetchAllUsers(token, 'user') : Promise.resolve([]),
-          isAdminOrStaff ? fetchAllUsers(token, 'staff') : Promise.resolve([]),
+          fetchGlobalServices(), // Services sind für alle sichtbar
+          token && isAdminOrStaff ? fetchAllUsers(token, 'user') : Promise.resolve([]),
         ]
-        const [svcs, users, staffMembers] = await Promise.all(promises)
+        const [svcs, users] = await Promise.all(promises)
         setServices(svcs as Service[])
         setAllCustomers(users as User[])
-        setAllStaff(staffMembers as Staff[])
       } catch {
         setError('Wichtige Daten konnten nicht geladen werden.')
       } finally {
         setLoading(p => ({ ...p, initial: false }))
       }
     }
-
     loadInitialData()
-  }, [token, isAdminOrStaff, authLoading])
+  }, [token, isAdminOrStaff])
 
   // Vorschlag für letzten Termin laden
   useEffect(() => {
@@ -118,17 +100,34 @@ export default function BookingPage() {
     }
   }, [selectedCustomerId, isAdminOrStaff, token])
 
-  // Mitarbeiter nach Service filtern
+  // NEU: Mitarbeiter laden, nachdem ein Service ausgewählt wurde
   useEffect(() => {
     if (!selectedService) {
       setStaffForService([])
       return
     }
-    const skilledStaff = allStaff.filter(staff =>
-      staff.skills?.some(skill => (typeof skill === 'string' ? skill : skill._id) === selectedService._id)
-    )
-    setStaffForService(skilledStaff)
-  }, [selectedService, allStaff])
+    const loadStaff = async () => {
+      setLoading(p => ({ ...p, staff: true }));
+      setSelectedStaff(null);
+      try {
+        const skilledStaff = await fetchStaffForService(selectedService._id);
+        setStaffForService(skilledStaff as Staff[]);
+        // Wenn ein Mitarbeiter eingeloggt ist, prüfen, ob er den Service kann und ihn auswählen
+        if (user?.role === 'staff') {
+          const self = skilledStaff.find(s => s._id === user._id);
+          if (self) {
+            setSelectedStaff(self);
+          }
+        }
+      } catch {
+        setError('Mitarbeiter für diesen Service konnten nicht geladen werden.');
+      } finally {
+        setLoading(p => ({ ...p, staff: false }));
+      }
+    };
+    loadStaff();
+  }, [selectedService, user]);
+
 
   // Zeitslots laden
   useEffect(() => {
@@ -151,8 +150,8 @@ export default function BookingPage() {
 
   const handleNext = () => {
     // Wenn ein Mitarbeiter einen Service ausgewählt hat, überspringe die Mitarbeiterauswahl
-    if (activeStep === 1 && user?.role === 'staff' && selectedStaff) {
-      setActiveStep(3); // Springe direkt zur Datumsauswahl
+    if (activeStep === (isAdminOrStaff ? 1 : 0) && user?.role === 'staff' && selectedStaff) {
+      setActiveStep(prev => prev + 2); // Springe direkt zur Datumsauswahl
     } else {
       setActiveStep(prev => prev + 1);
     }
@@ -160,30 +159,42 @@ export default function BookingPage() {
   const handleBack = () => setActiveStep(prev => prev - 1)
 
   // Vorschlag übernehmen
-  const applySuggestion = () => {
+  const applySuggestion = async () => {
     if (!suggestion) return
     const suggestedService = services.find(s => s._id === suggestion.service)
-    const suggestedStaff = allStaff.find(s => s._id === suggestion.staff)
+    if (!suggestedService) return;
 
-    if (suggestedService && suggestedStaff) {
-      setSelectedService(suggestedService)
+    setSelectedService(suggestedService)
+    // Mitarbeiter für den vorgeschlagenen Service laden
+    const skilledStaff = await fetchStaffForService(suggestedService._id);
+    setStaffForService(skilledStaff as Staff[]);
+    const suggestedStaff = skilledStaff.find(s => s._id === suggestion.staff);
+
+    if (suggestedStaff) {
       setSelectedStaff(suggestedStaff)
       setActiveStep(3)
-    } else if (suggestedService) {
-      setSelectedService(suggestedService)
+    } else {
       setActiveStep(2)
     }
     setSuggestion(null)
   }
 
   const handleBookingSubmit = async () => {
-    if (!token || !selectedService || !selectedStaff || !selectedSlot) {
+    if (!selectedService || !selectedStaff || !selectedSlot) {
       setError('Alle Angaben sind erforderlich.')
       return
     }
-    const targetUserId = isAdminOrStaff ? selectedCustomerId : user?._id
+    
+    const targetUserId = isAdminOrStaff ? selectedCustomerId : user?._id;
+
+    if (!token) {
+        setError('Bitte loggen Sie sich ein, um einen Termin zu buchen.');
+        router.push('/login');
+        return;
+    }
+
     if (!targetUserId) {
-      setError('Bitte wählen Sie einen Kunden aus.')
+      setError('Bitte wählen Sie einen Kunden aus oder loggen Sie sich ein.')
       return
     }
 
@@ -195,8 +206,10 @@ export default function BookingPage() {
     }
   }
 
-  const effectiveSteps = isAdminOrStaff ? steps : steps.slice(1)
-  const currentStepContent = isAdminOrStaff ? activeStep : activeStep + 1
+  // Logik für die Anzeige der Schritte und Inhalte
+  const effectiveSteps = isAdminOrStaff ? steps : steps.slice(1);
+  const stepContentIndex = isAdminOrStaff ? activeStep : activeStep + 1;
+
 
   const renderStepContent = (step: number) => {
     if (loading.initial) {
@@ -205,8 +218,8 @@ export default function BookingPage() {
 
     switch (step) {
       case 0:
+        if (!isAdminOrStaff) return null; // Darf von Kunden nicht gesehen werden
         const suggestedServiceDetails = suggestion ? services.find(s => s._id === suggestion.service) : null
-        const suggestedStaffDetails = suggestion ? allStaff.find(s => s._id === suggestion.staff) : null
         return (
           <Box>
             <Typography variant="h6" gutterBottom>Für wen wird der Termin gebucht?</Typography>
@@ -229,7 +242,6 @@ export default function BookingPage() {
                     <Typography variant="subtitle2" gutterBottom>Vorschlag (letzter Termin):</Typography>
                     <Typography>
                       <strong>{suggestedServiceDetails.title}</strong>
-                      {suggestedStaffDetails && ` bei ${suggestedStaffDetails.firstName}`}
                     </Typography>
                     <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
                       <Button variant="contained" size="small" onClick={applySuggestion}>Übernehmen</Button>
@@ -273,19 +285,16 @@ export default function BookingPage() {
         )
 
       case 2:
-        // Für Staff wird dieser Schritt übersprungen und daher nicht gerendert
-      if (user?.role === 'staff') {
-        return (
-          <Box sx={{ display: 'flex', justifyContent: 'center', my: 5 }}>
-            <CircularProgress />
-            <Typography sx={{ ml: 2 }}>Mitarbeiter wird geladen...</Typography>
-          </Box>
-        );
-      }
+        if (user?.role === 'staff' && selectedStaff) {
+          return null; // Wird übersprungen, wenn der Staff sich selbst auswählt
+        }
+        if (loading.staff) {
+          return <Box sx={{ display: 'flex', justifyContent: 'center', my: 5 }}><CircularProgress /></Box>;
+        }
         return (
           <Grid container spacing={2}>
             {staffForService.length === 0 ? (
-              <Typography sx={{ mt: 2 }}>Keine Mitarbeiter für diesen Service gefunden.</Typography>
+              <Typography sx={{ mt: 2, ml: 2 }}>Keine verfügbaren Mitarbeiter für diesen Service gefunden.</Typography>
             ) : (
               staffForService.map((staff) => (
                 <Grid key={staff._id} size={{ xs: 12, sm: 6, md: 4 }}>
@@ -326,6 +335,7 @@ export default function BookingPage() {
                 value={dayjs(selectedDate).format('YYYY-MM-DD')}
                 onChange={(e) => setSelectedDate(new Date(e.target.value))}
                 fullWidth
+                InputLabelProps={{ shrink: true }}
               />
             </Grid>
 
@@ -376,7 +386,7 @@ export default function BookingPage() {
               <CheckCircleIcon color="success" sx={{ fontSize: 60, mb: 2 }} />
             </motion.div>
             <Typography variant="h5">Termin erfolgreich gebucht!</Typography>
-            <Typography color="text.secondary">Der Kunde wurde per E-Mail benachrichtigt.</Typography>
+            <Typography color="text.secondary">Du erhältst eine Bestätigung per E-Mail.</Typography>
             <Button variant="contained" sx={{ mt: 3 }} onClick={() => router.push(isAdminOrStaff ? '/admin' : '/dashboard')}>
               {isAdminOrStaff ? 'Zurück zum Kalender' : 'Zu meinen Terminen'}
             </Button>
@@ -405,8 +415,8 @@ export default function BookingPage() {
 
         <Grid size={{ xs: 12, md: 8 }}>
           <Box sx={{ minHeight: 400 }}>
-            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-            {renderStepContent(currentStepContent)}
+            {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
+            {renderStepContent(stepContentIndex)}
           </Box>
 
           {activeStep < effectiveSteps.length && (
@@ -429,10 +439,10 @@ export default function BookingPage() {
                 <Button
                   onClick={handleNext}
                   disabled={
-                    (currentStepContent === 0 && !selectedCustomerId) ||
-                    (currentStepContent === 1 && !selectedService) ||
-                    (currentStepContent === 2 && !selectedStaff) ||
-                    (currentStepContent === 3 && !selectedSlot)
+                    (stepContentIndex === 0 && !selectedCustomerId) ||
+                    (stepContentIndex === 1 && !selectedService) ||
+                    (stepContentIndex === 2 && !selectedStaff) ||
+                    (stepContentIndex === 3 && !selectedSlot)
                   }
                   endIcon={<ArrowForwardIcon />}
                 >
