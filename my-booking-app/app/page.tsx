@@ -26,20 +26,17 @@ import { fetchServices, type Service } from '@/services/api'
 import { useAuth } from '@/context/AuthContext'
 import HeroSlider from '@/components/HeroSlider'
 
-// Icons (optional, falls du sie behalten möchtest)
+// Icons
 import LocationOnIcon from '@mui/icons-material/LocationOn'
 import AccessTimeIcon from '@mui/icons-material/AccessTime'
 import PhoneIphoneIcon from '@mui/icons-material/PhoneIphone'
 import InstagramIcon from '@mui/icons-material/Instagram'
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth'
-
-// Icons für die Kategorien
 import ContentCutIcon from '@mui/icons-material/ContentCut';
 import BrushIcon from '@mui/icons-material/Brush';
 import FaceIcon from '@mui/icons-material/Face';
 import SpaIcon from '@mui/icons-material/Spa';
 
-// --- Shop-Daten (wie zuvor) ---
 const SALON_NAME = "Mo's Barbershop"
 const SALON_ADDRESS = 'Musterstraße 7, 85055 Ingolstadt'
 const SALON_PHONE = '+49 151 23456789'
@@ -62,14 +59,12 @@ const MOCK_REVIEWS = [
 
 type ServiceWithCategory = Service & { category?: string };
 
-// NEU: Ein Objekt, das Kategorienamen Icons zuordnet.
-// Du kannst hier die Namen deiner Kategorien und die gewünschten Icons eintragen.
 const categoryIcons: { [key: string]: React.ReactElement } = {
   'Haarschnitt': <ContentCutIcon />,
   'Färben': <BrushIcon />,
   'Bart': <FaceIcon />,
   'Pflege': <SpaIcon />,
-  'Allgemein': <SpaIcon /> // Fallback-Icon
+  'Allgemein': <SpaIcon />
 };
 
 export default function LandingPage() {
@@ -77,10 +72,8 @@ export default function LandingPage() {
   const { token } = useAuth()
   const [services, setServices] = useState<ServiceWithCategory[]>([])
   const [loading, setLoading] = useState(true)
-
   const [selectedCategory, setSelectedCategory] = useState<string | false>(false);
 
-  // Gruppiert die Services nach Kategorie (wie zuvor)
   const servicesByCategory = useMemo(() => {
     return services.reduce((acc, service) => {
       const categoryName = (service as any).category?.name || 'Allgemein';
@@ -92,7 +85,6 @@ export default function LandingPage() {
     }, {} as Record<string, ServiceWithCategory[]>);
   }, [services]);
 
-  // Lade die Services (wie zuvor)
   useEffect(() => {
     const load = async () => {
       try {
@@ -107,7 +99,6 @@ export default function LandingPage() {
     load()
   }, [token])
 
-  // NEU: Setzt die erste Kategorie als aktiv, sobald die Daten geladen sind
   useEffect(() => {
     const categories = Object.keys(servicesByCategory);
     if (categories.length > 0 && !selectedCategory) {
@@ -115,7 +106,6 @@ export default function LandingPage() {
     }
   }, [servicesByCategory, selectedCategory]);
 
-  // NEU: Handler für den Tab-Wechsel
   const handleCategoryChange = (event: React.SyntheticEvent, newValue: string) => {
     setSelectedCategory(newValue);
   };
@@ -124,7 +114,6 @@ export default function LandingPage() {
     <Box sx={{ bgcolor: 'background.default' }}>
       <HeroSlider />
 
-      {/* ÜBERARBEITETER SERVICES-BEREICH */}
       <Container maxWidth="lg" sx={{ py: 8 }}>
         <Typography variant="h4" sx={{ fontWeight: 700, mb: 4, textAlign: 'center' }}>
           Unsere Dienstleistungen
@@ -134,7 +123,6 @@ export default function LandingPage() {
           <Box sx={{ display: 'flex', justifyContent: 'center' }}><CircularProgress /></Box>
         ) : (
           <>
-            {/* Horizontale Tabs für die Kategorien */}
             <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
               <Tabs
                 value={selectedCategory}
@@ -146,7 +134,7 @@ export default function LandingPage() {
                 {Object.keys(servicesByCategory).map((category) => (
                   <Tab
                     key={category}
-                    icon={categoryIcons[category] || <SpaIcon />} // Icon wird hier eingefügt
+                    icon={categoryIcons[category] || <SpaIcon />}
                     iconPosition="start"
                     label={category}
                     value={category}
@@ -155,10 +143,9 @@ export default function LandingPage() {
               </Tabs>
             </Box>
 
-            {/* Dienstleistungen der ausgewählten Kategorie */}
             {selectedCategory && servicesByCategory[selectedCategory] ? (
               servicesByCategory[selectedCategory].map(service => (
-                <Card key={service._id} variant="outlined" sx={{ mb: 2, '&:hover': { borderColor: 'secondary.main' } }}>
+                <Card key={service._id} variant="outlined" sx={{ mb: 2, '&:hover': { borderColor: 'primary.main' } }}>
                   <CardContent>
                     <Grid container alignItems="center" spacing={2}>
                       <Grid size={{ xs: 12, md: 6 }}>
@@ -169,7 +156,8 @@ export default function LandingPage() {
                         <Typography variant="h6" fontWeight="bold">{service.price.toFixed(2)} €</Typography>
                       </Grid>
                       <Grid size={{ xs: 6, md: 3 }} sx={{ textAlign: 'right' }}>
-                        <Button variant="contained" color="secondary" onClick={() => router.push('/booking')}>
+                        {/* HIER DIE ÄNDERUNG: Button-Farbe auf primary gesetzt */}
+                        <Button variant="contained" color="primary" onClick={() => router.push('/booking')}>
                           Buchen
                         </Button>
                       </Grid>
@@ -184,7 +172,6 @@ export default function LandingPage() {
         )}
       </Container>
       
-      {/* REVIEWS / TRUST (Wiederhergestellt) */}
       <Box sx={{ py: 8, backgroundColor: '#fff' }}>
         <Container maxWidth="lg">
           <Typography variant="h4" sx={{ fontWeight: 800, mb: 3 }}>
@@ -193,7 +180,7 @@ export default function LandingPage() {
 
           <Grid container spacing={3}>
             {MOCK_REVIEWS.map((r, i) => (
-              <Grid key={i} size={{ xs: 12, md: 4 }}>
+              <Grid size={{ xs: 12, md: 4 }} key={i}>
                 <Paper elevation={2} sx={{ p: 3, height: '100%' }}>
                   <Stack direction="row" alignItems="center" spacing={1}>
                     <Rating value={5} readOnly size="small" />
@@ -218,7 +205,6 @@ export default function LandingPage() {
         </Container>
       </Box>
 
-      {/* INFO: Opening hours + Contact */}
       <Container maxWidth="lg" sx={{ py: 8 }}>
         <Grid container spacing={3}>
           <Grid size={{ xs: 12, md: 6 }}>

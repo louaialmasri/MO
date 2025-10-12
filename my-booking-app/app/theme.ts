@@ -9,19 +9,21 @@ const roboto = Roboto({
   display: 'swap',
 });
 
-// === ORANGE PALETTE (wie in page.tsx) ===
+// === FARBPALETTE ANGEPASST ===
 const palette = {
   primary: {
-    main: '#E2673A',           // kräftiges, modernes Orange
+    main: '#E2673A',
     light: 'rgba(226,103,58,0.12)',
     dark: '#B04E28',
     contrastText: '#fff',
   },
+  // HIER DIE ÄNDERUNG: secondary wird wieder auf primary gesetzt für einen einheitlichen Look
   secondary: {
-    main: '#1976d2',           // klares Blau als Kontrast
+    main: '#E2673A', // Orange statt Grau
+    contrastText: '#fff',
   },
   background: {
-    default: '#f6f8fa',        // sehr hellgrauer Grund
+    default: '#f6f8fa',
     paper: '#ffffff',
   },
   text: {
