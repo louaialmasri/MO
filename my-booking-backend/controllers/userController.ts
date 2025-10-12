@@ -9,19 +9,21 @@ import { Booking } from '../models/Booking'
 export const getAllUsers = async (req: AuthRequest & { salonId?: string }, res: Response) => {
   try {
     const { role } = req.query as { role?: string };
-    const sid = req.salonId;
 
-    if (req.user?.role === 'admin' && (role === 'staff' || role === 'user')) {
+    // Admins und Staff dürfen die Kundenliste abrufen (bleibt unverändert)
+    if (role === 'user' && (req.user?.role === 'admin' || req.user?.role === 'staff')) {
+      const users = await User.find({ role }).sort({ lastName: 1, firstName: 1 }).lean();
+      return res.json({ success: true, users });
+    }
+
+    // Jetzt dürfen auch Mitarbeiter die Mitarbeiterliste abrufen
+    if (role === 'staff' && (req.user?.role === 'admin' || req.user?.role === 'staff')) {
       const users = await User.find({ role }).populate('skills').lean();
       return res.json({ success: true, users });
     }
 
-    if (!sid) return res.json({ success: true, users: [] });
-
-    const q: any = { salon: sid };
-    if (role) q.role = role;
-    const users = await User.find(q).populate('skills').lean();
-    return res.json({ success: true, users });
+    // Alle anderen Anfragen werden abgelehnt
+    return res.status(403).json({ success: false, message: 'Nicht autorisiert für diese Anfrage' });
 
   } catch (e) {
     console.error('getAllUsers error', e);
