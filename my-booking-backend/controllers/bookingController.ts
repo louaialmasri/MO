@@ -91,8 +91,10 @@ export const getUserBookings = async (req: AuthRequest, res: Response) => {
     }
 
     const bookings = await Booking.find({ user: userId })
-      .populate('service', 'title duration')
+      // HIER DIE ANPASSUNG: Wir holen jetzt mehr Details
+      .populate('service', 'title duration price category')
       .populate('staff', 'firstName lastName email')
+      .sort({ dateTime: -1 }); // Nach Datum absteigend sortieren
 
     res.status(200).json({ success: true, bookings })
   } catch (error) {

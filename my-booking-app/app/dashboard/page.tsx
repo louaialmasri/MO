@@ -5,25 +5,35 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { getUserBookings, deleteBooking, type Booking, type Service } from '@/services/api'
 import {
-  Container, Typography, Card, CardContent, CardActions, Button, Box, Paper, Alert,
+  Container, Typography, Card, CardContent, CardActions, Button, Box, Paper,
   Stack,
   CircularProgress,
   Grid,
   Tooltip,
-  // ⬇️ NEU:
-  Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions
+  Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
+  Avatar // NEU: Avatar importiert
 } from '@mui/material'
 import { motion } from 'framer-motion'
 import dayjs from 'dayjs'
+import 'dayjs/locale/de' // Wichtig für deutsche Datumsformate
 
 // Icons
 import EventIcon from '@mui/icons-material/Event';
-import PersonIcon from '@mui/icons-material/Person';
 import CategoryIcon from '@mui/icons-material/Category';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import MoodBadIcon from '@mui/icons-material/MoodBad';
+import EuroSymbolIcon from '@mui/icons-material/EuroSymbol'; // NEU: Preis-Icon
+import ReplayIcon from '@mui/icons-material/Replay'; // NEU: "Erneut buchen"-Icon
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 
-// staff-Eigenschaft zum Typ hinzufügen
+dayjs.locale('de');
+
+// NEU: Hilfsfunktion für Initialen
+const getInitials = (firstName = '', lastName = '') => {
+    const first = firstName ? firstName[0] : '';
+    const last = lastName ? lastName[0] : '';
+    return `${first}${last}`.toUpperCase();
+};
+
 type BookingWithService = Booking & {
   service: Service;
   staff: {
@@ -40,7 +50,6 @@ export default function DashboardPage() {
   const [bookings, setBookings] = useState<BookingWithService[]>([])
   const [dataLoading, setDataLoading] = useState(true);
 
-  // ⬇️ NEU: State für Bestätigungsdialog
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [bookingToCancel, setBookingToCancel] = useState<BookingWithService | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -59,7 +68,11 @@ export default function DashboardPage() {
       const loadData = async () => {
         try {
           const userBookings = await getUserBookings(token!);
-          setBookings(userBookings as BookingWithService[]);
+          // Sort bookings: upcoming first, then past ones descending
+          const sortedBookings = (userBookings as BookingWithService[]).sort((a, b) =>
+            dayjs(b.dateTime).diff(dayjs(a.dateTime))
+          );
+          setBookings(sortedBookings);
         } catch (error) {
           console.error('Fehler beim Laden der Buchungen:', error)
         } finally {
@@ -70,19 +83,16 @@ export default function DashboardPage() {
     }
   }, [user, token, router, loading])
 
-  // ⬇️ NEU: Öffnet den Dialog und merkt sich den Termin
   const openCancelDialog = (booking: BookingWithService) => {
     setBookingToCancel(booking);
     setConfirmOpen(true);
   };
 
-  // ⬇️ NEU: Schließt den Dialog ohne zu löschen
   const closeCancelDialog = () => {
     setConfirmOpen(false);
     setBookingToCancel(null);
   };
 
-  // ⬇️ Anpassung: tatsächliches Löschen erst nach Bestätigung
   const confirmCancel = async () => {
     if (!bookingToCancel) return;
     try {
@@ -91,22 +101,27 @@ export default function DashboardPage() {
       if (success) {
         setBookings(prev => prev.filter(b => b._id !== bookingToCancel._id))
       } else {
-        alert('Fehler beim Stornieren!')
+        // Hier sollte ein besserer Error-Handler hin, z.B. eine Snackbar
+        console.error('Fehler beim Stornieren des Termins.');
       }
     } catch (err) {
-      alert('Fehler beim Stornieren!')
+      console.error('Fehler beim Stornieren:', err);
     } finally {
       setDeletingId(null);
       closeCancelDialog();
     }
   }
 
-  // Funktion zur Prüfung, ob ein Termin stornierbar ist
   const isCancellable = (dateTime: string) => {
     const now = dayjs();
     const bookingDate = dayjs(dateTime);
     const diffHours = bookingDate.diff(now, 'hour');
     return diffHours >= 24;
+  };
+
+  // NEU: Funktion für "Erneut buchen"
+  const handleRebook = (booking: BookingWithService) => {
+    router.push(`/booking?serviceId=${booking.service._id}&staffId=${booking.staff._id}`);
   };
 
   if (loading || dataLoading || !user || user.role === 'admin') {
@@ -120,14 +135,86 @@ export default function DashboardPage() {
   const upcomingBookings = bookings.filter(b => dayjs(b.dateTime).isAfter(dayjs()));
   const pastBookings = bookings.filter(b => dayjs(b.dateTime).isBefore(dayjs()));
 
+  // NEU: Wiederverwendbare Komponente für eine Terminkarte
+  const BookingCard = ({ booking, isPast = false }: { booking: BookingWithService, isPast?: boolean }) => (
+    // KORREKTUR: Grid-Syntax angepasst
+    <Grid size={{ xs: 12, md: 6, lg: 4 }} key={booking._id}>
+      <Card
+        sx={{
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          borderRadius: 4,
+          transition: 'box-shadow 0.3s',
+          opacity: isPast ? 0.7 : 1,
+          '&:hover': { boxShadow: 6 }
+        }}
+      >
+        <CardContent sx={{ flexGrow: 1 }}>
+          <Typography variant="h6" fontWeight="bold" gutterBottom>
+            {booking.service?.title ?? 'Service'}
+          </Typography>
+          <Stack spacing={1.5} mt={2}>
+            <Stack direction="row" alignItems="center" spacing={1.5}>
+              <EventIcon color="action" />
+              <Typography variant="body1">
+                {dayjs(booking.dateTime).format('dd, DD.MM.YYYY [um] HH:mm [Uhr]')}
+              </Typography>
+            </Stack>
+            <Stack direction="row" alignItems="center" spacing={1.5}>
+              <Avatar sx={{ width: 24, height: 24, fontSize: '0.8rem', bgcolor: 'primary.light', color: 'primary.main' }}>
+                {getInitials(booking.staff.firstName, booking.staff.lastName)}
+              </Avatar>
+              <Typography variant="body1">
+                {booking.staff ? `${booking.staff.firstName} ${booking.staff.lastName}`.trim() : 'N/A'}
+              </Typography>
+            </Stack>
+            <Stack direction="row" alignItems="center" spacing={1.5}>
+              <CategoryIcon color="action" />
+              <Typography variant="body1">{booking.service?.duration} Minuten</Typography>
+            </Stack>
+            <Stack direction="row" alignItems="center" spacing={1.5}>
+              <EuroSymbolIcon color="action" />
+              <Typography variant="body1">{booking.service?.price.toFixed(2)} €</Typography>
+            </Stack>
+          </Stack>
+        </CardContent>
+
+        <CardActions sx={{ px: 2, pb: 2 }}>
+          {isPast ? (
+            <Button
+              size="small"
+              startIcon={<ReplayIcon />}
+              onClick={() => handleRebook(booking)}
+            >
+              Erneut buchen
+            </Button>
+          ) : isCancellable(booking.dateTime) ? (
+            <Button
+              size="small"
+              color="error"
+              onClick={() => openCancelDialog(booking)}
+              disabled={deletingId === booking._id}
+            >
+              {deletingId === booking._id ? 'Wird storniert...' : 'Stornieren'}
+            </Button>
+          ) : (
+            <Tooltip title="Stornierung nicht mehr möglich (weniger als 24h)">
+              <span>
+                <Button size="small" color="error" disabled>
+                  Stornieren
+                </Button>
+              </span>
+            </Tooltip>
+          )}
+        </CardActions>
+      </Card>
+    </Grid>
+  );
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <Box sx={{
-        bgcolor: 'primary.main',
-        color: 'white',
-        py: 6,
-        mb: 5
-      }}>
+       <Box sx={{ bgcolor: 'primary.main', color: 'white', py: 6, mb: 5 }}>
         <Container maxWidth="lg">
           <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center">
             <Box>
@@ -158,65 +245,7 @@ export default function DashboardPage() {
           </Paper>
         ) : (
           <Grid container spacing={3}>
-            {upcomingBookings.map((b) => (
-              <Grid key={b._id} size={{ xs: 12, md: 6, lg: 4 }}>
-                <Card
-                  sx={{
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    borderRadius: 4,
-                    transition: 'box-shadow 0.3s',
-                    '&:hover': { boxShadow: 6 }
-                  }}
-                >
-                  <CardContent sx={{ flexGrow: 1 }}>
-                    <Typography variant="h6" fontWeight="bold" gutterBottom>
-                      {b.service?.title ?? 'Service'}
-                    </Typography>
-                    <Stack spacing={1.5} mt={2}>
-                      <Stack direction="row" alignItems="center" spacing={1.5}>
-                        <EventIcon color="action" />
-                        <Typography variant="body1">
-                          {dayjs(b.dateTime).format('dd, DD.MM.YYYY [um] HH:mm [Uhr]')}
-                        </Typography>
-                      </Stack>
-                      <Stack direction="row" alignItems="center" spacing={1.5}>
-                        <PersonIcon color="action" />
-                        <Typography variant="body1">
-                          {b.staff ? `${b.staff.firstName} ${b.staff.lastName}`.trim() : 'N/A'}
-                        </Typography>
-                      </Stack>
-                      <Stack direction="row" alignItems="center" spacing={1.5}>
-                        <CategoryIcon color="action" />
-                        <Typography variant="body1">{b.service?.duration} Minuten</Typography>
-                      </Stack>
-                    </Stack>
-                  </CardContent>
-
-                  <CardActions sx={{ px: 2, pb: 2 }}>
-                    {isCancellable(b.dateTime) ? (
-                      <Button
-                        size="small"
-                        color="error"
-                        onClick={() => openCancelDialog(b)}
-                        disabled={deletingId === b._id}
-                      >
-                        {deletingId === b._id ? 'Wird storniert...' : 'Stornieren'}
-                      </Button>
-                    ) : (
-                      <Tooltip title="Stornierung nicht mehr möglich (weniger als 24h)">
-                        <span>
-                          <Button size="small" color="error" disabled>
-                            Stornieren
-                          </Button>
-                        </span>
-                      </Tooltip>
-                    )}
-                  </CardActions>
-                </Card>
-              </Grid>
-            ))}
+            {upcomingBookings.map((b) => <BookingCard key={b._id} booking={b} />)}
           </Grid>
         )}
 
@@ -225,12 +254,13 @@ export default function DashboardPage() {
             <Typography variant="h5" fontWeight={700} sx={{ mt: 6, mb: 3 }}>
               Vergangene Termine
             </Typography>
-            {/* Hier könnte eine Liste der vergangenen Termine implementiert werden */}
+            <Grid container spacing={3}>
+              {pastBookings.map((b) => <BookingCard key={b._id} booking={b} isPast />)}
+            </Grid>
           </>
         )}
       </Container>
-
-      {/* ⬇️ NEU: Bestätigungsdialog */}
+      
       <Dialog
         open={confirmOpen}
         onClose={closeCancelDialog}
@@ -242,9 +272,6 @@ export default function DashboardPage() {
             {bookingToCancel
               ? `Möchtest du den Termin „${bookingToCancel.service?.title ?? 'Service'}“ am ${dayjs(bookingToCancel.dateTime).format('DD.MM.YYYY [um] HH:mm [Uhr]')} wirklich stornieren?`
               : 'Möchtest du diesen Termin wirklich stornieren?'}
-          </DialogContentText>
-          <DialogContentText sx={{ mt: 1 }} color="error">
-            Hinweis: Stornierungen sind nur bis 24 Stunden vor dem Termin möglich.
           </DialogContentText>
         </DialogContent>
         <DialogActions>

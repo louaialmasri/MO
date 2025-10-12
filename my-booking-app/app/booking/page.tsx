@@ -1,6 +1,5 @@
 'use client'
-
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import {
   Container, Box, Stepper, Step, StepLabel, Button, Typography, CircularProgress,
@@ -12,7 +11,7 @@ import {
   createBooking,
   fetchTimeslots,
   fetchLastBookingForUser,
-  fetchStaffForService, // NEUER IMPORT
+  fetchStaffForService,
   type Service,
   type User
 } from '@/services/api'
@@ -30,6 +29,7 @@ const getInitials = (name = '') => name ? name.split(' ').map(n => n[0]).join(''
 export default function BookingPage() {
   const { user, token, loading: authLoading } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams() // Next.js Hook für URL-Parameter
 
   const [isAdminOrStaff, setIsAdminOrStaff] = useState(false)
   const [activeStep, setActiveStep] = useState(0)
@@ -38,7 +38,7 @@ export default function BookingPage() {
   const [allCustomers, setAllCustomers] = useState<User[]>([])
   const [staffForService, setStaffForService] = useState<Staff[]>([])
   const [availableSlots, setAvailableSlots] = useState<string[]>([])
-  const [loading, setLoading] = useState({ initial: true, slots: false, staff: false }) // NEU: staff loading
+  const [loading, setLoading] = useState({ initial: true, slots: false, staff: false })
   const [error, setError] = useState('')
 
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
@@ -48,41 +48,69 @@ export default function BookingPage() {
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
   const [suggestion, setSuggestion] = useState<{ service: string; staff: string } | null>(null)
 
-  // Logik zur Bestimmung der Rolle und des initialen Zustands vereinfacht
   useEffect(() => {
     if (authLoading) return;
     if (user && (user.role === 'admin' || user.role === 'staff')) {
       setIsAdminOrStaff(true);
     } else {
       setIsAdminOrStaff(false);
-      // Wenn ein normaler User eingeloggt ist, seine ID für spätere Buchung setzen
       if (user) {
         setSelectedCustomerId(user._id);
       }
     }
-    setActiveStep(0);
+    // setActiveStep wird nun im nächsten useEffect gesetzt, um Race Conditions zu vermeiden
   }, [user, authLoading]);
 
-  // Initiale Daten laden (ohne alle Mitarbeiter)
+  // Initiale Daten laden & URL-Parameter verarbeiten
   useEffect(() => {
     const loadInitialData = async () => {
       setLoading(p => ({ ...p, initial: true }))
       try {
-        const promises = [
-          fetchGlobalServices(), // Services sind für alle sichtbar
+        const [svcs, users] = await Promise.all([
+          fetchGlobalServices(),
           token && isAdminOrStaff ? fetchAllUsers(token, 'user') : Promise.resolve([]),
-        ]
-        const [svcs, users] = await Promise.all(promises)
+        ])
         setServices(svcs as Service[])
         setAllCustomers(users as User[])
+
+        // NEU: Parameter aus der URL auslesen und Status setzen
+        const serviceIdFromUrl = searchParams.get('serviceId');
+        const staffIdFromUrl = searchParams.get('staffId');
+
+        if (serviceIdFromUrl) {
+          const preselectedService = (svcs as Service[]).find(s => s._id === serviceIdFromUrl);
+          if (preselectedService) {
+            setSelectedService(preselectedService);
+
+            // Wenn Service da ist, direkt Mitarbeiter laden
+            const skilledStaff = await fetchStaffForService(serviceIdFromUrl);
+            setStaffForService(skilledStaff as Staff[]);
+
+            if (staffIdFromUrl) {
+              const preselectedStaff = (skilledStaff as Staff[]).find(s => s._id === staffIdFromUrl);
+              if (preselectedStaff) {
+                setSelectedStaff(preselectedStaff);
+                // Direkt zum Datum-Schritt springen
+                setActiveStep(isAdminOrStaff ? 3 : 2);
+              }
+            } else {
+              // Zum Mitarbeiter-Schritt springen
+              setActiveStep(isAdminOrStaff ? 2 : 1);
+            }
+          }
+        } else {
+          setActiveStep(0); // Normaler Start
+        }
       } catch {
         setError('Wichtige Daten konnten nicht geladen werden.')
       } finally {
         setLoading(p => ({ ...p, initial: false }))
       }
     }
-    loadInitialData()
-  }, [token, isAdminOrStaff])
+    if(token || !authLoading) { // Sicherstellen, dass der Token (oder der Ladezustand) geklärt ist
+        loadInitialData()
+    }
+  }, [token, isAdminOrStaff, searchParams, authLoading])
 
   // Vorschlag für letzten Termin laden
   useEffect(() => {
@@ -100,10 +128,9 @@ export default function BookingPage() {
     }
   }, [selectedCustomerId, isAdminOrStaff, token])
 
-  // NEU: Mitarbeiter laden, nachdem ein Service ausgewählt wurde
+  // Mitarbeiter laden, nachdem ein Service ausgewählt wurde (nur wenn nicht schon durch URL gesetzt)
   useEffect(() => {
-    if (!selectedService) {
-      setStaffForService([])
+    if (!selectedService || staffForService.length > 0) {
       return
     }
     const loadStaff = async () => {
@@ -112,7 +139,6 @@ export default function BookingPage() {
       try {
         const skilledStaff = await fetchStaffForService(selectedService._id);
         setStaffForService(skilledStaff as Staff[]);
-        // Wenn ein Mitarbeiter eingeloggt ist, prüfen, ob er den Service kann und ihn auswählen
         if (user?.role === 'staff') {
           const self = skilledStaff.find(s => s._id === user._id);
           if (self) {
@@ -156,7 +182,15 @@ export default function BookingPage() {
       setActiveStep(prev => prev + 1);
     }
   };
-  const handleBack = () => setActiveStep(prev => prev - 1)
+  const handleBack = () => {
+    // Wenn man von Datum zurückspringt und per URL kam, muss man zu Schritt 0
+    const serviceIdFromUrl = searchParams.get('serviceId');
+    if(serviceIdFromUrl && activeStep === (isAdminOrStaff ? 3 : 2)) {
+        router.push('/dashboard'); // Oder zurück zum Start der Buchung
+        return;
+    }
+    setActiveStep(prev => prev - 1);
+  }
 
   // Vorschlag übernehmen
   const applySuggestion = async () => {
@@ -165,7 +199,6 @@ export default function BookingPage() {
     if (!suggestedService) return;
 
     setSelectedService(suggestedService)
-    // Mitarbeiter für den vorgeschlagenen Service laden
     const skilledStaff = await fetchStaffForService(suggestedService._id);
     setStaffForService(skilledStaff as Staff[]);
     const suggestedStaff = skilledStaff.find(s => s._id === suggestion.staff);
@@ -218,7 +251,7 @@ export default function BookingPage() {
 
     switch (step) {
       case 0:
-        if (!isAdminOrStaff) return null; // Darf von Kunden nicht gesehen werden
+        if (!isAdminOrStaff) return null;
         const suggestedServiceDetails = suggestion ? services.find(s => s._id === suggestion.service) : null
         return (
           <Box>
@@ -258,7 +291,7 @@ export default function BookingPage() {
         return (
           <Grid container spacing={2}>
             {services.map((service) => (
-              <Grid key={service._id} size={{ xs: 12, sm: 6, md: 4 }}>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={service._id}>
                 <Card
                   variant="outlined"
                   sx={{
@@ -286,7 +319,7 @@ export default function BookingPage() {
 
       case 2:
         if (user?.role === 'staff' && selectedStaff) {
-          return null; // Wird übersprungen, wenn der Staff sich selbst auswählt
+          return null;
         }
         if (loading.staff) {
           return <Box sx={{ display: 'flex', justifyContent: 'center', my: 5 }}><CircularProgress /></Box>;
@@ -297,7 +330,7 @@ export default function BookingPage() {
               <Typography sx={{ mt: 2, ml: 2 }}>Keine verfügbaren Mitarbeiter für diesen Service gefunden.</Typography>
             ) : (
               staffForService.map((staff) => (
-                <Grid key={staff._id} size={{ xs: 12, sm: 6, md: 4 }}>
+                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={staff._id}>
                   <Card
                     variant="outlined"
                     sx={{
