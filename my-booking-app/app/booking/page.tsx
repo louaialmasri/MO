@@ -217,14 +217,22 @@ export default function BookingPage() {
       setError('Alle Angaben sind erforderlich.')
       return
     }
-    
-    const targetUserId = isAdminOrStaff ? selectedCustomerId : user?._id;
 
+    // --- HIER DIE LOGIK FÜR GÄSTE ---
     if (!token) {
-        setError('Bitte loggen Sie sich ein, um einen Termin zu buchen.');
-        router.push('/login');
+        // Speichere die Auswahl im localStorage, damit wir nach dem Login zurückkehren können
+        localStorage.setItem('bookingSelection', JSON.stringify({
+            serviceId: selectedService._id,
+            staffId: selectedStaff._id,
+            date: dayjs(selectedDate).format('YYYY-MM-DD'),
+            slot: selectedSlot,
+        }));
+        // Leite zur Login-Seite weiter und gib an, wohin es danach gehen soll
+        router.push('/login?redirect=/booking');
         return;
     }
+    
+    const targetUserId = isAdminOrStaff ? selectedCustomerId : user?._id;
 
     if (!targetUserId) {
       setError('Bitte wählen Sie einen Kunden aus oder loggen Sie sich ein.')
