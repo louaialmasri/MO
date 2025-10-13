@@ -42,8 +42,8 @@ export const register = async (req: Request, res: Response) => {
   try {
     const { email, password, firstName, lastName, address, phone, role } = req.body;
 
-    if (!email || !password || !firstName || !lastName) {
-      return res.status(400).json({ message: 'E-Mail, Passwort, Vor- und Nachname sind erforderlich' });
+    if (!email || !password || !firstName || !lastName || !phone) {
+      return res.status(400).json({ message: 'E-Mail, Passwort, Vor- und Nachname sowie Telefonnummer sind erforderlich' });
     }
 
     const existingUser = await User.findOne({ email });
@@ -59,7 +59,7 @@ export const register = async (req: Request, res: Response) => {
       firstName,
       lastName,
       address: address || '',
-      phone: phone || '',
+      phone: phone,
       role: role || 'user',
     });
 

@@ -1,3 +1,5 @@
+// my-booking-app/app/register/page.tsx
+
 'use client'
 
 import { useState } from 'react'
@@ -11,6 +13,7 @@ export default function RegisterPage() {
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [phone, setPhone] = useState('') // NEU: State für Telefonnummer
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const router = useRouter()
@@ -19,13 +22,15 @@ export default function RegisterPage() {
     setError('')
     setSuccess(false)
 
-    if (!firstName || !lastName) {
-      setError('Bitte Vor- und Nachnamen eingeben.');
+    // HIER DIE ÄNDERUNG: 'phone' zur Validierung hinzugefügt
+    if (!firstName || !lastName || !phone) {
+      setError('Bitte alle erforderlichen Felder ausfüllen.');
       return;
     }
 
     try {
-      const res = await registerRequest(email, password, firstName, lastName) // Angepasst an die neue API-Funktion
+      // HIER DIE ÄNDERUNG: 'phone' wird jetzt übergeben
+      const res = await registerRequest(email, password, firstName, lastName, undefined, phone)
       if (res.user) {
         setSuccess(true)
         setTimeout(() => {
@@ -60,6 +65,15 @@ export default function RegisterPage() {
             fullWidth
           />
         </Stack>
+        
+        {/* NEU: Textfeld für Telefonnummer */}
+        <TextField
+          label="Handynummer"
+          type="tel"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          required
+        />
         
         <TextField
           label="E-Mail"

@@ -7,7 +7,7 @@ const userSchema = new Schema({
   password: { type: String, required: true, select: false },
   role: { type: String, enum: ['user','staff','admin'], required: true },
   address: { type: String },
-  phone: { type: String },
+  phone: { type: String, required: true },
   // NEU: Feld für den gehashten Dashboard-PIN
   dashboardPin: { type: String, select: false },
   // Skills sind primär für Staff relevant
