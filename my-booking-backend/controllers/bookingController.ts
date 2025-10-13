@@ -10,6 +10,7 @@ import { ServiceSalon } from '../models/ServiceSalon'
 import { SalonRequest } from '../middlewares/activeSalon'
 import { Invoice } from '../models/Invoice';
 import dayjs from 'dayjs'
+import { sendEmail } from '../utils/email'
 
 // Booking erstellen
 export const createBooking = async (req: AuthRequest & SalonRequest, res: Response) => {
@@ -70,11 +71,35 @@ export const createBooking = async (req: AuthRequest & SalonRequest, res: Respon
     
     // Nach dem Speichern neu laden und populieren
     const savedBooking = await Booking.findById(booking._id)
-        .populate('user', 'firstName lastName email')
-        .populate('service', 'title price duration')
-        .populate('staff', 'firstName lastName email')
+        .populate<{ user: { firstName: string, email: string } }>('user', 'firstName email')
+        .populate<{ service: { title: string } }>('service', 'title')
+        .populate<{ staff: { firstName: string, lastName: string } }>('staff', 'firstName lastName')
         .populate('history.executedBy', 'firstName lastName');
 
+    // --- HIER WIRD DIE E-MAIL GESENDET ---
+    if (savedBooking) {
+      const customer = savedBooking.user;
+      const service = savedBooking.service;
+      const staff = savedBooking.staff;
+      
+      const subject = `Ihre Terminbestätigung bei ${process.env.SALON_NAME || "Mo's Barbershop"}`;
+      const html = `
+        <h1>Hallo ${customer.firstName},</h1>
+        <p>vielen Dank für Ihre Buchung. Ihr Termin wurde erfolgreich bestätigt.</p>
+        <p><strong>Service:</strong> ${service.title}</p>
+        <p><strong>Mitarbeiter:</strong> ${staff.firstName} ${staff.lastName}</p>
+        <p><strong>Wann:</strong> ${dayjs(savedBooking.dateTime).locale('de').format('dddd, DD. MMMM YYYY [um] HH:mm [Uhr]')}</p>
+        <p>Wir freuen uns auf Ihren Besuch!</p>
+        <p>Ihr Team von ${process.env.SALON_NAME || "Mo's Barbershop"}</p>
+      `;
+
+      await sendEmail({
+        to: customer.email,
+        subject,
+        html
+      });
+    }
+    
     return res.status(201).json({ success: true, message: 'Buchung erstellt', booking: savedBooking })
   } catch (err) {
     console.error('Fehler beim Erstellen der Buchung:', err)

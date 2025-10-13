@@ -293,3 +293,70 @@ export const verifyDashboardPin = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ message: 'Serverfehler beim Überprüfen der PIN.' });
   }
 };
+
+export const getMe = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Nicht authentifiziert' });
+    }
+    const user = await User.findById(req.user.userId).select('-password -dashboardPin');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Benutzer nicht gefunden' });
+    }
+    res.json({ success: true, user });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Serverfehler' });
+  }
+};
+
+export const updateMe = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Nicht authentifiziert' });
+    }
+    const { firstName, lastName, address, phone } = req.body;
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user.userId,
+      { firstName, lastName, address, phone },
+      { new: true, runValidators: true }
+    ).select('-password -dashboardPin');
+
+    if (!updatedUser) {
+      return res.status(404).json({ success: false, message: 'Benutzer nicht gefunden' });
+    }
+    res.json({ success: true, user: updatedUser });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Fehler beim Aktualisieren des Profils' });
+  }
+};
+
+export const changePassword = async (req: AuthRequest, res: Response) => {
+    try {
+        if (!req.user) {
+            return res.status(401).json({ success: false, message: 'Nicht authentifiziert' });
+        }
+        const { currentPassword, newPassword } = req.body;
+
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ message: 'Aktuelles und neues Passwort sind erforderlich.' });
+        }
+
+        const user = await User.findById(req.user.userId).select('+password');
+        if (!user || !user.password) {
+            return res.status(404).json({ message: 'Benutzer nicht gefunden.' });
+        }
+
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ message: 'Das aktuelle Passwort ist nicht korrekt.' });
+        }
+
+        user.password = await bcrypt.hash(newPassword, 10);
+        await user.save();
+
+        res.json({ success: true, message: 'Passwort erfolgreich geändert.' });
+
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Fehler beim Ändern des Passworts.' });
+    }
+};

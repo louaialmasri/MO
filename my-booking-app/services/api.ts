@@ -881,4 +881,26 @@ export const validateVoucher = async (code: string, token: string) => {
   return res.data; // Erwarten { success: true, voucher: { ... } }
 };
 
+// --- User Profile API ---
+export const fetchMyProfile = async (token: string): Promise<User> => {
+  const res = await api.get('/users/me', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data.user;
+};
+
+export const updateMyProfile = async (data: Partial<User>, token: string): Promise<User> => {
+  const res = await api.patch('/users/me', data, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data.user;
+};
+
+export const changePassword = async (data: any, token: string) => {
+  const res = await api.post('/users/change-password', data, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data;
+};
+
 export default api

@@ -16,6 +16,7 @@ const bookingSchema = new mongoose.Schema({
   status: { type: String, enum: ['confirmed', 'paid', 'cancelled', 'completed'], default: 'confirmed' },
   paymentMethod: { type: String, enum: ['cash', 'card'], default: null },
   invoiceNumber: { type: String, default: null },
+  reminderSent: { type: Boolean, default: false },
   
   // Das History-Array wird hinzugefügt
   history: { type: [historyEntrySchema], default: [] } 

@@ -8,7 +8,10 @@ import {
     getOrCreateWalkInCustomer, 
     getLastBookingForUser,
     setDashboardPin,
-    verifyDashboardPin
+    verifyDashboardPin,
+    getMe,
+    updateMe,
+    changePassword
 } from '../controllers/userController';
 import { AuthRequest, verifyToken } from '../middlewares/authMiddleware';
 import { verifyAdmin } from '../middlewares/adminMiddleware'; 
@@ -26,6 +29,11 @@ router.post('/create-manual', verifyToken, verifyAdmin, createUserManually);
 router.patch('/role/:id', verifyToken, verifyAdmin, updateUserRole);
 router.patch('/skills/:id', verifyToken, verifyAdmin, updateUserSkills);
 router.delete('/staff/:id', verifyToken, verifyAdmin, deleteStaff);
+
+// ROUTEN FÜR BENUTZERPROFIL
+router.get('/me', verifyToken, getMe);
+router.patch('/me', verifyToken, updateMe);
+router.post('/change-password', verifyToken, changePassword);
 
 // Diese Route benötigt keine Admin-Rechte, nur einen Login (für Mitarbeiter an der Kasse)
 router.get('/walk-in', verifyToken, getOrCreateWalkInCustomer);

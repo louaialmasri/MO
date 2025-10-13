@@ -16,6 +16,8 @@ import {
 import { motion } from 'framer-motion'
 import dayjs from 'dayjs'
 import 'dayjs/locale/de' // Wichtig für deutsche Datumsformate
+import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
+
 
 // Icons
 import EventIcon from '@mui/icons-material/Event';
@@ -221,16 +223,27 @@ export default function DashboardPage() {
               <Typography variant="h4" fontWeight={800}>Willkommen zurück, {user?.firstName || user?.email}! 👋</Typography>
               <Typography variant="h6" fontWeight={400} sx={{ opacity: 0.8 }}>Hier ist eine Übersicht deiner Termine.</Typography>
             </Box>
-            <Button
-              variant="contained"
-              color="secondary"
-              size="large"
-              sx={{ mt: { xs: 2, md: 0 } }}
-              endIcon={<ArrowForwardIcon />}
-              onClick={() => router.push('/booking')}
-            >
-              Neuen Termin buchen
-            </Button>
+            <Stack direction="row" spacing={2} sx={{ mt: { xs: 2, md: 0 } }}>
+                  {/* HIER DIE ÄNDERUNG: Zwei Buttons nebeneinander */}
+                  <Button
+                    variant="outlined"
+                    color="inherit"
+                    size="large"
+                    startIcon={<ManageAccountsIcon />}
+                    onClick={() => router.push('/dashboard/profile')}
+                  >
+                    Profil bearbeiten
+                  </Button>
+                  <Button
+                    variant="contained"
+                    color="secondary"
+                    size="large"
+                    endIcon={<ArrowForwardIcon />}
+                    onClick={() => router.push('/booking')}
+                  >
+                    Neuen Termin buchen
+                  </Button>
+                </Stack>
           </Stack>
         </Container>
       </Box>
