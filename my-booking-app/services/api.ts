@@ -523,11 +523,10 @@ export async function deleteAvailabilityApi(id: string, token: string) {
 // Timeslots API
 export async function fetchTimeslots(
   params: { staffId: string; serviceId: string; date: string; step?: number },
-  token: string
+  token?: string | null
 ): Promise<{ slots: string[]; duration: number }> {
   const res = await api.get('/timeslots', {
     params,
-    headers: { Authorization: `Bearer ${token}` }
   })
   return res.data
 }

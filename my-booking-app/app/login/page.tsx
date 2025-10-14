@@ -1,7 +1,10 @@
+// my-booking-app/app/login/page.tsx
+
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+// NEU: useSearchParams importieren
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { login as loginRequest } from '@/services/api'
 import { Box, Button, TextField, Typography } from '@mui/material'
@@ -10,6 +13,8 @@ import { motion } from 'framer-motion'
 export default function LoginPage() {
   const { login } = useAuth()
   const router = useRouter()
+  // NEU: searchParams-Hook initialisieren
+  const searchParams = useSearchParams()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -23,20 +28,31 @@ export default function LoginPage() {
       localStorage.setItem('token', token)
       login(user, token)
 
-      // Rollenbasierte Weiterleitung
-      if (user.role === 'admin') {
-        router.push('/admin')
-      } else if (user.role === 'staff') {
-        router.push('/staff-dashboard')
+      // --- HIER DIE ÄNDERUNG ---
+      // Prüfen, ob ein 'redirect'-Parameter in der URL vorhanden ist.
+      const redirectPath = searchParams.get('redirect');
+
+      if (redirectPath) {
+        // Wenn ja, dorthin weiterleiten.
+        router.push(redirectPath)
       } else {
-        router.push('/dashboard')
+        // Ansonsten die bestehende rollenbasierte Weiterleitung nutzen.
+        if (user.role === 'admin') {
+          router.push('/admin')
+        } else if (user.role === 'staff') {
+          router.push('/staff-dashboard')
+        } else {
+          router.push('/dashboard')
+        }
       }
+      // --- ENDE DER ÄNDERUNG ---
 
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login fehlgeschlagen')
+    }
   }
-}
 
+  // ... (restliche Komponente bleibt unverändert)
   return (
     <motion.div
       initial={{ opacity: 0 }}

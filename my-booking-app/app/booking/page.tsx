@@ -3,7 +3,12 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import {
   Container, Box, Stepper, Step, StepLabel, Button, Typography, CircularProgress,
-  Card, CardActionArea, Avatar, Chip, Alert, TextField, MenuItem, Paper, Stack, Grid
+  Card, CardActionArea, Avatar, Chip, Alert, TextField, MenuItem, Paper, Stack, Grid,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle
 } from '@mui/material'
 import {
   fetchServices as fetchGlobalServices,
@@ -47,6 +52,7 @@ export default function BookingPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
   const [suggestion, setSuggestion] = useState<{ service: string; staff: string } | null>(null)
+  const [loginRequiredDialogOpen, setLoginRequiredDialogOpen] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -157,7 +163,7 @@ export default function BookingPage() {
 
   // Zeitslots laden
   useEffect(() => {
-    if (!selectedService || !selectedStaff || !selectedDate || !token) return
+    if (!selectedService || !selectedStaff || !selectedDate) return
     const loadSlots = async () => {
       setLoading(p => ({ ...p, slots: true }))
       setSelectedSlot(null)
@@ -212,6 +218,50 @@ export default function BookingPage() {
     setSuggestion(null)
   }
 
+  useEffect(() => {
+    // Nur ausführen, wenn der Ladevorgang abgeschlossen ist und ein Benutzer eingeloggt ist.
+    if (!authLoading && token && user) {
+      const pendingBookingJSON = localStorage.getItem('bookingSelection');
+
+      // Prüfen, ob eine Buchung im localStorage wartet.
+      if (pendingBookingJSON) {
+        try {
+          const pendingBooking = JSON.parse(pendingBookingJSON);
+
+          // Sicherstellen, dass die Daten vollständig sind.
+          if (pendingBooking.serviceId && pendingBooking.staffId && pendingBooking.slot) {
+            // API-Aufruf auslösen, um die Buchung zu erstellen.
+            createBooking(
+              pendingBooking.serviceId,
+              pendingBooking.slot,
+              pendingBooking.staffId,
+              token,
+              user._id // Die ID des frisch eingeloggten Benutzers verwenden.
+            )
+            .then(() => {
+              // Bei Erfolg:
+              localStorage.removeItem('bookingSelection'); // Aufräumen
+              setActiveStep(effectiveSteps.length); // Zum finalen Erfolgs-Schritt springen
+            })
+            .catch((e) => {
+              // Bei Fehler (z.B. Slot inzwischen belegt):
+              localStorage.removeItem('bookingSelection'); // Aufräumen
+              setError(e?.response?.data?.message || 'Der Termin konnte leider nicht gebucht werden. Der Zeitslot ist möglicherweise nicht mehr verfügbar.');
+            });
+          } else {
+            // Daten unvollständig, also aufräumen.
+            localStorage.removeItem('bookingSelection');
+          }
+        } catch {
+          // Fehler beim Parsen, ebenfalls aufräumen.
+          localStorage.removeItem('bookingSelection');
+        }
+      }
+    }
+  }, [authLoading, token, user]); // Dieser Effekt wird immer dann ausgeführt, wenn sich der Login-Status ändert.
+  // --- ENDE DES NEUEN HOOKS ---
+
+
   const handleBookingSubmit = async () => {
     if (!selectedService || !selectedStaff || !selectedSlot) {
       setError('Alle Angaben sind erforderlich.')
@@ -220,15 +270,16 @@ export default function BookingPage() {
 
     // --- HIER DIE LOGIK FÜR GÄSTE ---
     if (!token) {
-        // Speichere die Auswahl im localStorage, damit wir nach dem Login zurückkehren können
+        // Speichere die Auswahl im localStorage, damit wir nach dem Login zurückkehren können.
         localStorage.setItem('bookingSelection', JSON.stringify({
             serviceId: selectedService._id,
             staffId: selectedStaff._id,
             date: dayjs(selectedDate).format('YYYY-MM-DD'),
             slot: selectedSlot,
         }));
-        // Leite zur Login-Seite weiter und gib an, wohin es danach gehen soll
-        router.push('/login?redirect=/booking');
+
+        // Öffne den Dialog, statt direkt weiterzuleiten.
+        setLoginRequiredDialogOpen(true);
         return;
     }
     
@@ -494,6 +545,31 @@ export default function BookingPage() {
           )}
         </Grid>
       </Grid>
+      <Dialog
+        open={loginRequiredDialogOpen}
+        onClose={() => setLoginRequiredDialogOpen(false)}
+        aria-labelledby="login-required-dialog-title"
+      >
+        <DialogTitle id="login-required-dialog-title">
+          Fast geschafft!
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Um Ihren Termin verbindlich zu buchen, melden Sie sich bitte an oder erstellen Sie ein neues, kostenloses Konto.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLoginRequiredDialogOpen(false)}>Abbrechen</Button>
+          <Button onClick={() => router.push('/register?redirect=/booking')}>Registrieren</Button>
+          <Button 
+            onClick={() => router.push('/login?redirect=/booking')} 
+            variant="contained" 
+            autoFocus
+          >
+            Zum Login
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   )
 }
