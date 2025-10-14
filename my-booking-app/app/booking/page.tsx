@@ -8,7 +8,8 @@ import {
   DialogActions,
   DialogContent,
   DialogContentText,
-  DialogTitle
+  DialogTitle,
+  Backdrop
 } from '@mui/material'
 import {
   fetchServices as fetchGlobalServices,
@@ -53,6 +54,8 @@ export default function BookingPage() {
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
   const [suggestion, setSuggestion] = useState<{ service: string; staff: string } | null>(null)
   const [loginRequiredDialogOpen, setLoginRequiredDialogOpen] = useState(false);
+
+  const [isFinalizing, setIsFinalizing] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -181,13 +184,35 @@ export default function BookingPage() {
   }, [selectedService, selectedStaff, selectedDate, token])
 
   const handleNext = () => {
-    // Wenn ein Mitarbeiter einen Service ausgewählt hat, überspringe die Mitarbeiterauswahl
+    // Ermittle den nächsten Schritt basierend auf der aktuellen Position.
+    // Für einen normalen Benutzer ist die Zeitauswahl Schritt 3.
+    // Für einen Admin/Mitarbeiter ist es ebenfalls Schritt 3, da wir die absoluten Indizes von 'steps' betrachten (0-basiert).
+    const isTimeSelectionStep = isAdminOrStaff ? activeStep === 3 : activeStep === 2;
+    
+    // Prüfen, ob wir uns im Zeitauswahl-Schritt befinden UND der Benutzer nicht eingeloggt ist.
+    if (isTimeSelectionStep && !token) {
+        // Speichere die Auswahl im localStorage.
+        localStorage.setItem('bookingSelection', JSON.stringify({
+            service: selectedService,
+            staff: selectedStaff,
+            date: dayjs(selectedDate).format('YYYY-MM-DD'),
+            slot: selectedSlot,
+        }));
+        // Öffne den Login-Dialog und pausiere den Prozess.
+        setLoginRequiredDialogOpen(true);
+        return; // WICHTIG: Die Funktion hier beenden, um ein Weiterschalten zu verhindern.
+    }
+
+    // Wenn die obige Bedingung nicht zutrifft, gehe normal zum nächsten Schritt.
+    // Behandelt auch den Fall, dass ein Mitarbeiter die Mitarbeiterauswahl überspringt.
     if (activeStep === (isAdminOrStaff ? 1 : 0) && user?.role === 'staff' && selectedStaff) {
       setActiveStep(prev => prev + 2); // Springe direkt zur Datumsauswahl
     } else {
       setActiveStep(prev => prev + 1);
     }
-  };
+};
+
+
   const handleBack = () => {
     // Wenn man von Datum zurückspringt und per URL kam, muss man zu Schritt 0
     const serviceIdFromUrl = searchParams.get('serviceId');
@@ -220,46 +245,33 @@ export default function BookingPage() {
 
   useEffect(() => {
     // Nur ausführen, wenn der Ladevorgang abgeschlossen ist und ein Benutzer eingeloggt ist.
-    if (!authLoading && token && user) {
+     if (!authLoading && token && user) {
       const pendingBookingJSON = localStorage.getItem('bookingSelection');
 
-      // Prüfen, ob eine Buchung im localStorage wartet.
-      if (pendingBookingJSON) {
+     if (pendingBookingJSON) {
         try {
           const pendingBooking = JSON.parse(pendingBookingJSON);
 
-          // Sicherstellen, dass die Daten vollständig sind.
-          if (pendingBooking.serviceId && pendingBooking.staffId && pendingBooking.slot) {
-            // API-Aufruf auslösen, um die Buchung zu erstellen.
-            createBooking(
-              pendingBooking.serviceId,
-              pendingBooking.slot,
-              pendingBooking.staffId,
-              token,
-              user._id // Die ID des frisch eingeloggten Benutzers verwenden.
-            )
-            .then(() => {
-              // Bei Erfolg:
-              localStorage.removeItem('bookingSelection'); // Aufräumen
-              setActiveStep(effectiveSteps.length); // Zum finalen Erfolgs-Schritt springen
-            })
-            .catch((e) => {
-              // Bei Fehler (z.B. Slot inzwischen belegt):
-              localStorage.removeItem('bookingSelection'); // Aufräumen
-              setError(e?.response?.data?.message || 'Der Termin konnte leider nicht gebucht werden. Der Zeitslot ist möglicherweise nicht mehr verfügbar.');
-            });
-          } else {
-            // Daten unvollständig, also aufräumen.
+          // Wenn eine valide, wartende Buchung im Speicher gefunden wird
+          if (pendingBooking.service && pendingBooking.staff && pendingBooking.slot) {
+            // Stelle alle Auswahl-States wieder her
+            setSelectedService(pendingBooking.service);
+            setSelectedStaff(pendingBooking.staff);
+            setSelectedDate(dayjs(pendingBooking.date).toDate());
+            setSelectedSlot(pendingBooking.slot);
+
+            // Springe direkt zum Zusammenfassungs-Schritt
+            setActiveStep(4);
+            // Räume den Speicher auf, da die Daten jetzt im State sind
             localStorage.removeItem('bookingSelection');
           }
         } catch {
-          // Fehler beim Parsen, ebenfalls aufräumen.
+          // Bei Fehlern (z.B. ungültiges JSON), einfach aufräumen
           localStorage.removeItem('bookingSelection');
         }
       }
     }
   }, [authLoading, token, user]); // Dieser Effekt wird immer dann ausgeführt, wenn sich der Login-Status ändert.
-  // --- ENDE DES NEUEN HOOKS ---
 
 
   const handleBookingSubmit = async () => {
@@ -267,34 +279,29 @@ export default function BookingPage() {
       setError('Alle Angaben sind erforderlich.')
       return
     }
-
-    // --- HIER DIE LOGIK FÜR GÄSTE ---
-    if (!token) {
-        // Speichere die Auswahl im localStorage, damit wir nach dem Login zurückkehren können.
-        localStorage.setItem('bookingSelection', JSON.stringify({
-            serviceId: selectedService._id,
-            staffId: selectedStaff._id,
-            date: dayjs(selectedDate).format('YYYY-MM-DD'),
-            slot: selectedSlot,
-        }));
-
-        // Öffne den Dialog, statt direkt weiterzuleiten.
-        setLoginRequiredDialogOpen(true);
-        return;
-    }
     
+    // Die alte Prüfung auf '!token' ist hier entfernt. 
+    // An diesem Punkt MUSS der Benutzer eingeloggt sein.
     const targetUserId = isAdminOrStaff ? selectedCustomerId : user?._id;
 
     if (!targetUserId) {
-      setError('Bitte wählen Sie einen Kunden aus oder loggen Sie sich ein.')
+      setError('Kunde konnte nicht identifiziert werden. Bitte loggen Sie sich erneut ein.')
       return
     }
 
     try {
-      await createBooking(selectedService._id, selectedSlot, selectedStaff._id, token, targetUserId)
-      handleNext()
+      // Wir verwenden wieder den Ladezustand für ein besseres UI-Feedback
+      setIsFinalizing(true); 
+      await createBooking(selectedService._id, selectedSlot, selectedStaff._id, token!, targetUserId)
+      
+      // handleNext() wird hier direkt aufgerufen, um zum finalen Erfolgs-Screen zu gelangen.
+      setActiveStep(prev => prev + 1);
+
     } catch (e: any) {
       setError(e?.response?.data?.message || 'Buchung fehlgeschlagen.')
+    } finally {
+      // Ladezustand in jedem Fall beenden
+      setIsFinalizing(false); 
     }
   }
 
@@ -490,86 +497,102 @@ export default function BookingPage() {
     }
   }
 
-  return (
+    return (
     <Container maxWidth="lg" sx={{ py: 5 }}>
-      <Grid container spacing={4}>
-        <Grid size={{ xs: 12, md: 4 }}>
-          <Paper sx={{ p: 2, borderRadius: 4 }}>
-            <Stepper activeStep={activeStep} orientation="vertical">
-              {effectiveSteps.map((label, index) => (
-                <Step key={label} completed={activeStep > index}>
-                  <StepLabel>{label}</StepLabel>
-                </Step>
-              ))}
-            </Stepper>
-          </Paper>
-        </Grid>
-
-        <Grid size={{ xs: 12, md: 8 }}>
-          <Box sx={{ minHeight: 400 }}>
-            {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
-            {renderStepContent(stepContentIndex)}
-          </Box>
-
-          {activeStep < effectiveSteps.length && (
-            <Box sx={{ display: 'flex', flexDirection: 'row', pt: 4, mt: 2, borderTop: 1, borderColor: 'divider' }}>
-              <Button
-                color="inherit"
-                disabled={activeStep === 0}
-                onClick={handleBack}
-                sx={{ mr: 1 }}
-                startIcon={<ArrowBackIcon />}
-              >
-                Zurück
-              </Button>
-              <Box sx={{ flex: '1 1 auto' }} />
-              {activeStep === effectiveSteps.length - 1 ? (
-                <Button variant="contained" color="secondary" onClick={handleBookingSubmit} endIcon={<CheckCircleIcon />}>
-                  Termin bestätigen
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleNext}
-                  disabled={
-                    (stepContentIndex === 0 && !selectedCustomerId) ||
-                    (stepContentIndex === 1 && !selectedService) ||
-                    (stepContentIndex === 2 && !selectedStaff) ||
-                    (stepContentIndex === 3 && !selectedSlot)
-                  }
-                  endIcon={<ArrowForwardIcon />}
-                >
-                  Weiter
-                </Button>
-              )}
-            </Box>
-          )}
-        </Grid>
-      </Grid>
-      <Dialog
-        open={loginRequiredDialogOpen}
-        onClose={() => setLoginRequiredDialogOpen(false)}
-        aria-labelledby="login-required-dialog-title"
+      {/* NEU: Lade-Overlay */}
+      <Backdrop
+        sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}
+        open={isFinalizing}
       >
-        <DialogTitle id="login-required-dialog-title">
-          Fast geschafft!
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Um Ihren Termin verbindlich zu buchen, melden Sie sich bitte an oder erstellen Sie ein neues, kostenloses Konto.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setLoginRequiredDialogOpen(false)}>Abbrechen</Button>
-          <Button onClick={() => router.push('/register?redirect=/booking')}>Registrieren</Button>
-          <Button 
-            onClick={() => router.push('/login?redirect=/booking')} 
-            variant="contained" 
-            autoFocus
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+          <CircularProgress color="inherit" />
+          <Typography>Termin wird gebucht...</Typography>
+        </Box>
+      </Backdrop>
+
+      {/* Bestehender Content wird nur angezeigt, wenn nicht finalisiert wird */}
+      {!isFinalizing && (
+        <>
+          <Grid container spacing={4}>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <Paper sx={{ p: 2, borderRadius: 4 }}>
+                <Stepper activeStep={activeStep} orientation="vertical">
+                  {effectiveSteps.map((label, index) => (
+                    <Step key={label} completed={activeStep > index}>
+                      <StepLabel>{label}</StepLabel>
+                    </Step>
+                  ))}
+                </Stepper>
+              </Paper>
+            </Grid>
+
+            <Grid size={{ xs: 12, md: 8 }}>
+              <Box sx={{ minHeight: 400 }}>
+                {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
+                {renderStepContent(stepContentIndex)}
+              </Box>
+
+              {activeStep < effectiveSteps.length && (
+                <Box sx={{ display: 'flex', flexDirection: 'row', pt: 4, mt: 2, borderTop: 1, borderColor: 'divider' }}>
+                  <Button
+                    color="inherit"
+                    disabled={activeStep === 0}
+                    onClick={handleBack}
+                    sx={{ mr: 1 }}
+                    startIcon={<ArrowBackIcon />}
+                  >
+                    Zurück
+                  </Button>
+                  <Box sx={{ flex: '1 1 auto' }} />
+                  {activeStep === effectiveSteps.length - 1 ? (
+                    <Button variant="contained" color="secondary" onClick={handleBookingSubmit} endIcon={<CheckCircleIcon />}>
+                      Termin bestätigen
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handleNext}
+                      disabled={
+                        (stepContentIndex === 0 && !selectedCustomerId) ||
+                        (stepContentIndex === 1 && !selectedService) ||
+                        (stepContentIndex === 2 && !selectedStaff) ||
+                        (stepContentIndex === 3 && !selectedSlot)
+                      }
+                      endIcon={<ArrowForwardIcon />}
+                    >
+                      Weiter
+                    </Button>
+                  )}
+                </Box>
+              )}
+            </Grid>
+          </Grid>
+          <Dialog
+            open={loginRequiredDialogOpen}
+            onClose={() => setLoginRequiredDialogOpen(false)}
+            aria-labelledby="login-required-dialog-title"
           >
-            Zum Login
-          </Button>
-        </DialogActions>
-      </Dialog>
+            <DialogTitle id="login-required-dialog-title">
+              Fast geschafft!
+            </DialogTitle>
+            <DialogContent>
+              <DialogContentText>
+                Um Ihren Termin verbindlich zu buchen, melden Sie sich bitte an oder erstellen Sie ein neues, kostenloses Konto.
+              </DialogContentText>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setLoginRequiredDialogOpen(false)}>Abbrechen</Button>
+              <Button onClick={() => router.push('/register?redirect=/booking')}>Registrieren</Button>
+              <Button
+                onClick={() => router.push('/login?redirect=/booking')}
+                variant="contained"
+                autoFocus
+              >
+                Zum Login
+              </Button>
+            </DialogActions>
+          </Dialog>
+        </>
+      )}
     </Container>
   )
 }
