@@ -370,7 +370,6 @@ export default function BookingPage() {
                   <CardActionArea
                     onClick={() => {
                       setSelectedService(service)
-                      handleNext()
                     }}
                     sx={{ p: 2 }}
                   >
@@ -408,7 +407,6 @@ export default function BookingPage() {
                     <CardActionArea
                       onClick={() => {
                         setSelectedStaff(staff)
-                        handleNext()
                       }}
                       sx={{ p: 2, textAlign: 'center' }}
                     >
