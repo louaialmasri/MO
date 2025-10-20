@@ -72,54 +72,66 @@ export default function BookingPage() {
 
   // Initiale Daten laden & URL-Parameter verarbeiten
   useEffect(() => {
-    const loadInitialData = async () => {
-      setLoading(p => ({ ...p, initial: true }))
+    const loadPrerequisites = async () => {
+      setLoading(p => ({ ...p, initial: true }));
       try {
         const [svcs, users] = await Promise.all([
           fetchGlobalServices(),
           token && isAdminOrStaff ? fetchAllUsers(token, 'user') : Promise.resolve([]),
-        ])
-        setServices(svcs as Service[])
-        setAllCustomers(users as User[])
+        ]);
+        setServices(svcs as Service[]);
+        setAllCustomers(users as User[]);
+      } catch {
+        setError('Wichtige Daten konnten nicht geladen werden.');
+      } finally {
+        setLoading(p => ({ ...p, initial: false }));
+      }
+    };
 
-        // NEU: Parameter aus der URL auslesen und Status setzen
-        const serviceIdFromUrl = searchParams.get('serviceId');
-        const staffIdFromUrl = searchParams.get('staffId');
+    if (token || !authLoading) {
+      loadPrerequisites();
+    }
+  }, [token, isAdminOrStaff, authLoading]);
 
-        if (serviceIdFromUrl) {
-          const preselectedService = (svcs as Service[]).find(s => s._id === serviceIdFromUrl);
-          if (preselectedService) {
-            setSelectedService(preselectedService);
+  // Effekt 2: Verarbeite Wiederherstellung, URL-Parameter oder starte normal.
+  // Dieser Hook wird erst ausgeführt, NACHDEM die Services geladen wurden.
+  useEffect(() => {
+    // Wiederherstellung nach Login: Zeige den Bestätigungs-Schritt (nicht den Erfolgs-Screen).
+    // Hängt von `services` und `isAdminOrStaff` ab, damit die Services geladen sind
+    // und wir die Mitarbeiterliste korrekt nachladen können.
+    if (!authLoading && token && user) {
+      const pendingBookingJSON = localStorage.getItem('bookingSelection');
+      if (!pendingBookingJSON) return;
+      try {
+        const pendingBooking = JSON.parse(pendingBookingJSON);
+        if (pendingBooking.service && pendingBooking.staff && pendingBooking.slot) {
+          // Versuche, den Service aus der geladenen Liste zu matchen (robuster)
+          const restoredService = services.find((s) => s._id === pendingBooking.service._id) || pendingBooking.service;
 
-            // Wenn Service da ist, direkt Mitarbeiter laden
-            const skilledStaff = await fetchStaffForService(serviceIdFromUrl);
-            setStaffForService(skilledStaff as Staff[]);
+          setSelectedService(restoredService as Service);
+          setSelectedDate(dayjs(pendingBooking.date).toDate());
+          setSelectedSlot(pendingBooking.slot);
 
-            if (staffIdFromUrl) {
-              const preselectedStaff = (skilledStaff as Staff[]).find(s => s._id === staffIdFromUrl);
-              if (preselectedStaff) {
-                setSelectedStaff(preselectedStaff);
-                // Direkt zum Datum-Schritt springen
-                setActiveStep(isAdminOrStaff ? 3 : 2);
-              }
-            } else {
-              // Zum Mitarbeiter-Schritt springen
-              setActiveStep(isAdminOrStaff ? 2 : 1);
-            }
-          }
-        } else {
-          setActiveStep(0); // Normaler Start
+          // Lade Mitarbeiter für den Service und setze das ausgewählte Staff-Objekt, falls matchbar
+          fetchStaffForService((restoredService as any)._id).then((skilledStaff) => {
+            const staffArr = skilledStaff as Staff[];
+            setStaffForService(staffArr);
+            const matched = staffArr.find(s => s._id === pendingBooking.staff._id) || pendingBooking.staff;
+            setSelectedStaff(matched);
+          }).catch(() => {
+            // Falls Laden fehlschlägt, setzen wir zumindest das gespeicherte Staff-Objekt
+            setSelectedStaff(pendingBooking.staff);
+          });
+
+          // Setze auf den Bestätigungs-Schritt (Admin/Staff nutzen anderen Index)
+          setActiveStep(isAdminOrStaff ? 4 : 3);
+          localStorage.removeItem('bookingSelection');
         }
       } catch {
-        setError('Wichtige Daten konnten nicht geladen werden.')
-      } finally {
-        setLoading(p => ({ ...p, initial: false }))
+        localStorage.removeItem('bookingSelection');
       }
     }
-    if(token || !authLoading) { // Sicherstellen, dass der Token (oder der Ladezustand) geklärt ist
-        loadInitialData()
-    }
-  }, [token, isAdminOrStaff, searchParams, authLoading])
+  }, [authLoading, token, user, services, isAdminOrStaff]);
 
   // Vorschlag für letzten Termin laden
   useEffect(() => {
