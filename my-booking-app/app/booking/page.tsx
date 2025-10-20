@@ -93,46 +93,6 @@ export default function BookingPage() {
     }
   }, [token, isAdminOrStaff, authLoading]);
 
-  // Effekt 2: Verarbeite Wiederherstellung, URL-Parameter oder starte normal.
-  // Dieser Hook wird erst ausgeführt, NACHDEM die Services geladen wurden.
-  useEffect(() => {
-    // Wiederherstellung nach Login: Zeige den Bestätigungs-Schritt (nicht den Erfolgs-Screen).
-    // Hängt von `services` und `isAdminOrStaff` ab, damit die Services geladen sind
-    // und wir die Mitarbeiterliste korrekt nachladen können.
-    if (!authLoading && token && user) {
-      const pendingBookingJSON = localStorage.getItem('bookingSelection');
-      if (!pendingBookingJSON) return;
-      try {
-        const pendingBooking = JSON.parse(pendingBookingJSON);
-        if (pendingBooking.service && pendingBooking.staff && pendingBooking.slot) {
-          // Versuche, den Service aus der geladenen Liste zu matchen (robuster)
-          const restoredService = services.find((s) => s._id === pendingBooking.service._id) || pendingBooking.service;
-
-          setSelectedService(restoredService as Service);
-          setSelectedDate(dayjs(pendingBooking.date).toDate());
-          setSelectedSlot(pendingBooking.slot);
-
-          // Lade Mitarbeiter für den Service und setze das ausgewählte Staff-Objekt, falls matchbar
-          fetchStaffForService((restoredService as any)._id).then((skilledStaff) => {
-            const staffArr = skilledStaff as Staff[];
-            setStaffForService(staffArr);
-            const matched = staffArr.find(s => s._id === pendingBooking.staff._id) || pendingBooking.staff;
-            setSelectedStaff(matched);
-          }).catch(() => {
-            // Falls Laden fehlschlägt, setzen wir zumindest das gespeicherte Staff-Objekt
-            setSelectedStaff(pendingBooking.staff);
-          });
-
-          // Setze auf den Bestätigungs-Schritt (Admin/Staff nutzen anderen Index)
-          setActiveStep(isAdminOrStaff ? 4 : 3);
-          localStorage.removeItem('bookingSelection');
-        }
-      } catch {
-        localStorage.removeItem('bookingSelection');
-      }
-    }
-  }, [authLoading, token, user, services, isAdminOrStaff]);
-
   // Vorschlag für letzten Termin laden
   useEffect(() => {
     if (isAdminOrStaff && selectedCustomerId && token) {
@@ -178,10 +138,12 @@ export default function BookingPage() {
 
   // Zeitslots laden
   useEffect(() => {
-    if (!selectedService || !selectedStaff || !selectedDate) return
+    // Verhindere das Neuladen der Slots, wenn bereits einer aus dem localStorage wiederhergestellt wurde.
+    if (!selectedService || !selectedStaff || !selectedDate || selectedSlot) return
+
     const loadSlots = async () => {
       setLoading(p => ({ ...p, slots: true }))
-      setSelectedSlot(null)
+      setSelectedSlot(null) // Dies wird jetzt nicht mehr fälschlicherweise ausgelöst.
       try {
         const dateStr = dayjs(selectedDate).format('YYYY-MM-DD')
         const { slots } = await fetchTimeslots({ staffId: selectedStaff._id, serviceId: selectedService._id, date: dateStr }, token)
@@ -193,7 +155,7 @@ export default function BookingPage() {
       }
     }
     loadSlots()
-  }, [selectedService, selectedStaff, selectedDate, token])
+  }, [selectedService, selectedStaff, selectedDate, token, selectedSlot])
 
   const handleNext = () => {
     // Ermittle den nächsten Schritt basierend auf der aktuellen Position.
