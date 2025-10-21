@@ -26,7 +26,7 @@ router.get('/', verifyToken, (req: AuthRequest, res: Response, next: NextFunctio
     return res.status(403).json({ success: false, message: 'Zugriff verweigert' });
 }, getAllUsers);
 router.post('/create-manual', verifyToken, verifyAdmin, createUserManually);
-router.patch('/role/:id', verifyToken, verifyAdmin, updateUserRole);
+router.patch('/:id/role', verifyToken, verifyAdmin, updateUserRole);
 router.patch('/skills/:id', verifyToken, verifyAdmin, updateUserSkills);
 router.delete('/staff/:id', verifyToken, verifyAdmin, deleteStaff);
 

@@ -607,7 +607,7 @@ export async function unassignServiceFromSalon(serviceId: string, salonId: strin
 }
 
 
-export async function createGlobalStaff(payload: { email: string; password: string; name?: string, firstName: string, lastName: string }) {
+export async function createGlobalStaff(payload: { email: string; password: string; name?: string, firstName: string, lastName: string, phone: string }) {
   const res = await api.post('/admin/staff', payload, {} as any);
   (res.config as any).noSalonHeader = true;
   return res.data.user as GlobalStaff

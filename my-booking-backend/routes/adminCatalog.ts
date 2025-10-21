@@ -20,9 +20,9 @@ router.get('/staff-all', verifyAdmin, async (_, res) => {
 
 router.post('/staff', verifyAdmin, async (req, res) => {
   try {
-    const { email, password, firstName, lastName } = req.body;
+    const { email, password, firstName, lastName, phone } = req.body;
 
-    if (!email || !password || !firstName || !lastName) {
+    if (!email || !password || !firstName || !lastName || !phone) {
       return res.status(400).json({ message: 'Alle Felder sind erforderlich' });
     }
 
@@ -34,6 +34,7 @@ router.post('/staff', verifyAdmin, async (req, res) => {
       password: hashedPassword,
       firstName,
       lastName,
+      phone,
       role: 'staff',
     });
 

@@ -26,6 +26,7 @@ import DeleteIcon from '@mui/icons-material/Delete'
 import TuneIcon from '@mui/icons-material/Tune'
 import EditIcon from '@mui/icons-material/Edit';
 import AdminBreadcrumbs from '@/components/AdminBreadcrumbs'
+import { Phone } from '@mui/icons-material'
 
 function fuzzy(txt: string, q: string) { return txt.toLowerCase().includes(q.toLowerCase()) }
 
@@ -68,7 +69,7 @@ export default function AdminCatalogPage() {
   const [selectedServices, setSelectedServices] = useState<Set<string>>(new Set());
 
   // forms
-  const [formStaff, setFormStaff] = useState({ email: '', password: '', firstName: '', lastName: '' })
+  const [formStaff, setFormStaff] = useState({ email: '', password: '', firstName: '', lastName: '', phone: '' })
   const [formEditStaff, setFormEditStaff] = useState<GlobalStaff | null>(null);
   const [formService, setFormService] = useState({ title: '', description: '', price: '', duration: '', category: '' })
   const [newServiceCategoryName, setNewServiceCategoryName] = useState('');
@@ -633,6 +634,7 @@ export default function AdminCatalogPage() {
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
           <TextField label="Vorname" value={formStaff.firstName} onChange={e => setFormStaff(p => ({ ...p, firstName: e.target.value }))} />
           <TextField label="Nachname" value={formStaff.lastName} onChange={e => setFormStaff(p => ({ ...p, lastName: e.target.value }))} />
+          <TextField label="Telefonnummer" value={formStaff.phone} onChange={e => setFormStaff(p => ({ ...p, phone: e.target.value }))} />
           <TextField label="E-Mail" type="email" value={formStaff.email} onChange={e => setFormStaff(p => ({ ...p, email: e.target.value }))} />
           <TextField label="Passwort" type="password" value={formStaff.password} onChange={e => setFormStaff(p => ({ ...p, password: e.target.value }))} />
         </DialogContent>
