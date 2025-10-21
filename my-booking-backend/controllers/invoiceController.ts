@@ -21,7 +21,7 @@ function generateVoucherCode(): string {
 
 export const createInvoice = async (req: SalonRequest, res: Response) => {
   try {
-    const { bookingId, customerId, items, paymentMethod, staffId: providedStaffId, discount, voucherCode, amountGiven } = req.body;
+    const { bookingId, customerId, items, paymentMethod, staffId: providedStaffId, discount, voucherCode, amountGiven, voucherPayment } = req.body;
 
     if (!req.user || !req.salonId) {
       throw new Error('Authentifizierung fehlgeschlagen.');
@@ -135,6 +135,7 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
       redeemedAmount: redeemedAmount,
       amount: finalAmount, 
       paymentMethod,
+      voucherPayment: paymentMethod === 'voucher' ? voucherPayment : undefined, // Hier speichern
       date: today,
       status: 'paid',
       amountGiven: amountGiven || finalAmount,

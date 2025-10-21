@@ -175,21 +175,33 @@ export const updateUserSkills = async (req: Request, res: Response) => {
 export const getOrCreateWalkInCustomer = async (req: AuthRequest, res: Response) => {
   try {
     const walkInEmail = 'laufkunde@shop.local';
-    let walkInCustomer = await User.findOne({ email: walkInEmail });
-
-    if (!walkInCustomer) {
-      walkInCustomer = await User.create({
-        email: walkInEmail,
-        firstName: 'Laufkunde',
-        lastName: ' - ',
-        role: 'user',
-        password: await bcrypt.hash(Math.random().toString(36).slice(-8), 10),
-      });
-    }
     
+    // Wir verwenden findOneAndUpdate mit upsert: true. Das ist der sicherste Weg.
+    // Es sucht den User und erstellt ihn atomar, wenn er nicht existiert.
+    const walkInCustomer = await User.findOneAndUpdate(
+      { email: walkInEmail },
+      {
+        $setOnInsert: {
+          email: walkInEmail,
+          firstName: 'Laufkunde',
+          lastName: ' - ',
+          phone: '0000000000', // Pflichtfeld
+          role: 'user',    // Korrekte Rolle
+          password: await bcrypt.hash(Math.random().toString(36).slice(-8), 10),
+        }
+      },
+      {
+        new: true,    // Gibt das neue oder gefundene Dokument zurück
+        upsert: true, // Erstellt das Dokument, wenn es nicht gefunden wird
+        runValidators: true // Führt die Schema-Validierung beim Erstellen aus
+      }
+    );
+
     res.json(walkInCustomer);
+
   } catch (error) {
-    res.status(500).json({ message: 'Fehler beim Abrufen des Laufkunden-Kontos' });
+    console.error('FATAL ERROR in getOrCreateWalkInCustomer:', error);
+    res.status(500).json({ message: 'Fehler beim Abrufen oder Erstellen des Laufkunden-Kontos' });
   }
 };
 

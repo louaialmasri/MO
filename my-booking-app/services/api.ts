@@ -91,7 +91,8 @@ export type Invoice = {
   invoiceNumber: string;
   date: string;
   amount: number;
-  paymentMethod: 'cash' | 'card';
+  paymentMethod: 'cash' | 'card' | 'voucher';
+  voucherPayment?: VoucherPaymentDetails;
   customer: { firstName: string; lastName: string; email: string; };
   items: {
     description: string;
@@ -146,6 +147,33 @@ export type CashClosing = {
   difference: number;
   status: 'completed' | 'cancelled'; 
 }
+
+// Definiert, wie ein Gutschein-Objekt aussieht
+export type Voucher = {
+  _id: string;
+  code: string;
+  initialValue: number;
+  balance: number;
+  expiryDate: string;
+  isActive: boolean;
+};
+
+// Definiert die Rückgabe nach erfolgreicher Gutschein-Zahlung
+export interface VoucherRedemptionResult {
+  message: string;
+  initialBalance: number;
+  remainingBalance: number;
+  redeemedAmount: number;
+  voucherCode: string;
+}
+
+// NEU: Definiert die Gutschein-Details für die Rechnung
+export type VoucherPaymentDetails = {
+  code: string;
+  initialBalance: number;
+  paidAmount: number;
+  remainingBalance: number;
+};
 
 
 export type ServiceCategory = {
@@ -879,6 +907,17 @@ export const validateVoucher = async (code: string, token: string) => {
   });
   return res.data; // Erwarten { success: true, voucher: { ... } }
 };
+
+/**
+ * LÖST einen Gutschein für einen bestimmten Betrag ein (BEZAHLVORGANG).
+ * Reduziert das Guthaben des Gutscheins.
+ */
+export async function redeemVoucher(token: string, code: string, amount: number): Promise<VoucherRedemptionResult> {
+  const res = await api.post('/voucher/redeem', { code, amount }, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data;
+}
 
 // --- User Profile API ---
 export const fetchMyProfile = async (token: string): Promise<User> => {

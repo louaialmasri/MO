@@ -43,6 +43,12 @@ const invoiceSchema = new Schema({
   redeemedAmount: { type: Number, default: 0 },
   amount: { type: Number, required: true },
   paymentMethod: { type: String, required: true, enum: ['cash', 'card'] },
+  voucherPayment: {
+    code: String,
+    initialBalance: Number,
+    paidAmount: Number,
+    remainingBalance: Number,
+  },
   status: { type: String, required: true, enum: ['paid', 'unpaid', 'cancelled'], default: 'paid' },
   amountGiven: { type: Number },
   change: { type: Number },

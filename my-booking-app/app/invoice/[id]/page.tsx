@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { fetchInvoiceById, type Invoice } from '@/services/api';
-import { Container, Paper, Typography, Box, Divider, Button, CircularProgress, Alert, Stack } from '@mui/material';
+import { Container, Paper, Typography, Box, Divider, Button, CircularProgress, Alert, Stack, Grid } from '@mui/material';
 import PrintIcon from '@mui/icons-material/Print';
 import dayjs from 'dayjs';
 
@@ -95,6 +95,24 @@ export default function InvoicePage() {
                              <Stack direction="row" justifyContent="space-between">
                                 <Typography variant="h6"><strong>Gesamtbetrag</strong></Typography>
                                 <Typography variant="h6"><strong>{invoice.amount.toFixed(2)} €</strong></Typography>
+                                {invoice.voucherPayment && (
+                                    <Box sx={{ mt: 2, p: 2, border: '1px solid', borderColor: 'grey.300', borderRadius: 1 }}>
+                                        <Typography variant="h6" gutterBottom>Gutschein-Zahlung</Typography>
+                                        <Grid container spacing={1}>
+                                        <Grid size={{xs:6}}><Typography>Gutschein-Code:</Typography></Grid>
+                                        <Grid size={{xs:6}}><Typography align="right">{invoice.voucherPayment.code}</Typography></Grid>
+                                        
+                                        <Grid size={{xs:6}}><Typography>Guthaben vor Zahlung:</Typography></Grid>
+                                        <Grid size={{xs:6}}><Typography align="right">{invoice.voucherPayment.initialBalance.toFixed(2)} €</Typography></Grid>
+                                        
+                                        <Grid size={{xs:6}}><Typography>Bezahlter Betrag:</Typography></Grid>
+                                        <Grid size={{xs:6}}><Typography align="right">- {invoice.voucherPayment.paidAmount.toFixed(2)} €</Typography></Grid>
+                                        
+                                        <Grid size={{xs:6}}><Typography variant="body2" sx={{ fontWeight: 'bold' }}>Neues Guthaben:</Typography></Grid>
+                                        <Grid size={{xs:6}}><Typography align="right" sx={{ fontWeight: 'bold' }}>{invoice.voucherPayment.remainingBalance.toFixed(2)} €</Typography></Grid>
+                                        </Grid>
+                                    </Box>
+                                )}
                             </Stack>
                              <Stack direction="row" justifyContent="space-between">
                                 <Typography>Gegeben ({invoice.paymentMethod === 'cash' ? 'Bar' : 'Karte'})</Typography>
