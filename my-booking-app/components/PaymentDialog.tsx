@@ -19,9 +19,10 @@ interface PaymentDialogProps {
   cart: any[]; // Ggf. genauer typisieren
   customer: User;
   salonId: string | null; // Prop für Salon-ID
+  discount: { type: 'percentage' | 'fixed', value: number };
 }
 
-export default function PaymentDialog({ open, onClose, onPaymentSuccess, total = 0, cart, customer, salonId }: PaymentDialogProps) {
+export default function PaymentDialog({ open, onClose, onPaymentSuccess, total = 0, cart, customer, salonId, discount }: PaymentDialogProps) {
   const { token } = useAuth();
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'voucher'>('cash');
   const [isLoading, setIsLoading] = useState(false);
@@ -87,6 +88,7 @@ export default function PaymentDialog({ open, onClose, onPaymentSuccess, total =
         })),
         // HIER DIE WICHTIGE ÄNDERUNG:
         // Wir übergeben den Code und den zu zahlenden Betrag, wenn mit Gutschein bezahlt wird.
+        discount: discount,
         voucherCode: paymentMethod === 'voucher' ? validatedVoucher?.code : undefined,
         totalAmount: total, // Das Backend muss den Gesamtbetrag für die Gutscheinberechnung kennen
         amountGiven: paymentMethod === 'cash' ? numAmountGiven : undefined,

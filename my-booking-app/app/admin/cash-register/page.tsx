@@ -375,6 +375,7 @@ export default function CashRegisterPage() {
         // DIE ENTSCHEIDENDE ÄNDERUNG:
         // Wir lesen den Wert direkt aus dem localStorage, der garantiert aktuell ist.
         salonId={typeof window !== 'undefined' ? localStorage.getItem('activeSalonId') : null}
+        discount={discount}
       />
       
       <Snackbar 
