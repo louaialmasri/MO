@@ -202,45 +202,6 @@ export default function CashRegisterPage() {
     setVoucherError('');
   };
   
-  const handleCheckout = async (amountGiven: number) => {
-    if (!selectedCustomer || cart.length === 0) {
-      setToast({ open: true, msg: 'Bitte einen Kunden und mindestens einen Artikel auswählen.', sev: 'error' });
-      return;
-    }
-    const staffIdForInvoice = cart.find(item => item.type === 'service')?.staffId || user?._id;
-
-    const payload: InvoicePayload = {
-      customerId: selectedCustomer._id,
-      paymentMethod: 'cash',
-      staffId: staffIdForInvoice,
-      items: cart.map(item => ({
-        type: item.type as 'product' | 'voucher' | 'service',
-        id: item.type !== 'voucher' ? item.id : undefined,
-        value: item.type === 'voucher' ? item.price : undefined,
-      })),
-      discount: discount.value > 0 ? discount : undefined,
-      voucherCode: appliedVoucher?.code,
-      amountGiven,
-    };
-
-    try {
-      await createInvoice(payload, token!);
-      setToast({ open: true, msg: 'Verkauf erfolgreich abgeschlossen!', sev: 'success' });
-      setCart([]);
-      setSelectedCustomer(null);
-      setDiscount({ type: 'percentage', value: 0 });
-      handleRemoveVoucher();
-      const updatedProducts = await fetchProducts(token!);
-      setProducts(updatedProducts);
-    } catch (error) {
-      console.error('Fehler beim Verkauf:', error);
-      const errorMessage = (error instanceof Error) ? error.message : 'Ein unbekannter Fehler ist aufgetreten.';
-      setToast({ open: true, msg: `Fehler: ${errorMessage}`, sev: 'error' });
-    } finally {
-      setIsPaymentDialogOpen(false);
-    }
-  };
-
   return (
     <Container maxWidth="xl" sx={{ pb: 4 }}>
       <Typography variant="h4" sx={{ my: 4 }}>Kasse / Sofortverkauf</Typography>
@@ -378,7 +339,7 @@ export default function CashRegisterPage() {
                   disabled={!selectedCustomer || cart.length === 0} 
                   onClick={() => setIsPaymentDialogOpen(true)}
                 >
-                  Verkauf abschließen (Bar)
+                  Verkauf abschließen
                 </Button>
             </Stack>
           </Paper>

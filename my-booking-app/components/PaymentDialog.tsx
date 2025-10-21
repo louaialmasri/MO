@@ -98,7 +98,7 @@ export default function PaymentDialog({ open, onClose, onPaymentSuccess, total =
         // falls nötig: salonId, staffId, discount etc.
       } as any; // as any, weil lokale Typen evtl. von backend-Shapes abweichen
 
-      const newInvoice = await createInvoice(payload, token);
+      const newInvoice = await createInvoice(token, payload, salonId);
       onPaymentSuccess(newInvoice as Invoice);
     } catch (error) {
       console.error("Fehler beim Erstellen der Rechnung:", error);
