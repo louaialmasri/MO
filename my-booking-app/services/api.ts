@@ -154,7 +154,7 @@ export type Voucher = {
   _id: string;
   code: string;
   initialValue: number;
-  balance: number;
+  currentValue: number;
   expiryDate: string;
   isActive: boolean;
 };

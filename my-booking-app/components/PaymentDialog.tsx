@@ -166,7 +166,7 @@ export default function PaymentDialog({ open, onClose, onPaymentSuccess, total =
                 </Button>
               </Stack>
               {voucherError && <Alert severity="error">{voucherError}</Alert>}
-              {validatedVoucher && <Alert severity="success">Gutschein gültig! Guthaben: {validatedVoucher.balance.toFixed(2)} €</Alert>}
+              {validatedVoucher && <Alert severity="success">Gutschein gültig! Guthaben: {validatedVoucher.currentValue.toFixed(2)} €</Alert>}
             </Box>
           )}
         </Stack>
