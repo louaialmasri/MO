@@ -74,30 +74,21 @@ export default function PaymentDialog({ open, onClose, onPaymentSuccess, total =
     setIsLoading(true);
 
     try {
-      let voucherPaymentDetails;
-      if (paymentMethod === 'voucher' && validatedVoucher) {
-        const redemptionResult = await redeemVoucher(token, validatedVoucher.code, total);
-        voucherPaymentDetails = {
-          code: redemptionResult.voucherCode,
-          initialBalance: redemptionResult.initialBalance,
-          paidAmount: redemptionResult.redeemedAmount,
-          remainingBalance: redemptionResult.remainingBalance
-        };
-      }
-
+      
       // Build payload in the correct shape for the backend and call createInvoice(payload, token)
       const payload = {
         customerId: customer._id,
         paymentMethod: paymentMethod,
         items: cart.map(item => ({
-          type: item.type, // Direkt den Typ aus dem Warenkorb-Item übernehmen
+          type: item.type,
           id: item.id,
-          // 'value' wird nur für Gutscheine (beim Kauf) benötigt, daher ist die Logik hier korrekt
           value: item.type === 'voucher' ? item.price : undefined, 
-          // Stelle sicher, dass die staffId für Services mitgesendet wird
           staffId: item.staffId 
         })),
-        voucherCode: voucherPaymentDetails?.code,
+        // HIER DIE WICHTIGE ÄNDERUNG:
+        // Wir übergeben den Code und den zu zahlenden Betrag, wenn mit Gutschein bezahlt wird.
+        voucherCode: paymentMethod === 'voucher' ? validatedVoucher?.code : undefined,
+        totalAmount: total, // Das Backend muss den Gesamtbetrag für die Gutscheinberechnung kennen
         amountGiven: paymentMethod === 'cash' ? numAmountGiven : undefined,
       };
 
