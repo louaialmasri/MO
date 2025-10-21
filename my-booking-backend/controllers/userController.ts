@@ -9,6 +9,14 @@ import { Booking } from '../models/Booking'
 export const getAllUsers = async (req: AuthRequest & { salonId?: string }, res: Response) => {
   try {
     const { role } = req.query as { role?: string };
+    let usersQuery = User.find();
+
+    if (role) {
+      usersQuery = User.find({ role: role });
+      if (role === 'staff') {
+        usersQuery = usersQuery.populate('salons'); // Lädt die Salon-Daten für jeden Mitarbeiter
+      }
+    }
 
     // Admins und Staff dürfen die Kundenliste abrufen (bleibt unverändert)
     if (role === 'user' && (req.user?.role === 'admin' || req.user?.role === 'staff')) {

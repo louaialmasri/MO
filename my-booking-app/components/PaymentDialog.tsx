@@ -18,10 +18,11 @@ interface PaymentDialogProps {
   total: number;
   cart: any[]; // Ggf. genauer typisieren
   customer: User;
+  salonId: string | null; // Prop für Salon-ID
 }
 
-export default function PaymentDialog({ open, onClose, onPaymentSuccess, total = 0, cart, customer }: PaymentDialogProps) {
-  const { token, salonId } = useAuth();
+export default function PaymentDialog({ open, onClose, onPaymentSuccess, total = 0, cart, customer, salonId }: PaymentDialogProps) {
+  const { token } = useAuth();
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'voucher'>('cash');
   const [isLoading, setIsLoading] = useState(false);
   

@@ -18,6 +18,7 @@ export type User = {
   address?: string;
   phone?: string;
   skills?: { _id: string; title?: string }[];
+  salons?: Salon[];
 }
 
 export type Service = {

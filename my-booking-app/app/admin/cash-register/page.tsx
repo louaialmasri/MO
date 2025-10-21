@@ -61,6 +61,9 @@ export default function CashRegisterPage() {
 
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
 
+  // State,um die Salon-ID der Transaktion zu speichern
+  const [transactionSalonId, setTransactionSalonId] = useState<string | null>(null);
+
   useEffect(() => {
     if (!token) return;
     const loadData = async () => {
@@ -201,6 +204,18 @@ export default function CashRegisterPage() {
     setVoucherCodeInput('');
     setVoucherError('');
   };
+
+  // Funktion, um die Salon-ID beim Auswählen des Mitarbeiters zu setzen
+  const handleStaffChange = (staffId: string) => {
+    setSelectedStaffId(staffId);
+    const selectedStaffMember = staff.find(s => s._id === staffId);
+    // Wenn der Mitarbeiter Salons hat, nehmen wir den ersten als Transaktions-Salon
+    if (selectedStaffMember && selectedStaffMember.salons && selectedStaffMember.salons.length > 0) {
+      setTransactionSalonId(selectedStaffMember.salons[0]._id);
+    } else {
+      setTransactionSalonId(null);
+    }
+  };
   
   return (
     <Container maxWidth="xl" sx={{ pb: 4 }}>
@@ -260,7 +275,7 @@ export default function CashRegisterPage() {
                 <Select
                     value={selectedStaffId}
                     label="Mitarbeiter für Dienstleistung"
-                    onChange={(e) => setSelectedStaffId(e.target.value)}
+                    onChange={(e) => handleStaffChange(e.target.value)}
                 >
                     {staff.map((s) => (
                         <MenuItem key={s._id} value={s._id}>{s.firstName} {s.lastName}</MenuItem>
@@ -416,6 +431,7 @@ export default function CashRegisterPage() {
         total={finalTotal}
         cart={cart}
         customer={selectedCustomer!}
+        salonId={transactionSalonId}
       />
       
       <Snackbar 
