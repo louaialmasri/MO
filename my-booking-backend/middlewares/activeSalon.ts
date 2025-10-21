@@ -1,6 +1,6 @@
 import { Response, NextFunction } from 'express'
 import { AuthRequest } from './authMiddleware'
-import { User } from '../models/User'
+import { User } from '../models/user'
 
 export interface SalonRequest extends AuthRequest {
   salonId?: string | null

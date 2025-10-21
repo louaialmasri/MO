@@ -1,5 +1,5 @@
 import express from 'express';
-import { User } from '../models/User';
+import { User } from '../models/user';
 import { StaffSalon } from '../models/StaffSalon';
 import { SalonRequest } from '../middlewares/activeSalon';
 

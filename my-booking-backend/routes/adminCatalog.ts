@@ -1,7 +1,7 @@
 import express from 'express'
 import { verifyToken } from '../middlewares/authMiddleware'
 import { verifyAdmin } from '../middlewares/adminMiddleware'
-import { User } from '../models/User'
+import { User } from '../models/user'
 import { Service } from '../models/Service'
 import bcrypt from 'bcrypt';
 import { Salon } from '../models/Salon'
