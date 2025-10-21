@@ -185,26 +185,6 @@ export default function CashRegisterPage() {
     setIsDiscountDialogOpen(false);
   }
 
-  const handleApplyVoucher = async () => {
-    if (!token || !voucherCodeInput) return;
-    setVoucherError('');
-    try {
-      const { voucher } = await validateVoucher(voucherCodeInput, token);
-      setAppliedVoucher({ code: voucher.code, amount: voucher.currentValue });
-      setToast({ open: true, msg: `Gutschein ${voucher.code} mit ${voucher.currentValue.toFixed(2)}€ Guthaben angewendet!`, sev: 'success' });
-    } catch (error: any) {
-      const msg = error.response?.data?.message || 'Fehler bei der Gutscheinprüfung.';
-      setVoucherError(msg);
-      setAppliedVoucher(null);
-    }
-  };
-
-  const handleRemoveVoucher = () => {
-    setAppliedVoucher(null);
-    setVoucherCodeInput('');
-    setVoucherError('');
-  };
-
   // Funktion, um die Salon-ID beim Auswählen des Mitarbeiters zu setzen
   const handleStaffChange = (staffId: string) => {
     setSelectedStaffId(staffId);
@@ -306,35 +286,6 @@ export default function CashRegisterPage() {
                   {discount.value > 0 ? 'Rabatt bearbeiten' : 'Rabatt hinzufügen'}
                 </Button>
 
-                <Divider sx={{pt: 1}}/>
-
-                {!appliedVoucher ? (
-                    <Box>
-                        <Typography sx={{mt: 1}}>Gutschein einlösen</Typography>
-                        <Stack direction="row" spacing={1} sx={{mt: 1}}>
-                            <TextField 
-                                size="small" 
-                                label="Gutschein-Code" 
-                                value={voucherCodeInput}
-                                onChange={(e) => setVoucherCodeInput(e.target.value.toUpperCase())}
-                                error={!!voucherError}
-                                helperText={voucherError}
-                                fullWidth
-                            />
-                            <Button onClick={handleApplyVoucher} variant="outlined">Prüfen</Button>
-                        </Stack>
-                    </Box>
-                ) : (
-                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ color: 'success.main', mt: 1 }}>
-                        <Typography>Gutschein eingelöst</Typography>
-                        <Chip 
-                            label={`-${redeemedAmount.toFixed(2)}€ (${appliedVoucher.code})`}
-                            onDelete={handleRemoveVoucher}
-                            color="success"
-                            size="small"
-                        />
-                    </Stack>
-                )}
 
                 <Divider sx={{ my: 2 }} variant="middle" />
 
@@ -345,7 +296,7 @@ export default function CashRegisterPage() {
                   color="primary" 
                   fullWidth 
                   disabled={!selectedCustomer || cart.length === 0} 
-                  onClick={() => setIsPaymentDialogOpen(true)}
+                  onClick={() => {setIsPaymentDialogOpen(true);}}
                 >
                   Verkauf abschließen
                 </Button>
@@ -407,14 +358,11 @@ export default function CashRegisterPage() {
       <PaymentDialog
         open={isPaymentDialogOpen}
         onClose={() => setIsPaymentDialogOpen(false)}
-        // PaymentDialog erstellt die Rechnung und liefert das neue Invoice-Objekt zurück
         onPaymentSuccess={async (invoice) => {
           setToast({ open: true, msg: 'Verkauf erfolgreich abgeschlossen!', sev: 'success' });
           setCart([]);
           setSelectedCustomer(null);
           setDiscount({ type: 'percentage', value: 0 });
-          handleRemoveVoucher();
-          // aktualisiere Produktliste
           if (token) {
             const updatedProducts = await fetchProducts(token);
             setProducts(updatedProducts);
@@ -424,7 +372,9 @@ export default function CashRegisterPage() {
         total={finalTotal}
         cart={cart}
         customer={selectedCustomer!}
-        salonId={activeSalonId}
+        // DIE ENTSCHEIDENDE ÄNDERUNG:
+        // Wir lesen den Wert direkt aus dem localStorage, der garantiert aktuell ist.
+        salonId={typeof window !== 'undefined' ? localStorage.getItem('activeSalonId') : null}
       />
       
       <Snackbar 

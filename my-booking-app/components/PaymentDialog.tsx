@@ -56,7 +56,7 @@ export default function PaymentDialog({ open, onClose, onPaymentSuccess, total =
       const result = await validateVoucher(voucherCode, token);
       // Erwartet, dass result direkt das Gutschein-Objekt oder { voucher: {...} } zurückgibt.
       const voucher = result.voucher ?? result;
-      if (voucher.balance >= total) {
+      if (voucher.currentValue >= total) {
         setValidatedVoucher(voucher);
       } else {
         setVoucherError('Guthaben des Gutscheins reicht nicht aus.');
