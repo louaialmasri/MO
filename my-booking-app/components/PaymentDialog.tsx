@@ -20,7 +20,7 @@ interface PaymentDialogProps {
   customer: User;
 }
 
-export default function PaymentDialog({ open, onClose, onPaymentSuccess, total, cart, customer }: PaymentDialogProps) {
+export default function PaymentDialog({ open, onClose, onPaymentSuccess, total = 0, cart, customer }: PaymentDialogProps) {
   const { token, salonId } = useAuth();
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'voucher'>('cash');
   const [isLoading, setIsLoading] = useState(false);
@@ -86,7 +86,7 @@ export default function PaymentDialog({ open, onClose, onPaymentSuccess, total, 
 
       // Build payload in the correct shape for the backend and call createInvoice(payload, token)
       const payload = {
-        customerId: customer._id,
+        customer: customer._id,
         paymentMethod: paymentMethod === 'voucher' ? 'voucher' : paymentMethod,
         items: cart.map(item => ({
           type: item.duration ? 'service' : 'product',

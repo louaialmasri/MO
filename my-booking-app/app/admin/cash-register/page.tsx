@@ -438,8 +438,23 @@ export default function CashRegisterPage() {
       <PaymentDialog
         open={isPaymentDialogOpen}
         onClose={() => setIsPaymentDialogOpen(false)}
-        onConfirm={handleCheckout}
-        totalAmount={finalTotal}
+        // PaymentDialog erstellt die Rechnung und liefert das neue Invoice-Objekt zurück
+        onPaymentSuccess={async (invoice) => {
+          setToast({ open: true, msg: 'Verkauf erfolgreich abgeschlossen!', sev: 'success' });
+          setCart([]);
+          setSelectedCustomer(null);
+          setDiscount({ type: 'percentage', value: 0 });
+          handleRemoveVoucher();
+          // aktualisiere Produktliste
+          if (token) {
+            const updatedProducts = await fetchProducts(token);
+            setProducts(updatedProducts);
+          }
+          setIsPaymentDialogOpen(false);
+        }}
+        total={finalTotal}
+        cart={cart}
+        customer={selectedCustomer!}
       />
       
       <Snackbar 
