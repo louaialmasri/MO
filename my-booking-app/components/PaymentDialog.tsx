@@ -87,17 +87,19 @@ export default function PaymentDialog({ open, onClose, onPaymentSuccess, total =
 
       // Build payload in the correct shape for the backend and call createInvoice(payload, token)
       const payload = {
-        customer: customer._id,
-        paymentMethod: paymentMethod === 'voucher' ? 'voucher' : paymentMethod,
+        customerId: customer._id,
+        paymentMethod: paymentMethod,
         items: cart.map(item => ({
-          type: item.duration ? 'service' : 'product',
-          id: item._id,
-          value: item.price
+          type: item.type, // Direkt den Typ aus dem Warenkorb-Item übernehmen
+          id: item.id,
+          // 'value' wird nur für Gutscheine (beim Kauf) benötigt, daher ist die Logik hier korrekt
+          value: item.type === 'voucher' ? item.price : undefined, 
+          // Stelle sicher, dass die staffId für Services mitgesendet wird
+          staffId: item.staffId 
         })),
         voucherCode: voucherPaymentDetails?.code,
         amountGiven: paymentMethod === 'cash' ? numAmountGiven : undefined,
-        // falls nötig: salonId, staffId, discount etc.
-      } as any; // as any, weil lokale Typen evtl. von backend-Shapes abweichen
+      };
 
       const newInvoice = await createInvoice(token, payload, salonId);
       onPaymentSuccess(newInvoice as Invoice);

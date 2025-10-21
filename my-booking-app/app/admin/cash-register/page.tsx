@@ -36,7 +36,7 @@ type CartItem = {
 };
 
 export default function CashRegisterPage() {
-  const { token, user } = useAuth();
+  const { token, user, salonId: activeSalonId } = useAuth();
   const [customers, setCustomers] = useState<User[]>([]);
   const [staff, setStaff] = useState<User[]>([]);
   const [products, setProducts] = useState<ProductType[]>([]);
@@ -208,13 +208,6 @@ export default function CashRegisterPage() {
   // Funktion, um die Salon-ID beim Auswählen des Mitarbeiters zu setzen
   const handleStaffChange = (staffId: string) => {
     setSelectedStaffId(staffId);
-    const selectedStaffMember = staff.find(s => s._id === staffId);
-    // Wenn der Mitarbeiter Salons hat, nehmen wir den ersten als Transaktions-Salon
-    if (selectedStaffMember && selectedStaffMember.salons && selectedStaffMember.salons.length > 0) {
-      setTransactionSalonId(selectedStaffMember.salons[0]._id);
-    } else {
-      setTransactionSalonId(null);
-    }
   };
   
   return (
@@ -431,7 +424,7 @@ export default function CashRegisterPage() {
         total={finalTotal}
         cart={cart}
         customer={selectedCustomer!}
-        salonId={transactionSalonId}
+        salonId={activeSalonId}
       />
       
       <Snackbar 
