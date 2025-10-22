@@ -1,7 +1,7 @@
 import { Response } from 'express'
 import mongoose, { Types } from 'mongoose'
 import { AuthRequest } from '../middlewares/authMiddleware'
-import { Salon } from '../models/Salon'
+import { Salon, ISalon } from '../models/Salon' // ISalon importiert
 import { User } from '../models/user'
 import { Service } from '../models/Service'
 import { Booking } from '../models/Booking'
@@ -11,24 +11,48 @@ import { StaffSalon } from '../models/StaffSalon'
 import { SalonRequest } from '../middlewares/activeSalon'
 
 export const getMySalons = async (req: AuthRequest, res: Response) => {
+  // Bleibt unverändert, holt alle Salons für den Admin
   if (req.user?.role !== 'admin') return res.status(403).json({ success:false, message:'Nur Admin' })
   const salons = await Salon.find({ /* optional: owner: req.user.userId */ }).sort({ name: 1 })
   res.json({ success:true, salons })
 }
 
+// NEU: Holt die Daten des aktuell *aktiven* Salons
 export const getCurrentSalon = async (req: SalonRequest, res: Response) => {
     try {
+        if (!req.salonId) {
+            // Versuche, den ersten Salon des Admins zu finden, falls keiner aktiv ist
+             if (req.user?.role === 'admin') {
+                const userWithSalon = await User.findById(req.user.userId).select('salon');
+                if (userWithSalon?.salon) {
+                    req.salonId = userWithSalon.salon.toString();
+                } else {
+                    const firstSalon = await Salon.findOne().sort({ createdAt: 1 });
+                    if (firstSalon) {
+                         req.salonId = firstSalon._id.toString();
+                    }
+                }
+            }
+        }
+
+        if (!req.salonId) {
+             return res.status(404).json({ message: 'Kein aktiver Salon gefunden oder auswählbar.' });
+        }
+
         const salon = await Salon.findById(req.salonId);
         if (!salon) {
             return res.status(404).json({ message: 'Aktiver Salon nicht gefunden.' });
         }
         res.json({ success: true, salon });
     } catch (error) {
+        console.error("Fehler in getCurrentSalon:", error);
         res.status(500).json({ message: 'Serverfehler' });
     }
 }
 
+
 export const createSalon = async (req: AuthRequest, res: Response) => {
+  // Bleibt unverändert
   if (req.user?.role !== 'admin') return res.status(403).json({ success:false, message:'Nur Admin' })
   const { name, logoUrl } = req.body
   const salon = await Salon.create({ name, logoUrl /* , owner: req.user.userId */ })
@@ -36,6 +60,7 @@ export const createSalon = async (req: AuthRequest, res: Response) => {
 }
 
 export const deleteSalon = async (req: AuthRequest, res: Response) => {
+  // Bleibt unverändert
   try {
     if (req.user?.role !== 'admin') {
       return res.status(403).json({ success:false, message:'Nur Admin' })
@@ -79,6 +104,18 @@ export const deleteSalon = async (req: AuthRequest, res: Response) => {
       })
     }
 
+    // Zusätzliche Prüfungen für Zuordnungsmodelle
+    const staffSalonCount = await StaffSalon.countDocuments({ salon: salonId });
+    const serviceSalonCount = await ServiceSalon.countDocuments({ salon: salonId });
+
+     if (staffSalonCount > 0 || serviceSalonCount > 0) {
+        return res.status(409).json({
+            success: false,
+            message: 'Salon kann nicht gelöscht werden. Entferne zuerst alle Mitarbeiter- und Service-Zuordnungen.',
+            details: { staffAssignments: staffSalonCount, serviceAssignments: serviceSalonCount }
+        });
+    }
+
     await Salon.findByIdAndDelete(id)
     return res.json({ success:true, message:'Salon gelöscht' })
   } catch (e) {
@@ -87,7 +124,9 @@ export const deleteSalon = async (req: AuthRequest, res: Response) => {
   }
 }
 
+
 export const migrateDefaultSalon = async (req: AuthRequest, res: Response) => {
+  // Bleibt unverändert
   try {
     if (req.user?.role !== 'admin') {
       return res.status(403).json({ success:false, message:'Nur Admin' })
@@ -126,6 +165,7 @@ export const migrateDefaultSalon = async (req: AuthRequest, res: Response) => {
 }
 
 export const listSalonGuards = async (req: AuthRequest, res: Response) => {
+ // Bleibt unverändert
   try {
     if (req.user?.role !== 'admin') {
       return res.status(403).json({ success:false, message:'Nur Admin' })
@@ -194,31 +234,59 @@ export const listSalonGuards = async (req: AuthRequest, res: Response) => {
   }
 }
 
-export const updateSalon = async (req: AuthRequest, res: Response) => {
+// ANGEPASST: Aktualisiert einen Salon (inkl. der neuen Felder)
+export const updateSalon = async (req: SalonRequest, res: Response) => {
+  // Nur Admins dürfen Salons bearbeiten
   if (req.user?.role !== 'admin') {
     return res.status(403).json({ success: false, message: 'Nur Admin' });
   }
   try {
-    const { id } = req.params;
-    const { name, address, phone, email, openingHours } = req.body;
+    // ID kann entweder aus Params (/:id) oder dem aktiven Salon (req.salonId für /current) kommen
+    const salonIdToUpdate = req.params.id || req.salonId;
 
-    const salon = await Salon.findById(id);
+    if (!salonIdToUpdate || !mongoose.Types.ObjectId.isValid(salonIdToUpdate)) {
+         return res.status(400).json({ success: false, message: 'Gültige Salon-ID erforderlich' });
+    }
+
+    // Nur Admins dürfen Daten *dieses* Salons bearbeiten (oder generell alle, je nach Logik)
+    // Die activeSalon Middleware stellt sicher, dass Admins den Salon wechseln können,
+    // daher reicht die Admin-Rollenprüfung.
+
+    const salon = await Salon.findById(salonIdToUpdate);
     if (!salon) {
       return res.status(404).json({ success: false, message: 'Salon nicht gefunden' });
     }
 
-    // Update fields if they are provided
-    if (name) salon.name = name;
-    if (address) salon.address = address;
-    if (phone) salon.phone = phone;
-    if (email) salon.email = email;
-    if (openingHours) salon.openingHours = openingHours;
+    // Erlaubte Felder für das Update definieren
+    const allowedUpdates = [
+      'name', 'address', 'phone', 'email', 'websiteUrl', 'logoUrl',
+      'openingHours', 'datevSettings', 'socialMedia', 'bookingRules', 'invoiceSettings'
+    ];
+    const updates: Partial<ISalon> = {};
 
-    await salon.save();
+    // Nur erlaubte Felder aus dem Request Body übernehmen
+    for (const key of allowedUpdates) {
+      if (req.body[key] !== undefined) {
+        // Spezielle Behandlung für verschachtelte Objekte, um nur vorhandene Unterfelder zu überschreiben
+        if (typeof req.body[key] === 'object' && !Array.isArray(req.body[key]) && salon[key as keyof ISalon]) {
+           updates[key as keyof ISalon] = { ...salon[key as keyof ISalon], ...req.body[key] } as any;
+        } else {
+           (updates as any)[key] = req.body[key];
+        }
+      }
+    }
 
-    res.json({ success: true, salon });
+
+    // Aktualisiere das Salon-Dokument mit den neuen Daten
+    const updatedSalon = await Salon.findByIdAndUpdate(salonIdToUpdate, { $set: updates }, { new: true, runValidators: true });
+
+    res.json({ success: true, salon: updatedSalon });
   } catch (e) {
     console.error('Update Salon Error:', e);
+    // Detailliertere Fehlermeldung bei Validierungsfehlern
+    if (e instanceof mongoose.Error.ValidationError) {
+        return res.status(400).json({ success: false, message: 'Validierungsfehler', errors: e.errors });
+    }
     res.status(500).json({ success: false, message: 'Fehler beim Aktualisieren des Salons' });
   }
 };

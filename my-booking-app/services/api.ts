@@ -2,13 +2,32 @@ import axios from 'axios'
 
 // --- Types ---
 
+// SocialMedia Interface
+export interface SocialMediaLinks {
+  instagram?: string;
+  facebook?: string;
+  // Weitere hinzufügen bei Bedarf
+}
+
+// BookingRules Interface
+export interface BookingRules {
+  cancellationDeadlineHours?: number;
+  bookingLeadTimeMinutes?: number;
+  bookingHorizonDays?: number;
+  sendReminderEmails?: boolean;
+}
+
+// InvoiceSettings Interface
+export interface InvoiceSettings {
+    footerText?: string;
+}
+
 export type OpeningHours = {
   weekday: number;
   isOpen: boolean;
   open: string;
   close: string;
 }
-
 export type User = {
   _id: string
   email: string
@@ -18,7 +37,7 @@ export type User = {
   address?: string;
   phone?: string;
   skills?: { _id: string; title?: string }[];
-  salons?: Salon[];
+  salons?: Salon[]; // Verwendet jetzt den erweiterten Salon-Typ
 }
 
 export type Service = {
@@ -27,17 +46,17 @@ export type Service = {
   description?: string
   price: number
   duration: number
-  salon?: string | null
+  salon?: string | null // Referenziert die Salon-ID
   category?: { _id: string; name: string; };
 }
 
 export type Booking = {
   _id: string
-  user: string
-  serviceId: string
+  user: string // User-ID
+  serviceId: string // Service-ID
   dateTime: string
-  service: Service;
-  staff: User;
+  service: Service; // Ggf. nur ID, je nachdem was das Backend liefert
+  staff: User; // Ggf. nur ID
 }
 
 export type StaffBooking  = {
@@ -72,19 +91,22 @@ export type InvoiceItem = {
 
 export type InvoicePayload = {
   customerId: string;
-  paymentMethod: 'cash' | 'card';
+  paymentMethod: 'cash' | 'card' | 'voucher';
   staffId?: string;
   items: {
     type: 'product' | 'voucher' | 'service';
-    id?: string;
-    value?: number;
+    id?: string; // ID von Produkt oder Service
+    value?: number; // Wert des Gutscheins
+    name?: string; // Wird vom Backend generiert, aber zur Sicherheit hier optional
+    price?: number; // Wird vom Backend generiert
   }[];
   discount?: {
     type: 'percentage' | 'fixed';
     value: number;
   };
-  voucherCode?: string;
-  amountGiven?: number;
+  voucherCode?: string; // Code des eingelösten Gutscheins
+  totalAmount?: number; // Gesamtbetrag VOR Gutscheineinlösung
+  amountGiven?: number; // Gegebener Betrag bei Barzahlung
 };
 
 export type Invoice = {
@@ -98,17 +120,19 @@ export type Invoice = {
   voucherRemainingValue?: number;
   paymentMethod: 'cash' | 'card' | 'voucher';
   voucherPayment?: VoucherPaymentDetails;
-  customer: { firstName: string; lastName: string; email: string; };
+  customer: { _id: string; firstName: string; lastName: string; email: string; };
   items: {
     description: string;
     price: number;
   }[];
-  service: { title: string; price: number; duration: number; };
-  staff: { firstName: string; lastName: string; };
-  salon: { name: string; address?: string; phone?: string; email?: string; };
-  booking: string;
+  service: { title: string; price: number; duration: number; }; // Kann optional sein, wenn 'items' verwendet wird
+  staff: { _id: string; firstName: string; lastName: string; };
+  salon: { _id: string; name: string; address?: string; phone?: string; email?: string; };
+  booking: string; // Booking ID
   amountGiven?: number;
   change?: number;
+  discount?: { type: 'percentage' | 'fixed'; value: number }; // Rabatt hinzugefügt
+  status: 'paid' | 'unpaid' | 'cancelled'; // Status hinzugefügt
 };
 
 // KORREKTUR: Die Eigenschaft 'service' wurde durch 'itemsSummary' ersetzt.
@@ -202,7 +226,27 @@ export type Product = {
 };
 
 // --- Global Types ---
-export type Salon = { _id: string; name: string; logoUrl?: string; openingHours: OpeningHours[]; }
+export type Salon = {
+    _id: string;
+    name: string;
+    address?: string;
+    phone?: string;
+    email?: string;
+    websiteUrl?: string; // NEU
+    logoUrl?: string;
+    openingHours: OpeningHours[];
+    datevSettings?: { // Optional, falls nicht immer vorhanden
+        revenueAccountServices?: string;
+        revenueAccountProducts?: string;
+        cashAccount?: string;
+        cardAccount?: string;
+        consultantNumber?: string;
+        clientNumber?: string;
+    };
+    socialMedia?: SocialMediaLinks; // NEU
+    bookingRules?: BookingRules; // NEU
+    invoiceSettings?: InvoiceSettings; // NEU
+}
 
 export type GlobalStaff = {
   _id: string
@@ -734,9 +778,19 @@ export async function fetchUserInvoices(token: string): Promise<Invoice[]> {
   return res.data;
 }
 
-export async function updateSalon(id: string, data: Partial<Salon>) {
-  const res = await api.patch(`/salons/${id}`, data);
-  return res.data.salon as Salon;
+//Holt die Daten des aktuell *aktiven* Salons
+export const getCurrentSalon = async (token: string): Promise<{ success: boolean; salon: Salon }> => {
+  const res = await api.get('/salons/current', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data; // Erwartet { success: true, salon: {...} }
+};
+
+export async function updateSalon(id: string, data: Partial<Salon>, token: string): Promise<Salon> {
+  const res = await api.patch(`/salons/${id}`, data, {
+      headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data.salon;
 }
 
 export async function createInvoice(token: string, invoiceData: any, salonId: string): Promise<Invoice> {

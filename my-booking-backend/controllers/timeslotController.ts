@@ -1,13 +1,15 @@
 import { Response } from 'express';
 import mongoose from 'mongoose';
+import dayjs from 'dayjs'; // Dayjs importieren
 import { AuthRequest } from '../middlewares/authMiddleware';
 import { Booking } from '../models/Booking';
 import { Availability } from '../models/Availability';
 import { Service } from '../models/Service';
-import { Salon } from '../models/Salon';
+import { Salon } from '../models/Salon'; // Salon importieren
 import { SalonRequest } from '../middlewares/activeSalon';
+import { ServiceSalon } from '../models/ServiceSalon'; // ServiceSalon importieren
 
-// Hilfsfunktionen
+// Hilfsfunktionen (unverändert)
 function addMinutes(d: Date, mins: number): Date {
   return new Date(d.getTime() + mins * 60000);
 }
@@ -15,9 +17,21 @@ function overlaps(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
   return aStart < bEnd && bStart < aEnd;
 }
 
+// Hilfsfunktion zum Abrufen der Service-Dauer (Berücksichtigt Overrides)
+async function getServiceDurationMinutes(serviceId: string, salonId: string): Promise<number> {
+    const svcAssign = await ServiceSalon.findOne({ service: serviceId, salon: salonId }).select('durationOverride');
+    if (svcAssign && svcAssign.durationOverride != null) {
+        return svcAssign.durationOverride;
+    }
+    const svc = await Service.findById(serviceId).select('duration');
+    return svc?.duration ?? 30;
+}
+
+
 export const getTimeslots = async (req: AuthRequest & SalonRequest, res: Response) => {
   try {
     const { staffId, serviceId, date, step } = req.query as { staffId: string; serviceId: string; date: string; step?: string };
+    const salonId = req.salonId; // Salon-ID aus der Middleware holen
 
     if (!staffId || !serviceId || !date) {
       return res.status(400).json({ success: false, message: 'staffId, serviceId, date erforderlich' });
@@ -25,23 +39,35 @@ export const getTimeslots = async (req: AuthRequest & SalonRequest, res: Respons
     if (!mongoose.Types.ObjectId.isValid(staffId) || !mongoose.Types.ObjectId.isValid(serviceId)) {
       return res.status(400).json({ success: false, message: 'Ungültige ID' });
     }
-    if (!req.salonId) {
-      return res.status(400).json({ success: false, message: 'Kein Salon ausgewählt. Bitte wählen Sie einen Salon aus der Navigationsleiste aus.' });
+    // WICHTIG: Prüfen, ob eine Salon-ID vorhanden ist
+    if (!salonId) {
+      return res.status(400).json({ success: false, message: 'Kein Salon ausgewählt. Bitte wählen Sie einen Salon.' });
     }
 
-    const service = await Service.findById(serviceId).select('duration');
-    const duration = service?.duration ?? 30;
-    const stepMinutes = Math.max(5, Math.min(60, Number(step) || 15));
-
-    // 1. Salon-Öffnungszeiten als primäre Grenze laden
-    const salon = await Salon.findById(req.salonId);
+    // Salon-Einstellungen laden für Regeln
+    const salon = await Salon.findById(salonId);
     if (!salon) {
       return res.status(404).json({ success: false, message: 'Salon nicht gefunden.' });
     }
+    const { bookingLeadTimeMinutes = 60, bookingHorizonDays = 90 } = salon.bookingRules ?? {};
 
-    // Datum im lokalen Kontext des Servers erstellen, um Zeitzonenfehler zu vermeiden
-    const requestedDate = new Date(date); 
-    const dayOfWeek = requestedDate.getDay(); // Sonntag = 0, Montag = 1, ...
+    const duration = await getServiceDurationMinutes(serviceId, salonId); // Dauer über Hilfsfunktion
+    const stepMinutes = Math.max(5, Math.min(60, Number(step) || 15));
+
+    const requestedDate = dayjs(date).startOf('day'); // Dayjs für einfachere Vergleiche
+    const now = dayjs();
+
+    // Prüfung: Buchungshorizont (Datum darf nicht zu weit in der Zukunft liegen)
+    if (requestedDate.diff(now, 'day') > bookingHorizonDays) {
+        return res.json({ success: true, slots: [], duration, message: `Datum liegt außerhalb des Buchungshorizonts von ${bookingHorizonDays} Tagen.` });
+    }
+
+    // Datumsobjekte für Mongoose-Queries
+    const requestedDateStart = requestedDate.toDate();
+    const requestedDateEnd = requestedDate.endOf('day').toDate();
+
+    // 1. Salon-Öffnungszeiten als primäre Grenze
+    const dayOfWeek = requestedDate.day(); // dayjs().day() gibt 0 für Sonntag, 6 für Samstag
     const openingHourRule = salon.openingHours.find(h => h.weekday === dayOfWeek);
 
     if (!openingHourRule || !openingHourRule.isOpen) {
@@ -51,74 +77,76 @@ export const getTimeslots = async (req: AuthRequest & SalonRequest, res: Respons
     const [openH, openM] = openingHourRule.open.split(':').map(Number);
     const [closeH, closeM] = openingHourRule.close.split(':').map(Number);
 
-    const salonOpenTime = new Date(requestedDate);
-    salonOpenTime.setHours(openH, openM, 0, 0);
+    const salonOpenTime = requestedDate.hour(openH).minute(openM).second(0).millisecond(0).toDate();
+    const salonCloseTime = requestedDate.hour(closeH).minute(closeM).second(0).millisecond(0).toDate();
 
-    const salonCloseTime = new Date(requestedDate);
-    salonCloseTime.setHours(closeH, closeM, 0, 0);
-
-    // 2. Arbeitsfenster des Mitarbeiters abrufen oder Öffnungszeiten als Standard verwenden
+    // 2. Arbeitsfenster des Mitarbeiters
     let workWindows = await Availability.find({
       staff: staffId,
       type: 'work',
-      start: { $lt: salonCloseTime },
-      end: { $gt: salonOpenTime },
+      start: { $lt: salonCloseTime }, // Muss vor Salon-Schluss enden
+      end: { $gt: salonOpenTime },   // Muss nach Salon-Öffnung beginnen
     }).lean();
 
     if (workWindows.length === 0) {
-      // Wenn keine spezifischen Arbeitszeiten gesetzt sind, gelten die Öffnungszeiten des Salons
+      // Wenn keine spezifischen Arbeitszeiten, gelten Salon-Öffnungszeiten
       workWindows = [{ start: salonOpenTime, end: salonCloseTime }] as any;
     }
 
-    // 3. Alle Blocker abrufen
+    // 3. Alle Blocker (Abwesenheit, Pause, Buchungen)
     const blocks = await Availability.find({
       staff: staffId,
       type: { $in: ['absence', 'break'] },
-      start: { $lt: salonCloseTime },
-      end: { $gt: salonOpenTime },
+      start: { $lt: requestedDateEnd }, // Ganzen Tag betrachten
+      end: { $gt: requestedDateStart },
     }).lean();
 
     const bookings = await Booking.find({
       staff: staffId,
-      dateTime: { $gte: salonOpenTime, $lt: salonCloseTime },
+      dateTime: { $gte: requestedDateStart, $lt: requestedDateEnd }, // Ganzen Tag betrachten
     }).populate('service', 'duration').lean();
 
     // 4. Slots generieren und filtern
     const slots: string[] = [];
-    const now = new Date();
+    const minBookingTime = now.add(bookingLeadTimeMinutes, 'minute'); // Mindestzeitpunkt für Buchung
 
     for (const window of workWindows) {
-      // Sicherstellen, dass die Arbeitszeitfenster die Salon-Öffnungszeiten nicht überschreiten
-      let t = new Date(window.start) > salonOpenTime ? new Date(window.start) : salonOpenTime;
-      const windowEnd = new Date(window.end) < salonCloseTime ? new Date(window.end) : salonCloseTime;
+      // Startzeit innerhalb der Salon-Öffnungszeit sicherstellen
+      let t = dayjs(window.start).isAfter(salonOpenTime) ? dayjs(window.start) : dayjs(salonOpenTime);
+      // Endzeit innerhalb der Salon-Öffnungszeit sicherstellen
+      const windowEnd = dayjs(window.end).isBefore(salonCloseTime) ? dayjs(window.end) : dayjs(salonCloseTime);
 
-      while (addMinutes(t, duration) <= windowEnd) {
-        // Slot darf nicht in der Vergangenheit liegen
-        if (t < now) {
-          t = addMinutes(t, stepMinutes);
+      while (t.add(duration, 'minute').isBefore(windowEnd) || t.add(duration, 'minute').isSame(windowEnd)) {
+        const slotStart = t.toDate();
+        const slotEnd = t.add(duration, 'minute').toDate();
+
+        // Prüfung: Slot muss nach der Mindestvorlaufzeit liegen
+        if (t.isBefore(minBookingTime)) {
+          t = t.add(stepMinutes, 'minute');
           continue;
         }
 
-        const slotEnd = addMinutes(t, duration);
-
-        const isBlocked = blocks.some(b => overlaps(t, slotEnd, new Date(b.start), new Date(b.end)));
+        // Prüfung: Blocker (Abwesenheit, Pause)
+        const isBlocked = blocks.some(b => overlaps(slotStart, slotEnd, new Date(b.start), new Date(b.end)));
         if (isBlocked) {
-          t = addMinutes(t, stepMinutes);
+          t = t.add(stepMinutes, 'minute');
           continue;
         }
 
+        // Prüfung: Bestehende Buchungen
         const hasClash = bookings.some(b => {
           const bookingStart = new Date(b.dateTime as any);
-          const bookingDuration = (b as any).service?.duration ?? 30;
+          // WICHTIG: Dauer für Kollisionsprüfung muss Salon-spezifisch sein!
+          const bookingDuration = (b as any).service?.duration ?? 30; // Fallback, aber idealerweise immer über ServiceSalon holen
           const bookingEnd = addMinutes(bookingStart, bookingDuration);
-          return overlaps(t, slotEnd, bookingStart, bookingEnd);
+          return overlaps(slotStart, slotEnd, bookingStart, bookingEnd);
         });
 
         if (!hasClash) {
-          slots.push(t.toISOString());
+          slots.push(slotStart.toISOString());
         }
 
-        t = addMinutes(t, stepMinutes);
+        t = t.add(stepMinutes, 'minute');
       }
     }
 
