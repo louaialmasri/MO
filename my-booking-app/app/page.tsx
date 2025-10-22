@@ -148,14 +148,14 @@ export default function LandingPage() {
                 <Card key={service._id} variant="outlined" sx={{ mb: 2, '&:hover': { borderColor: 'primary.main' } }}>
                   <CardContent>
                     <Grid container alignItems="center" spacing={2}>
-                      <Grid size={{ xs: 12, md: 6 }}>
+                      <Grid item xs = {12} md = {6}>
                         <Typography variant="h6">{service.title}</Typography>
                         <Typography variant="body2" color="text.secondary">{service.duration} Minuten</Typography>
                       </Grid>
-                      <Grid size={{ xs: 6, md: 3 }} sx={{ textAlign: { xs: 'left', md: 'right' } }}>
+                      <Grid item xs = {12} md = {3} sx={{ textAlign: { xs: 'left', md: 'right' } }}>
                         <Typography variant="h6" fontWeight="bold">{service.price.toFixed(2)} €</Typography>
                       </Grid>
-                      <Grid size={{ xs: 6, md: 3 }} sx={{ textAlign: 'right' }}>
+                      <Grid item xs = {12} md = {3} sx={{ textAlign: 'right' }}>
                         {/* HIER DIE ÄNDERUNG: Button-Farbe auf primary gesetzt */}
                         <Button variant="contained" color="primary" onClick={() => router.push('/booking')}>
                           Buchen
@@ -180,7 +180,7 @@ export default function LandingPage() {
 
           <Grid container spacing={3}>
             {MOCK_REVIEWS.map((r, i) => (
-              <Grid size={{ xs: 12, md: 4 }} key={i}>
+              <Grid item xs = {12} md = {4} key={i}>
                 <Paper elevation={2} sx={{ p: 3, height: '100%' }}>
                   <Stack direction="row" alignItems="center" spacing={1}>
                     <Rating value={5} readOnly size="small" />
@@ -207,7 +207,7 @@ export default function LandingPage() {
 
       <Container maxWidth="lg" sx={{ py: 8 }}>
         <Grid container spacing={3}>
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid item xs = {12} md = {4}>
             <Paper elevation={2} sx={{ p: 3 }}>
               <Stack direction="row" alignItems="center" spacing={1}>
                 <AccessTimeIcon />
@@ -235,7 +235,7 @@ export default function LandingPage() {
             </Paper>
           </Grid>
 
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid item xs = {12} md = {4}>
             <Paper elevation={2} sx={{ p: 3, height: '100%' }}>
               <Stack direction="row" alignItems="center" spacing={1}>
                 <LocationOnIcon />
