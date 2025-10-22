@@ -19,7 +19,8 @@ import {
   Paper,
   MenuItem,
   Popper,
-  Menu
+  Menu,
+  useTheme // Import useTheme hook
 } from '@mui/material';
 
 import MenuIcon from '@mui/icons-material/Menu';
@@ -34,18 +35,18 @@ import CategoryIcon from '@mui/icons-material/Category';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
 import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
-import VpnKeyIcon from '@mui/icons-material/VpnKey';
+// VpnKeyIcon wird nicht mehr direkt im Menü benötigt
 import BuildIcon from '@mui/icons-material/Build';
 import ContentCutIcon from '@mui/icons-material/ContentCut';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
+import SettingsApplicationsIcon from '@mui/icons-material/SettingsApplications'; // Neues Icon für allgemeine Einstellungen
 
 import { useAuth } from '@/context/AuthContext';
 import { fetchSalons, type Salon } from '@/services/api';
 
-import SettingsApplicationsIcon from '@mui/icons-material/SettingsApplications';
-
 export default function Navbar() {
   const router = useRouter();
+  const theme = useTheme(); // Get theme object
   const { user, logout } = useAuth();
   const isMobile = useMediaQuery('(max-width:1099px)', { noSsr: true });
 
@@ -86,7 +87,7 @@ export default function Navbar() {
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, menu: 'kasse' | 'verwaltung' | 'settings') => {
     clearCloseTimer();
-    closeAllMenus();
+    closeAllMenus(); // Schließe alle *anderen* Menüs
     if (menu === 'kasse') setAnchorElKasse(event.currentTarget);
     else if (menu === 'verwaltung') setAnchorElVerwaltung(event.currentTarget);
     else if (menu === 'settings') setAnchorElSettings(event.currentTarget);
@@ -116,29 +117,32 @@ export default function Navbar() {
       }
     };
     loadSalons();
-  }, [user]);
-  
-  // Effekt zum Aktualisieren der aktiven Salon-ID aus dem Local Storage,
-  // falls sie sich extern ändert (z.B. durch die Einstellungsseite)
+  }, [user]); // Nur von User abhängig
+
+  // Effekt zum Aktualisieren der aktiven Salon-ID aus dem Local Storage
   useEffect(() => {
      const handleStorageChange = () => {
         const storedId = localStorage.getItem('activeSalonId');
         setActiveSalonId(storedId);
      };
+     // Event Listener für Änderungen im Local Storage (durch andere Tabs/Fenster)
      window.addEventListener('storage', handleStorageChange);
-     // Auch auf benutzerdefiniertes Event hören (aus api.ts)
-     window.addEventListener('activeSalonChanged', (event: Event) => {
+     // Auch auf benutzerdefiniertes Event hören (z.B. nach Speichern in Einstellungen)
+     const handleCustomEvent = (event: Event) => {
          setActiveSalonId((event as CustomEvent).detail);
-     });
+     };
+     window.addEventListener('activeSalonChanged', handleCustomEvent);
 
      // Initialen Wert aus Local Storage setzen
      setActiveSalonId(localStorage.getItem('activeSalonId'));
 
+     // Aufräumen beim Unmounten
      return () => {
         window.removeEventListener('storage', handleStorageChange);
-        window.removeEventListener('activeSalonChanged', handleStorageChange); // Event-Listener aufräumen
+        window.removeEventListener('activeSalonChanged', handleCustomEvent);
      };
   }, []); // Nur beim Mounten ausführen
+
 
   useEffect(() => {
     const handleScroll = () => {
@@ -159,7 +163,7 @@ export default function Navbar() {
     localStorage.setItem('activeSalonId', salonId);
     window.dispatchEvent(new CustomEvent('activeSalonChanged', { detail: salonId })); // Event auslösen
     setSalonMenuAnchor(null);
-    // Optional: Seite neu laden, um sicherzustellen, dass alle Daten aktualisiert werden
+    // Seite neu laden, um Datenkonsistenz sicherzustellen
     window.location.reload();
   };
 
@@ -170,11 +174,13 @@ export default function Navbar() {
 
   const activeSalon = salons.find(s => s._id === activeSalonId);
 
+  // --- ANPASSUNG: Name dynamisch einsetzen ---
   const Brand = (
     <Stack direction="row" spacing={1} alignItems="center" sx={{ cursor: 'pointer', transition: 'color 0.3s' }} onClick={() => router.push('/')}>
        <ContentCutIcon sx={{ color: scrolled ? 'primary.main' : 'white' }} />
        <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: '-0.5px', color: scrolled ? 'text.primary' : 'white' }}>
-         MeinFrisör
+         {/* Hier den Namen dynamisch oder statisch einsetzen */}
+         MO's Barbershop
        </Typography>
     </Stack>
   );
@@ -184,9 +190,11 @@ export default function Navbar() {
     opacity: hoveredButton && hoveredButton !== buttonName ? 0.5 : 1,
     transition: 'opacity 0.2s ease-in-out, color 0.3s ease-in-out',
     '&:hover': {
-      color: scrolled ? 'primary.main' : 'white',
+      color: scrolled ? 'primary.main' : 'white', // Beibehaltung des Hover-Effekts
+      opacity: 1, // Volle Deckkraft beim Hovern
     },
   });
+
 
   const renderDropdown = (anchor: HTMLElement | null, items: JSX.Element[]) => (
     <Popper open={Boolean(anchor)} anchorEl={anchor} placement="bottom-start" disablePortal sx={{ zIndex: 1300 /* Höher als AppBar */ }}>
@@ -197,12 +205,12 @@ export default function Navbar() {
     </Popper>
   );
 
+  // --- ADMIN NAVIGATION ---
   const adminNav = user?.role === 'admin' && (
     <Box onMouseLeave={() => setHoveredButton(null)}>
-      {/* Dashboard, Kalender, Termin buchen */}
-      <Button sx={navButtonStyle('dashboard')} onMouseEnter={() => setHoveredButton('dashboard')} onClick={() => router.push('/admin/dashboard')}>Dashboard</Button>
-      <Button sx={navButtonStyle('kalender')} onMouseEnter={() => setHoveredButton('kalender')} onClick={() => router.push('/admin')}>Kalender</Button>
-      <Button sx={navButtonStyle('booking')} onMouseEnter={() => setHoveredButton('booking')} onClick={() => router.push('/booking')}>Termin buchen</Button>
+      <Button sx={navButtonStyle('dashboard')} onMouseEnter={() => {setHoveredButton('dashboard'); closeAllMenus();}} onClick={() => router.push('/admin/dashboard')}>Dashboard</Button>
+      <Button sx={navButtonStyle('kalender')} onMouseEnter={() => {setHoveredButton('kalender'); closeAllMenus();}} onClick={() => router.push('/admin')}>Kalender</Button>
+      <Button sx={navButtonStyle('booking')} onMouseEnter={() => {setHoveredButton('booking'); closeAllMenus();}} onClick={() => router.push('/booking')}>Termin buchen</Button>
 
       {/* Kasse Dropdown */}
       <Box onMouseEnter={(e) => { handleMenuOpen(e, 'kasse'); setHoveredButton('kasse'); }} onMouseLeave={handleMenuLeave} sx={{ position: 'relative', display: 'inline-block' }}>
@@ -223,41 +231,45 @@ export default function Navbar() {
         ])}
       </Box>
 
-      {/* --- EINSTELLUNGEN Dropdown --- */}
+      {/* Einstellungen Dropdown */}
       <Box onMouseEnter={(e) => { handleMenuOpen(e, 'settings'); setHoveredButton('settings'); }} onMouseLeave={handleMenuLeave} sx={{ position: 'relative', display: 'inline-block' }}>
-         {/* Button statt Icon für bessere Klickbarkeit */}
         <Button endIcon={<ArrowDropDownIcon />} sx={navButtonStyle('settings')} startIcon={<SettingsIcon />}>Einstellungen</Button>
         {renderDropdown(anchorElSettings, [
-          // Hauptlink zur neuen Einstellungsseite
-          <MenuItem key="general" onClick={() => handleNavigate('/admin/general')}><SettingsApplicationsIcon fontSize="small" sx={{ mr: 1.5 }} /> Allgemeine Einstellungen</MenuItem>,
+          <MenuItem key="general" onClick={() => handleNavigate('/admin/settings/general')}><SettingsApplicationsIcon fontSize="small" sx={{ mr: 1.5 }} /> Allgemeine Einstellungen</MenuItem>,
           <Divider key="div-settings" />,
-          // Spezifische Unterpunkte bleiben zur schnellen Navigation erhalten
           <MenuItem key="avail" onClick={() => handleNavigate('/admin/availability')}><ScheduleIcon fontSize="small" sx={{ mr: 1.5 }} /> Arbeitszeiten</MenuItem>,
           <MenuItem key="template" onClick={() => handleNavigate('/admin/availability/templates')}><BuildIcon fontSize="small" sx={{ mr: 1.5 }} /> Zeit-Vorlagen</MenuItem>,
         ])}
       </Box>
 
-      {/* Salon Auswahl */}
+      {/* --- ANPASSUNG: Salon Auswahl Button --- */}
        <Button
-        variant={scrolled ? "outlined" : "contained"} // Stil je nach Scroll-Position
-        color="primary"
+        // Der 'variant' wird jetzt rein über den 'scrolled'-Status gesteuert
+        variant={scrolled ? "outlined" : "contained"}
+        color="primary" // Hauptfarbe bleibt Orange
         sx={{
-          color: scrolled ? 'primary.main' : 'white', // Textfarbe anpassen
-          borderColor: scrolled ? 'primary.main' : 'rgba(255,255,255,0.5)', // Randfarbe anpassen
-          bgcolor: scrolled ? 'transparent' : 'rgba(255,255,255,0.1)', // Hintergrund anpassen
+          color: scrolled ? 'primary.main' : 'white', // Text: Orange (gescrollt) oder Weiß (oben)
+          borderColor: scrolled ? 'primary.main' : 'transparent', // Rand: Orange (gescrollt) oder keiner (oben)
+          // Hintergrund: leichter Orangeton (gescrollt) oder dunkleres Orange (oben)
+          bgcolor: scrolled ? theme.palette.primary.light : 'primary.dark',
           '&:hover': {
-            bgcolor: scrolled ? 'rgba(226, 103, 58, 0.08)' : 'rgba(255,255,255,0.2)',
-            borderColor: scrolled ? 'primary.dark' : 'white',
+            // Leichter Hover-Effekt
+            bgcolor: scrolled ? 'rgba(226, 103, 58, 0.15)' : 'primary.main', // Etwas dunkler beim Hover
+            borderColor: scrolled ? 'primary.dark' : 'transparent',
           },
-          ml: 1 // Etwas Abstand
+          ml: 1, // Abstand
+          boxShadow: scrolled ? 'none' : 1, // Leichter Schatten, wenn nicht gescrollt
         }}
         onMouseEnter={() => setHoveredButton('salon')}
         onClick={(e) => setSalonMenuAnchor(e.currentTarget)}
         endIcon={<ArrowDropDownIcon />}
       >
         <Stack direction="row" spacing={1} alignItems="center">
-          <Avatar sx={{ width: 28, height: 28, bgcolor: 'rgba(255,255,255,0.2)', color: 'white' }}><StorefrontIcon fontSize="small" /></Avatar>
-          <Typography sx={{ fontWeight: 600, textTransform: 'none', color: 'inherit' }}>{activeSalon?.name || 'Salon wählen'}</Typography>
+          {/* Avatar bleibt gleich */}
+          <Avatar sx={{ width: 28, height: 28, bgcolor: scrolled ? 'primary.main' : 'rgba(255,255,255,0.2)', color: 'white' }}><StorefrontIcon fontSize="small" /></Avatar>
+          <Typography sx={{ fontWeight: 600, textTransform: 'none', color: 'inherit' }}>
+            {activeSalon?.name || 'Salon wählen'}
+          </Typography>
         </Stack>
       </Button>
 
@@ -273,29 +285,53 @@ export default function Navbar() {
       <Divider orientation="vertical" flexItem sx={{ mx: 1, borderColor: scrolled ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.12)' }} />
     </Box>
   );
-  
-  const userNav = (
+
+   // User Navigation
+   const userNav = (
     <Box onMouseLeave={() => setHoveredButton(null)}>
       {user && user.role !== 'admin' && (
-        <Button sx={navButtonStyle('termine')} onMouseEnter={() => setHoveredButton('termine')} onClick={() => router.push(user.role === 'staff' ? '/staff-dashboard' : '/dashboard')}>Meine Termine</Button>
+        <Button sx={navButtonStyle('termine')} onMouseEnter={() => {setHoveredButton('termine'); closeAllMenus();}} onClick={() => router.push(user.role === 'staff' ? '/staff-dashboard' : '/dashboard')}>Meine Termine</Button>
       )}
-       {/* Button "Termin buchen" speziell für Staff hinzufügen */}
       {user && user.role === 'staff' && (
-        <Button sx={navButtonStyle('booking')} onMouseEnter={() => setHoveredButton('booking')} onClick={() => router.push('/booking')}>Termin buchen</Button>
+        <Button sx={navButtonStyle('booking')} onMouseEnter={() => {setHoveredButton('booking'); closeAllMenus();}} onClick={() => router.push('/booking')}>Termin buchen</Button>
       )}
     </Box>
   );
 
-  const mobileMenuItems = user ? [
-    <MenuItem key="dashboard" onClick={() => handleNavigate(user.role === 'staff' ? '/staff-dashboard' : '/dashboard')}>Meine Termine</MenuItem>,
-    <MenuItem key="booking" onClick={() => handleNavigate('/booking')}>Termin buchen</MenuItem>,
-    <Divider key="divider" />,
-    <MenuItem key="logout" onClick={handleLogout}><LogoutIcon fontSize="small" sx={{ mr: 1.5 }} />Logout</MenuItem>,
+   // Mobile Menü Items
+   const mobileMenuItems = user ? [
+     // Conditionally render Admin items
+     ...(user.role === 'admin' ? [
+        <MenuItem key="m-dash" onClick={() => handleNavigate('/admin/dashboard')}>Dashboard</MenuItem>,
+        <MenuItem key="m-cal" onClick={() => handleNavigate('/admin')}>Kalender</MenuItem>,
+        <MenuItem key="m-book" onClick={() => handleNavigate('/booking')}>Termin buchen</MenuItem>,
+        <Divider key="m-div1" />,
+        <MenuItem key="m-cash-reg" onClick={() => handleNavigate('/admin/cash-register')}>Sofortverkauf</MenuItem>,
+        <MenuItem key="m-cash-close" onClick={() => handleNavigate('/admin/cash-closing')}>Kassenabschluss</MenuItem>,
+         <Divider key="m-div2" />,
+        <MenuItem key="m-catalog" onClick={() => handleNavigate('/admin/catalog')}>Katalog</MenuItem>,
+        <MenuItem key="m-products" onClick={() => handleNavigate('/admin/products')}>Produkte</MenuItem>,
+        <MenuItem key="m-invoices" onClick={() => handleNavigate('/admin/invoices')}>Rechnungen</MenuItem>,
+         <Divider key="m-div3" />,
+         <MenuItem key="m-settings" onClick={() => handleNavigate('/admin/settings/general')}>Einstellungen</MenuItem>,
+         <MenuItem key="m-avail" onClick={() => handleNavigate('/admin/availability')}>Arbeitszeiten</MenuItem>,
+         <MenuItem key="m-template" onClick={() => handleNavigate('/admin/availability/templates')}>Zeit-Vorlagen</MenuItem>,
+         <Divider key="m-div4" />,
+     ] : []),
+      // Conditionally render Staff/User items
+     ...(user.role !== 'admin' ? [
+         <MenuItem key="m-user-dash" onClick={() => handleNavigate(user.role === 'staff' ? '/staff-dashboard' : '/dashboard')}>Meine Termine</MenuItem>,
+        ...(user.role === 'staff' ? [<MenuItem key="m-staff-book" onClick={() => handleNavigate('/booking')}>Termin buchen</MenuItem>] : []), // Nur für Staff
+         <Divider key="m-user-div" />,
+     ] : []),
+    <MenuItem key="m-logout" onClick={handleLogout}><LogoutIcon fontSize="small" sx={{ mr: 1.5 }} />Logout</MenuItem>,
   ] : [
-    <MenuItem key="login" onClick={() => handleNavigate('/login')}><LoginIcon fontSize="small" sx={{ mr: 1.5 }} />Login</MenuItem>,
-    <MenuItem key="booking" onClick={() => handleNavigate('/booking')}><EventAvailableIcon fontSize="small" sx={{ mr: 1.5 }} />Jetzt Buchen</MenuItem>,
+    <MenuItem key="m-login" onClick={() => handleNavigate('/login')}><LoginIcon fontSize="small" sx={{ mr: 1.5 }} />Login</MenuItem>,
+    <MenuItem key="m-register" onClick={() => handleNavigate('/register')}>Registrieren</MenuItem>,
+    <MenuItem key="m-guest-book" onClick={() => handleNavigate('/booking')}><EventAvailableIcon fontSize="small" sx={{ mr: 1.5 }} />Jetzt Buchen</MenuItem>,
   ];
 
+  // AppBar und Toolbar Struktur
   return (
     <AppBar
         position="fixed"
@@ -305,38 +341,45 @@ export default function Navbar() {
             left: '50%',
             transform: 'translateX(-50%)',
             width: { xs: 'calc(100% - 20px)', md: 'calc(100% - 40px)' }, // Schmaler auf Mobilgeräten
-            maxWidth: '1300px', // Etwas breiter für große Bildschirme
+            // --- ANPASSUNG: Breite erhöht ---
+            maxWidth: '1450px', // Breite erhöht
             borderRadius: { xs: '15px', md: '25px'}, // Weniger Rundung auf Mobilgeräten
-            backgroundColor: scrolled ? 'rgba(255, 255, 255, 0.85)' : 'rgba(28, 28, 28, 0.5)',
+            backgroundColor: scrolled ? 'rgba(255, 255, 255, 0.85)' : 'rgba(28, 28, 28, 0.5)', // Zurück zu Dunkelgrau
             backdropFilter: 'blur(10px)',
             border: scrolled ? '1px solid rgba(145, 158, 171, 0.2)' : '1px solid rgba(255, 255, 255, 0.1)',
-            transition: 'background-color 0.3s ease-in-out, border-color 0.3s ease-in-out, top 0.3s, border-radius 0.3s, width 0.3s',
-            zIndex: 1200, // Sicherstellen, dass sie über anderen Elementen liegt
+            transition: 'background-color 0.3s ease-in-out, border-color 0.3s ease-in-out, top 0.3s, border-radius 0.3s, width 0.3s, box-shadow 0.3s',
+            boxShadow: scrolled ? theme.shadows[2] : 'none',
+            zIndex: 1200,
         }}
         >
-      <Container maxWidth="xl">
-        <Toolbar disableGutters sx={{ minHeight: { xs: 56, sm: 64, md: 70 } }}> {/* Höhe angepasst */}
+      <Container maxWidth="xl"> {/* Container auf 'xl' setzen, damit Inhalt die AppBar-Breite nutzen kann */}
+        <Toolbar disableGutters sx={{ minHeight: { xs: 56, sm: 64, md: 70 } }}>
           {Brand}
           <Box sx={{ flexGrow: 1 }} />
 
           {/* Desktop Navigation */}
           {!isMobile && (
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}> {/* Gap reduziert */}
               {user && user.role !== 'admin' && userNav}
               {adminNav}
               {!user ? (
                 <>
                   <Button
                     onClick={() => router.push('/login')}
-                    sx={navButtonStyle('login')} onMouseEnter={() => setHoveredButton('login')}
+                    sx={navButtonStyle('login')} onMouseEnter={() => {setHoveredButton('login'); closeAllMenus();}}
                   >
                     Login
                   </Button>
                   <Button
                     variant="contained"
-                    color="primary"
+                    color={"primary"} // Farbe bleibt primär
                     onClick={() => router.push('/booking')}
-                    sx={{ boxShadow: '0 4px 12px rgba(226,103,58,0.3)', '&:hover': { boxShadow: '0 2px 8px rgba(226,103,58,0.4)' } }} // Angepasster Schatten
+                    sx={{
+                      boxShadow: scrolled ? '0 4px 12px rgba(226,103,58,0.3)' : '0 4px 12px rgba(0,0,0,0.2)',
+                      '&:hover': {
+                         boxShadow: scrolled ? '0 2px 8px rgba(226,103,58,0.4)' : '0 2px 8px rgba(0,0,0,0.3)'
+                      }
+                    }}
                   >
                     Jetzt Buchen
                   </Button>
@@ -364,39 +407,17 @@ export default function Navbar() {
           {isMobile && (
             <Box>
               <IconButton sx={{ color: scrolled ? 'text.primary' : 'white' }} onClick={(e) => setMobileMenuAnchor(e.currentTarget)}><MenuIcon /></IconButton>
-              <Menu anchorEl={mobileMenuAnchor} open={Boolean(mobileMenuAnchor)} onClose={() => setMobileMenuAnchor(null)}>
-                 {/* Admin Menüpunkte für Mobile */}
-                 {user?.role === 'admin' && [
-                    <MenuItem key="m-dash" onClick={() => handleNavigate('/admin/dashboard')}>Dashboard</MenuItem>,
-                    <MenuItem key="m-cal" onClick={() => handleNavigate('/admin')}>Kalender</MenuItem>,
-                    <MenuItem key="m-book" onClick={() => handleNavigate('/booking')}>Termin buchen</MenuItem>,
-                    <Divider key="m-div1" />,
-                    <MenuItem key="m-cash-reg" onClick={() => handleNavigate('/admin/cash-register')}>Sofortverkauf</MenuItem>,
-                    <MenuItem key="m-cash-close" onClick={() => handleNavigate('/admin/cash-closing')}>Kassenabschluss</MenuItem>,
-                     <Divider key="m-div2" />,
-                    <MenuItem key="m-catalog" onClick={() => handleNavigate('/admin/catalog')}>Katalog</MenuItem>,
-                    <MenuItem key="m-products" onClick={() => handleNavigate('/admin/products')}>Produkte</MenuItem>,
-                    <MenuItem key="m-invoices" onClick={() => handleNavigate('/admin/invoices')}>Rechnungen</MenuItem>,
-                     <Divider key="m-div3" />,
-                     <MenuItem key="m-settings" onClick={() => handleNavigate('/admin/settings/general')}>Einstellungen</MenuItem>,
-                     <MenuItem key="m-avail" onClick={() => handleNavigate('/admin/availability')}>Arbeitszeiten</MenuItem>,
-                     <MenuItem key="m-template" onClick={() => handleNavigate('/admin/availability/templates')}>Zeit-Vorlagen</MenuItem>,
-                     <Divider key="m-div4" />,
-                 ]}
-                 {/* User/Staff Menüpunkte für Mobile */}
-                 {user && user.role !== 'admin' && [
-                     <MenuItem key="m-user-dash" onClick={() => handleNavigate(user.role === 'staff' ? '/staff-dashboard' : '/dashboard')}>Meine Termine</MenuItem>,
-                     <MenuItem key="m-user-book" onClick={() => handleNavigate('/booking')}>Termin buchen</MenuItem>,
-                     <Divider key="m-user-div" />,
-                 ]}
-                 {/* Allgemeine Menüpunkte */}
-                 {user ?
-                    <MenuItem key="m-logout" onClick={handleLogout}><LogoutIcon fontSize="small" sx={{ mr: 1.5 }} />Logout</MenuItem>
-                 : [
-                    <MenuItem key="m-login" onClick={() => handleNavigate('/login')}><LoginIcon fontSize="small" sx={{ mr: 1.5 }} />Login</MenuItem>,
-                    <MenuItem key="m-register" onClick={() => handleNavigate('/register')}>Registrieren</MenuItem>,
-                    <MenuItem key="m-guest-book" onClick={() => handleNavigate('/booking')}><EventAvailableIcon fontSize="small" sx={{ mr: 1.5 }} />Jetzt Buchen</MenuItem>,
-                 ]}
+              <Menu anchorEl={mobileMenuAnchor} open={Boolean(mobileMenuAnchor)} onClose={() => setMobileMenuAnchor(null)}
+                // Styling für mobiles Menü
+                 PaperProps={{
+                    sx: {
+                      mt: 1,
+                      boxShadow: 3,
+                      borderRadius: 2,
+                    },
+                }}
+              >
+                 {mobileMenuItems}
               </Menu>
             </Box>
           )}
@@ -405,3 +426,4 @@ export default function Navbar() {
     </AppBar>
   );
 }
+
