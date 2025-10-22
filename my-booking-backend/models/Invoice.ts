@@ -13,8 +13,10 @@ export interface IInvoice extends Document {
   }[];
   redeemedVoucher?: string;
   redeemedAmount?: number;
+  voucherInitialValue?: number;
+  voucherRemainingValue?: number;
   amount: number;
-  paymentMethod: 'cash' | 'card';
+  paymentMethod: 'cash' | 'card' | 'voucher';
   status: 'paid' | 'unpaid' | 'cancelled';
   amountGiven?: number;
   change?: number;
@@ -41,6 +43,8 @@ const invoiceSchema = new Schema({
   },
   redeemedVoucher: { type: String },
   redeemedAmount: { type: Number, default: 0 },
+  voucherInitialValue: { type: Number },
+  voucherRemainingValue: { type: Number },
   amount: { type: Number, required: true },
   paymentMethod: { type: String, required: true, enum: ['cash', 'card', 'voucher'] },
   voucherPayment: {

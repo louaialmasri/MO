@@ -85,6 +85,30 @@ export default function InvoicePage() {
 
                     <Divider sx={{ my: 3 }} />
 
+                    {/* Zahlungsinformationen + ggf. Gutschein-Details */}
+                   <Grid container spacing={2} sx={{ mb: 2 }}>
+                     <Grid size={{xs:12, md:6}}>
+                       <Typography variant="h6" gutterBottom>Zahlungsinformationen</Typography>
+                       <Typography>
+                         Zahlungsmethode:{' '}
+                         {invoice.paymentMethod === 'cash' ? 'Bar' : invoice.paymentMethod === 'voucher' ? 'Gutschein' : 'Karte'}
+                       </Typography>
+                       <Typography>Datum: {dayjs(invoice.date).format('DD.MM.YYYY')}</Typography>
+                     </Grid>
+
+                     {/* NEUER BLOCK FÜR GUTSCHEIN-DETAILS */}
+                     <Grid size={{xs:12, md:6}} >
+                       {invoice.paymentMethod === 'voucher' && invoice.redeemedVoucher && (
+                         <Box sx={{ mt: 1, p: 1, border: '1px solid #eee', borderRadius: 1 }}>
+                            <Typography variant="body2">Gutschein-Code: {invoice.redeemedVoucher}</Typography>
+                            <Typography variant="body2">Guthaben vor Zahlung: {invoice.voucherInitialValue?.toFixed(2)} €</Typography>
+                            <Typography variant="body2" sx={{ color: 'red' }}>Eingelöst: -{invoice.redeemedAmount?.toFixed(2)} €</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Restguthaben: {invoice.voucherRemainingValue?.toFixed(2)} €</Typography>
+                        </Box>
+                       )}
+                     </Grid>
+                   </Grid>
+
                     <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
                         <Stack spacing={1} sx={{ minWidth: '250px', textAlign: 'right' }}>
                             <Stack direction="row" justifyContent="space-between">

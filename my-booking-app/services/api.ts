@@ -92,6 +92,10 @@ export type Invoice = {
   invoiceNumber: string;
   date: string;
   amount: number;
+  redeemedVoucher?: string;
+  redeemedAmount?: number;
+  voucherInitialValue?: number;
+  voucherRemainingValue?: number;
   paymentMethod: 'cash' | 'card' | 'voucher';
   voucherPayment?: VoucherPaymentDetails;
   customer: { firstName: string; lastName: string; email: string; };

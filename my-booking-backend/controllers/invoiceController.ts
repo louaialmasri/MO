@@ -33,7 +33,11 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
     } = req.body;
 
     const salonId = req.salonId;
-    const staffId = req.user?.userId;
+    const itemWithStaff = items && Array.isArray(items) ? items.find(item => item.staffId) : undefined;
+    
+    // Nutze die ID dieses Mitarbeiters. Wenn keiner gefunden wird (z.B. Produktverkauf),
+    // nutze die ID des eingeloggten Benutzers als Fallback.
+    const staffId = itemWithStaff ? itemWithStaff.staffId : req.user?.userId;
 
     if (!salonId || !staffId) {
       throw new Error('Authentifizierung fehlgeschlagen.');
@@ -101,12 +105,16 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
 
     let redeemedAmount = 0;
     let redeemedVoucherCode: string | undefined = undefined;
+    let voucherInitial: number | undefined = undefined;
+    let voucherRemaining: number | undefined = undefined;
 
     if (paymentMethod === 'voucher' && providedVoucherCode) {
         const voucher = await Voucher.findOne({ code: providedVoucherCode, salon: salonId });
         if (!voucher || voucher.currentValue <= 0) {
             throw new Error('Gutschein ist ungültig oder hat kein Guthaben.');
         }
+        // WERT VOR DER TRANSAKTION ERFASSEN
+        voucherInitial = voucher.currentValue;
 
         redeemedAmount = Math.min(finalAmount, voucher.currentValue);
         
@@ -116,6 +124,9 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
 
         finalAmount -= redeemedAmount;
         voucher.currentValue -= redeemedAmount;
+
+        // WERT NACH DER TRANSAKTION ERFASSEN
+        voucherRemaining = voucher.currentValue;
 
         if (voucher.currentValue <= 0) {
             voucher.currentValue = 0;
@@ -153,6 +164,8 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
       discount: discount || null,
       redeemedVoucher: redeemedVoucherCode || null,
       redeemedAmount: redeemedAmount || 0,
+      voucherInitialValue: voucherInitial,
+      voucherRemainingValue: voucherRemaining,
       amount: finalAmount,
       paymentMethod,
       date: today,
@@ -290,6 +303,7 @@ export const processPaymentForBooking = async (req: AuthRequest & SalonRequest, 
                 finalAmount -= redeemedAmount;
 
                 voucher.currentValue -= redeemedAmount;
+
                 if (voucher.currentValue <= 0) {
                     voucher.isActive = false;
                 }
