@@ -235,7 +235,7 @@ export default function Navbar() {
       <Box onMouseEnter={(e) => { handleMenuOpen(e, 'settings'); setHoveredButton('settings'); }} onMouseLeave={handleMenuLeave} sx={{ position: 'relative', display: 'inline-block' }}>
         <Button endIcon={<ArrowDropDownIcon />} sx={navButtonStyle('settings')} startIcon={<SettingsIcon />}>Einstellungen</Button>
         {renderDropdown(anchorElSettings, [
-          <MenuItem key="general" onClick={() => handleNavigate('/admin/settings/general')}><SettingsApplicationsIcon fontSize="small" sx={{ mr: 1.5 }} /> Allgemeine Einstellungen</MenuItem>,
+          <MenuItem key="general" onClick={() => handleNavigate('/admin/general')}><SettingsApplicationsIcon fontSize="small" sx={{ mr: 1.5 }} /> Allgemeine Einstellungen</MenuItem>,
           <Divider key="div-settings" />,
           <MenuItem key="avail" onClick={() => handleNavigate('/admin/availability')}><ScheduleIcon fontSize="small" sx={{ mr: 1.5 }} /> Arbeitszeiten</MenuItem>,
           <MenuItem key="template" onClick={() => handleNavigate('/admin/availability/templates')}><BuildIcon fontSize="small" sx={{ mr: 1.5 }} /> Zeit-Vorlagen</MenuItem>,
