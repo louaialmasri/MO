@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState, useRef, useLayoutEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   fetchServices,
   getAllBookings,
@@ -10,7 +10,9 @@ import {
   fetchAllUsers,
   updateBooking,
   markBookingAsPaid,
-  createBooking, // NEU: Import für die neue Kopier-Funktion
+  createBooking,
+  getCurrentSalon,
+  type OpeningHours,
 } from '@/services/api'
 import dynamic from 'next/dynamic'
 import {
@@ -20,24 +22,31 @@ import {
   Divider,
   List,
   ListItem,
-  ListItemText
+  ListItemText,
+  CircularProgress,
 } from '@mui/material'
 import type { Service } from '@/services/api'
 import dayjs from 'dayjs'
 import 'dayjs/locale/de';
 import AdminBreadcrumbs from '@/components/AdminBreadcrumbs'
+import './calendar-custom.css'
 
 // react-big-calendar + DnD
 import { Calendar as RBCalendar, Views, DateLocalizer } from 'react-big-calendar'
-import moment from 'moment'
+import moment from 'moment' // Keep moment for localizer
 import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css'
 
+// date-fns für min/max Zeitberechnung ---
+import { setHours, setMinutes } from 'date-fns';
+
+
 dayjs.locale('de');
 moment.locale('de');
 
-const localizer: DateLocalizer = (require('react-big-calendar').momentLocalizer)(moment) // keep typescript happy
+// Beibehaltung des moment-Localizers für react-big-calendar
+const localizer: DateLocalizer = (require('react-big-calendar').momentLocalizer)(moment)
 const DnDCalendar = withDragAndDrop(RBCalendar as any)
 
 // Icons
@@ -118,7 +127,12 @@ function AdminPage() {
   const [amountGiven, setAmountGiven] = useState('');
   const [toast, setToast] = useState<{ open: boolean; msg: string; sev: 'success' | 'error' | 'info' }>({ open: false, msg: '', sev: 'success' })
   const [showHistory, setShowHistory] = useState(false);
-  const [copiedBooking, setCopiedBooking] = useState<BookingFull | null>(null); // NEU: State für den Kopiermodus
+  const [copiedBooking, setCopiedBooking] = useState<BookingFull | null>(null);
+
+  // State für Salon-Daten und Kalendergrenzen ---
+  const [salonOpeningHours, setSalonOpeningHours] = useState<OpeningHours[] | null>(null);
+  const [calendarMinTime, setCalendarMinTime] = useState<Date | undefined>(undefined);
+  const [calendarMaxTime, setCalendarMaxTime] = useState<Date | undefined>(undefined);
 
   const staffUsers = useMemo(() => users.filter(u => u.role === 'staff'), [users]);
 
@@ -131,6 +145,7 @@ function AdminPage() {
     return colorMap;
   }, [staffUsers]);
 
+  // Lade Kern-Daten (Termine, Mitarbeiter, Services)
   useEffect(() => {
     if (!user || user.role !== 'admin' || !token) {
       return;
@@ -148,11 +163,85 @@ function AdminPage() {
         setServices(servicesData);
       } catch (error) {
         console.error("Failed to fetch admin data:", error);
-        setToast({ open: true, msg: 'Daten konnten nicht geladen werden.', sev: 'error' });
+        setToast({ open: true, msg: 'Kerndaten konnten nicht geladen werden.', sev: 'error' });
       }
     };
     fetchData();
   }, [user, token, router]);
+
+  // Lade Salon-Öffnungszeiten ---
+  useEffect(() => {
+    if (!token) return;
+
+    const fetchSalonData = async () => {
+      try {
+        const salonData = await getCurrentSalon(token);
+        if (salonData.salon?.openingHours) {
+          setSalonOpeningHours(salonData.salon.openingHours);
+        } else {
+          setSalonOpeningHours(null); // Explizit auf null setzen, falls nicht gefunden
+        }
+      } catch (error) {
+        console.error("Fehler beim Laden der Salon-Öffnungszeiten:", error);
+        setSalonOpeningHours(null); // Auf null setzen bei Fehler
+        setToast({ open: true, msg: 'Öffnungszeiten konnten nicht geladen werden.', sev: 'error' });
+      }
+    };
+    fetchSalonData();
+  }, [token]); // Nur von Token abhängig
+
+  // Setze Kalender min/max basierend auf currentDate und Öffnungszeiten ---
+  useEffect(() => {
+    if (!salonOpeningHours) {
+       // Setze Standardwerte (z.B. 8-20 Uhr), wenn keine Öffnungszeiten geladen werden konnten
+       const defaultMin = setHours(setMinutes(currentDate, 0), 8);
+       // Standard-Max leicht erhöht ---
+       const defaultMax = setHours(setMinutes(currentDate, 1), 20); // 20:01
+       setCalendarMinTime(defaultMin);
+       setCalendarMaxTime(defaultMax);
+       return;
+    }
+
+    const dayOfWeek = currentDate.getDay(); // Sonntag = 0, Montag = 1, ...
+    const hoursRule = salonOpeningHours.find(h => h.weekday === dayOfWeek);
+
+    if (hoursRule && hoursRule.isOpen && hoursRule.open && hoursRule.close) {
+      try {
+        // Parse "HH:mm" strings
+        const [openH, openM] = hoursRule.open.split(':').map(Number);
+        const [closeH, closeM] = hoursRule.close.split(':').map(Number);
+
+        // Erzeuge Date-Objekte für min/max
+        const minTime = setHours(setMinutes(currentDate, openM), openH);
+        let maxTime = setHours(setMinutes(currentDate, closeM), closeH);
+
+        // Eine Minute zur maxTime hinzufügen ---
+        // Wenn die Schließzeit nicht Mitternacht ist, füge eine Minute hinzu
+        if (!(closeH === 0 && closeM === 0)) {
+           maxTime = new Date(maxTime.getTime() + 60000); // + 1 Minute
+        } else {
+           // Fallback für Mitternacht bleibt 23:59
+           maxTime = setHours(setMinutes(currentDate, 59), 23);
+        }
+
+        setCalendarMinTime(minTime);
+        setCalendarMaxTime(maxTime);
+      } catch (e) {
+        console.error("Fehler beim Parsen der Öffnungszeiten:", e);
+        // Fallback bei Parsing-Fehler
+        const defaultMin = setHours(setMinutes(currentDate, 0), 8);
+        const defaultMax = setHours(setMinutes(currentDate, 0), 20);
+        setCalendarMinTime(defaultMin);
+        setCalendarMaxTime(defaultMax);
+      }
+    } else {
+      // Wenn Tag geschlossen ist, einen eingeschränkten Bereich anzeigen
+      const defaultMin = setHours(setMinutes(currentDate, 0), 9);
+      const defaultMax = setHours(setMinutes(currentDate, 0), 17);
+      setCalendarMinTime(defaultMin);
+      setCalendarMaxTime(defaultMax);
+    }
+  }, [currentDate, salonOpeningHours]); // Abhängig vom Datum und den geladenen Zeiten
 
   const openDialogFor = (bookingId: string) => {
     const b = bookings.find(x => x._id === bookingId);
@@ -185,27 +274,24 @@ function AdminPage() {
         const end = new Date(start.getTime() + duration * 60000);
         const staffId = b.staff?._id;
 
-        const customerName = `${b.user.firstName || ''} ${b.user.lastName || ''}`.trim() || b.user.email || 'Kunde';
-
         return {
           id: b._id,
           title: service?.title ?? 'Service',
           start,
           end,
           resourceId: staffId,
-          booking: b, // keep original object for handlers
+          booking: b,
         };
       });
   }, [bookings, services]);
 
-  const calendarResources: CalendarResource[] = useMemo(() => { // <-- Typ hier hinzufügen
+  const calendarResources: CalendarResource[] = useMemo(() => {
     return staffUsers.map(s => ({
       id: s._id,
       title: `${s.firstName} ${s.lastName}`.trim() || s.name || s.email,
     }));
   }, [staffUsers]);
 
-  // Event Drop / Move (react-big-calendar DnD)
   const onEventDrop = async ({ event, start, end, resourceId }: any) => {
     const originalBooking = bookings.find(b => b._id === event.id);
     if (!originalBooking) {
@@ -248,12 +334,11 @@ function AdminPage() {
     }
   }
 
-  // Slot click (react-big-calendar selectable slots)
   const onSelectSlot = async (slotInfo: any) => {
     if (copiedBooking) {
       const { user: cbUser, service } = copiedBooking;
       const staffId = slotInfo.resourceId;
-      const dateTime = slotInfo.start; // Date
+      const dateTime = slotInfo.start;
 
       if (!staffId || !service?._id) {
         setToast({ open: true, msg: 'Mitarbeiter oder Service fehlen.', sev: 'error' });
@@ -271,12 +356,11 @@ function AdminPage() {
       } catch (e: any) {
         setToast({ open: true, msg: e.response?.data?.message || 'Einfügen fehlgeschlagen.', sev: 'error' });
       } finally {
-        setCopiedBooking(null); // Kopiermodus beenden
+        setCopiedBooking(null);
       }
     }
   };
 
-  // Kopieren starten
   const handleStartCopy = () => {
     if (!activeBooking) return;
     setCopiedBooking(activeBooking);
@@ -284,7 +368,6 @@ function AdminPage() {
     closeDialog();
   };
 
-  // Delete booking
   const handleDeleteBooking = async () => {
     if (!activeBooking || !token) return;
     try {
@@ -326,7 +409,6 @@ function AdminPage() {
     }
   };
 
-  // Event styling based on resource (staff)
   const eventStyleGetter = (event: any) => {
     const color = staffColors.get(event.resourceId) || '#8D6E63';
     const style: React.CSSProperties = {
@@ -339,7 +421,6 @@ function AdminPage() {
     return { style };
   };
 
-  // Resource header renderer
   const ResourceHeader = ({ resource }: any) => (
     <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 1, px: 1 }}>
       <Avatar sx={{ bgcolor: staffColors.get(resource.id), width: 40, height: 40, fontSize: '1rem' }}>
@@ -375,40 +456,65 @@ function AdminPage() {
         </Stack>
 
         <Paper sx={{ p: { xs: 1, md: 2 } }}>
-          <DnDCalendar
-            localizer={localizer}
-            events={calendarEvents}
-            defaultView={Views.DAY}
-            views={{ day: true, week: true, agenda: true }}
-            step={15}
-            defaultDate={currentDate}
-            date={currentDate}
-            onNavigate={(date: Date) => setCurrentDate(date)}
-            selectable
-            onSelectEvent={(event: any) => openDialogFor(event.id)}
-            onEventDrop={onEventDrop}
-            onSelectSlot={onSelectSlot}
-            resizable
-            resources={calendarResources}
-            resourceIdAccessor={(resource: any) => (resource as CalendarResource).id}
-            resourceTitleAccessor={(resource: any) => (resource as CalendarResource).title}
-            components={{
-              event: (props: any) => {
-                // Default event display with customer name + title
-                const booking: BookingFull | undefined = props.event.booking;
-                const customerName = booking ? `${booking.user.firstName || ''} ${booking.user.lastName || ''}`.trim() || booking.user.email : '';
-                return (
-                  <div style={{ padding: 2 }}>
-                    <div style={{ fontWeight: 700 }}>{props.title}</div>
-                    <div style={{ fontSize: '0.8rem', opacity: 0.95 }}>{customerName}</div>
-                  </div>
-                );
-              },
-              resourceHeader: ResourceHeader
-            }}
-            eventPropGetter={(event: any) => eventStyleGetter(event)}
-            style={{ height: 'auto', minHeight: 600 }}
-          />
+          {/* Zeige Ladeanzeige, während min/max Zeiten berechnet werden */}
+          {!calendarMinTime || !calendarMaxTime ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 600 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <DnDCalendar
+              localizer={localizer}
+              events={calendarEvents}
+              defaultView={Views.DAY}
+              views={{ day: true, week: true, agenda: true }}
+              step={15}
+              defaultDate={currentDate}
+              date={currentDate}
+              onNavigate={(date: Date) => setCurrentDate(date)}
+              selectable
+              onSelectEvent={(event: any) => openDialogFor(event.id)}
+              onEventDrop={onEventDrop}
+              onSelectSlot={onSelectSlot}
+              resizable
+              resources={calendarResources}
+              resourceIdAccessor={(resource: any) => (resource as CalendarResource).id}
+              resourceTitleAccessor={(resource: any) => (resource as CalendarResource).title}
+              // --- NEU: min und max Zeiten setzen ---
+              min={calendarMinTime}
+              max={calendarMaxTime}
+              // --- Ende Neu ---
+              components={{
+                event: (props: any) => {
+                  const booking: BookingFull | undefined = props.event.booking;
+                  const customerName = booking ? `${booking.user.firstName || ''} ${booking.user.lastName || ''}`.trim() || booking.user.email : '';
+                  return (
+                    <div style={{ padding: 2 }}>
+                      <div style={{ fontWeight: 700 }}>{props.title}</div>
+                      <div style={{ fontSize: '0.8rem', opacity: 0.95 }}>{customerName}</div>
+                    </div>
+                  );
+                },
+                resourceHeader: ResourceHeader
+              }}
+              eventPropGetter={(event: any) => eventStyleGetter(event)}
+              style={{ height: 'auto', minHeight: 600 }}
+              // Deutsche Texte für den Kalender
+              messages={{
+                allDay: 'Ganztägig',
+                previous: 'Zurück',
+                next: 'Weiter',
+                today: 'Heute',
+                month: 'Monat',
+                week: 'Woche',
+                day: 'Tag',
+                agenda: 'Agenda',
+                date: 'Datum',
+                time: 'Zeit',
+                event: 'Termin',
+                noEventsInRange: 'Keine Termine in diesem Zeitraum.',
+              }}
+            />
+          )}
         </Paper>
 
         <Dialog open={openEvent} onClose={closeDialog} fullWidth maxWidth="xs">
@@ -440,7 +546,6 @@ function AdminPage() {
                       {`${activeBooking.user.firstName || ''} ${activeBooking.user.lastName || ''}`.trim() || activeBooking.user.email}
                     </strong>
                   </Typography>
-
                   <Button
                     size="small"
                     startIcon={<HistoryIcon />}
@@ -449,21 +554,20 @@ function AdminPage() {
                   >
                     {showHistory ? 'Verlauf ausblenden' : 'Verlauf anzeigen'}
                   </Button>
-
                   {showHistory && activeBooking.history && activeBooking.history.length > 0 && (
-                      <List dense sx={{ maxHeight: 150, overflowY: 'auto', bgcolor: 'grey.50', p: 1, borderRadius: 1, mt: 1 }}>
-                        {activeBooking.history.slice().reverse().map((entry, index) => {
-                          const executedByName = entry.executedBy ? `${entry.executedBy.firstName || ''} ${entry.executedBy.lastName || ''}`.trim() : 'System';
-                          return (
-                            <ListItem key={index} disableGutters>
-                              <ListItemText
-                                primary={`${translateAction(entry.action)}: ${entry.details || ''}`}
-                                secondary={`Durch ${executedByName} am ${dayjs(entry.timestamp).format('DD.MM.YY HH:mm')}`}
-                              />
-                            </ListItem>
-                          );
-                        })}
-                      </List>
+                    <List dense sx={{ maxHeight: 150, overflowY: 'auto', bgcolor: 'grey.50', p: 1, borderRadius: 1, mt: 1 }}>
+                      {activeBooking.history.slice().reverse().map((entry, index) => {
+                        const executedByName = entry.executedBy ? `${entry.executedBy.firstName || ''} ${entry.executedBy.lastName || ''}`.trim() : 'System';
+                        return (
+                          <ListItem key={index} disableGutters>
+                            <ListItemText
+                              primary={`${translateAction(entry.action)}: ${entry.details || ''}`}
+                              secondary={`Durch ${executedByName} am ${dayjs(entry.timestamp).format('DD.MM.YY HH:mm')}`}
+                            />
+                          </ListItem>
+                        );
+                      })}
+                    </List>
                   )}
                 </>
               )
@@ -480,17 +584,15 @@ function AdminPage() {
               {!editMode && <Button onClick={() => setEditMode(true)}>Bearbeiten</Button>}
             </Box>
             <Box>
-              {/* ANGEPASSTER KOPIEREN-BUTTON */}
               {!editMode && activeBooking && (
-                <Button 
+                <Button
                   startIcon={<ContentCopyIcon />}
-                  onClick={handleStartCopy} // Ruft die neue Funktion auf
+                  onClick={handleStartCopy}
                   sx={{ mr: 1 }}
                 >
                   Kopieren
                 </Button>
               )}
-
               {activeBooking?.status === 'paid' ? (
                 <Button
                   variant="contained"
@@ -535,7 +637,7 @@ function AdminPage() {
           <DialogContent>
             <Stack spacing={2} sx={{ mt: 1, minWidth: '300px' }}>
               <Typography variant="h6">
-                Zu zahlen: <strong>{servicePrice.toFixed(2)} €</strong>
+                Zu zahlen: <strong>{(activeBooking?.service?.price ?? 0).toFixed(2)} €</strong>
               </Typography>
               <TextField
                 label="Gegeben"
@@ -545,8 +647,8 @@ function AdminPage() {
                 InputProps={{ endAdornment: '€' }}
                 autoFocus
               />
-              <Typography variant="h6" color={change > 0 ? 'primary' : 'text.secondary'}>
-                Rückgeld: <strong>{change.toFixed(2)} €</strong>
+              <Typography variant="h6" color={parseFloat(amountGiven) - (activeBooking?.service?.price ?? 0) >= 0 ? 'primary' : 'text.secondary'}>
+                Rückgeld: <strong>{(Math.max(0, parseFloat(amountGiven) - (activeBooking?.service?.price ?? 0))).toFixed(2)} €</strong>
               </Typography>
             </Stack>
           </DialogContent>
@@ -555,7 +657,7 @@ function AdminPage() {
             <Button
               variant="contained"
               onClick={handlePaymentSubmit}
-              disabled={parseFloat(amountGiven) < servicePrice || isNaN(parseFloat(amountGiven))}
+              disabled={parseFloat(amountGiven) < (activeBooking?.service?.price ?? Infinity) || isNaN(parseFloat(amountGiven))}
             >
               Zahlung bestätigen
             </Button>

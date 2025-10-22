@@ -1,32 +1,111 @@
+/* Generelles Styling für den Kalender-Container */
+.rbc-calendar {
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  overflow: hidden; /* Stellt sicher, dass die abgerundeten Ecken wirken */
+}
+
+/* --- Toolbar: "Heute", "Zurück", "Weiter" Buttons --- */
+.rbc-toolbar {
+  padding: 12px;
+  background-color: #f7f7f7; /* Heller Hintergrund für die Leiste */
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.rbc-toolbar .rbc-btn-group button {
+  background-color: white;
+  border: 1px solid #ccc;
+  color: #333;
+  padding: 8px 16px;
+  border-radius: 6px;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+  cursor: pointer;
+}
+
+/* Hover-Effekt für die Buttons */
+.rbc-toolbar .rbc-btn-group button:hover {
+  background-color: #f0f0f0;
+  border-color: #999;
+}
+
+/* "Heute" Button und aktiver Ansicht-Button (Tag, Woche, etc.) */
+.rbc-toolbar .rbc-btn-group button.rbc-active,
+.rbc-toolbar .rbc-btn-group button:active,
+.rbc-toolbar button#rbc-today-button { /* Spezifische ID für den "Heute" Button */
+  background-color: #E2673A; /* Deine primäre orange Farbe */
+  border-color: #E2673A;
+  color: white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.rbc-toolbar button#rbc-today-button:hover {
+    background-color: #c95a32; /* Etwas dunkleres Orange beim Hovern */
+    border-color: #c95a32;
+}
+
+/* Titel in der Toolbar (z.B. "Oktober 2025") */
+.rbc-toolbar-label {
+  font-size: 1.25em;
+  font-weight: 600;
+  color: #333;
+}
+
+
+/* --- Kopfzeile: "Wednesday Oct 22" --- */
+.rbc-header {
+  background-color: #fafafa; /* Sehr heller grauer Hintergrund */
+  border: 0;
+  border-bottom: 1px solid #e0e0e0;
+  padding: 12px 8px;
+  font-weight: 600;
+  color: #555;
+}
+
+/* --- Zeit-Spalte links (09:00, 10:00, etc.) --- */
+.rbc-time-gutter {
+  background-color: #fafafa; /* Gleicher Hintergrund wie die Kopfzeile */
+  border-right: 1px solid #e0e0e0;
+}
+.rbc-time-gutter .rbc-timeslot-group {
+    border-bottom: none; /* Entfernt doppelte Linien */
+}
+
+
+/* --- Haupt-Kalender-Grid (die blauen Felder) --- */
+.rbc-time-view, .rbc-time-header-content {
+  border: 0; /* Entfernt den inneren Rahmen */
+}
+
+/* Vertikale Spalten der Tage */
+.rbc-day-slot .rbc-time-column {
+  background-color: #ffffff; /* Weißer Hintergrund statt blau */
+}
+
+/* Heutigen Tag hervorheben */
+.rbc-day-slot .rbc-today {
+  background-color: #fff9f7; /* Sehr heller Orangeton */
+}
+
+/* Horizontale Zeit-Linien */
+.rbc-timeslot-group {
+  border-bottom: 1px solid #f0f0f0; /* Subtile graue Linien */
+}
+
+/* Event-Styling */
 .rbc-event {
-    background-color: #1976d2; /* Passt zum MUI Primary-Blau */
-    border-radius: 4px;
-    border: none;
-    padding: 2px 5px;
-    color: white;
-    cursor: pointer;
+  border-radius: 6px;
+  padding: 4px 8px;
+  border: none;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+  transition: box-shadow 0.2s, transform 0.2s;
 }
 
-.rbc-event:focus {
-    outline: none;
+.rbc-event:hover {
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  transform: translateY(-1px);
 }
 
+/* Ausgewähltes Event (wenn man darauf klickt) */
 .rbc-event.rbc-selected {
-    background-color: #115293; /* Dunkleres Blau bei Auswahl */
-}
-
-.rbc-time-slot {
-    border-top: 1px solid #eee;
-}
-
-.rbc-time-header-content {
-    border-bottom: 1px solid #ddd;
-}
-
-.rbc-time-view-resources .rbc-time-header-content {
-    border-left: 1px solid #ddd;
-}
-
-.rbc-time-view-resources .rbc-day-slot {
-    border-left: 1px solid #ddd;
+  background-color: #555 !important; /* Dunklerer Hintergrund für ausgewählte Termine */
 }
