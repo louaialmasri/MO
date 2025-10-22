@@ -22,14 +22,23 @@ import {
   ListItem,
   ListItemText
 } from '@mui/material'
-import FullCalendar from '@fullcalendar/react'
-import timeGridPlugin from '@fullcalendar/timegrid'
-import interactionPlugin, { DateClickArg } from '@fullcalendar/interaction' // NEU: DateClickArg importiert
-import resourceTimeGridPlugin from '@fullcalendar/resource-timegrid';
 import type { Service } from '@/services/api'
 import dayjs from 'dayjs'
 import 'dayjs/locale/de';
 import AdminBreadcrumbs from '@/components/AdminBreadcrumbs'
+
+// react-big-calendar + DnD
+import { Calendar as RBCalendar, Views, DateLocalizer } from 'react-big-calendar'
+import moment from 'moment'
+import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop'
+import 'react-big-calendar/lib/css/react-big-calendar.css'
+import 'react-big-calendar/lib/addons/dragAndDrop/styles.css'
+
+dayjs.locale('de');
+moment.locale('de');
+
+const localizer: DateLocalizer = (require('react-big-calendar').momentLocalizer)(moment) // keep typescript happy
+const DnDCalendar = withDragAndDrop(RBCalendar as any)
 
 // Icons
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
@@ -40,7 +49,6 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import HistoryIcon from '@mui/icons-material/History';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 
-dayjs.locale('de');
 
 // --- TYP-DEFINITIONEN ---
 type User = {
@@ -72,6 +80,11 @@ type BookingFull = {
   }[];
 }
 
+type CalendarResource = {
+  id: string;
+  title: string;
+}
+
 // --- HELPER-FUNKTIONEN ---
 const getInitials = (name = '') => name ? name.split(' ').map(n => n[0]).join('').toUpperCase() : '';
 
@@ -87,58 +100,6 @@ const translateAction = (action: string) => {
 
 
 // --- KOMPONENTEN ---
-const CalendarEventContent: React.FC<{ arg: any }> = ({ arg }) => {
-  const eventRef = useRef<HTMLDivElement>(null);
-  const [eventHeight, setEventHeight] = useState(0);
-
-  useLayoutEffect(() => {
-    if (eventRef.current) {
-      setEventHeight(eventRef.current.offsetHeight);
-    }
-  }, [arg.event.start, arg.event.end]);
-
-  const showTime = eventHeight > 20;
-  const showService = eventHeight > 35;
-
-  let timeFontSize = '0.75rem';
-  let customerFontSize = '0.875rem';
-  let serviceFontSize = '0.75rem';
-
-  if (eventHeight < 40) {
-    timeFontSize = '0.65rem';
-    customerFontSize = '0.75rem';
-    serviceFontSize = '0.65rem';
-  } else if (eventHeight < 60) {
-    timeFontSize = '0.7rem';
-    customerFontSize = '0.8rem';
-    serviceFontSize = '0.7rem';
-  }
-
-  return (
-    <Box
-      ref={eventRef}
-      sx={{
-        px: 1, py: '2px', overflow: 'hidden', height: '100%', color: 'white',
-        display: 'flex', flexDirection: 'column',
-      }}
-    >
-      {showTime && (
-        <Typography noWrap sx={{ lineHeight: 1.1, fontWeight: 'bold', fontSize: timeFontSize }}>
-          {dayjs(arg.event.start).format('HH:mm')} - {dayjs(arg.event.end).format('HH:mm')}
-        </Typography>
-      )}
-      <Typography noWrap sx={{ lineHeight: 1.1, fontWeight: 'bold', fontSize: customerFontSize }}>
-        {arg.event.extendedProps.customer}
-      </Typography>
-      {showService && (
-        <Typography noWrap sx={{ lineHeight: 1.1, opacity: 0.9, fontSize: serviceFontSize }}>
-          {arg.event.title}
-        </Typography>
-      )}
-    </Box>
-  );
-};
-
 function AdminPage() {
   const { user, token } = useAuth()
   const router = useRouter()
@@ -229,41 +190,36 @@ function AdminPage() {
         return {
           id: b._id,
           title: service?.title ?? 'Service',
-          start: start.toISOString(),
-          end: end.toISOString(),
+          start,
+          end,
           resourceId: staffId,
-          extendedProps: {
-            customer: customerName,
-          },
-          backgroundColor: staffColors.get(staffId!) || '#8D6E63',
-          borderColor: staffColors.get(staffId!) || '#8D6E63',
+          booking: b, // keep original object for handlers
         };
       });
-  }, [bookings, services, staffColors]);
+  }, [bookings, services]);
 
-  const calendarResources = useMemo(() => {
+  const calendarResources: CalendarResource[] = useMemo(() => { // <-- Typ hier hinzufügen
     return staffUsers.map(s => ({
       id: s._id,
       title: `${s.firstName} ${s.lastName}`.trim() || s.name || s.email,
     }));
   }, [staffUsers]);
 
-  const handleEventDrop = async (info: any) => {
-    const { event } = info;
+  // Event Drop / Move (react-big-calendar DnD)
+  const onEventDrop = async ({ event, start, end, resourceId }: any) => {
     const originalBooking = bookings.find(b => b._id === event.id);
     if (!originalBooking) {
-      info.revert();
+      setToast({ open: true, msg: 'Original-Termindaten nicht gefunden.', sev: 'error' });
       return;
     }
 
-    const newStaffId = event.getResources()[0]?.id;
+    const newStaffId = resourceId || originalBooking.staff?._id;
     if (newStaffId && newStaffId !== originalBooking.staff?._id) {
       const serviceId = originalBooking.service?._id || originalBooking.serviceId;
       const newStaffMember = staffUsers.find(staff => staff._id === newStaffId);
       const hasSkill = newStaffMember?.skills?.some(skill => (typeof skill === 'string' ? skill : skill._id) === serviceId);
 
       if (!hasSkill) {
-        info.revert();
         setToast({
           open: true,
           msg: `Mitarbeiter ${newStaffMember?.firstName} beherrscht diesen Service nicht.`,
@@ -275,30 +231,29 @@ function AdminPage() {
 
     try {
       const payload = {
-        dateTime: event.start.toISOString(),
+        dateTime: start.toISOString(),
         staffId: newStaffId || originalBooking.staff?._id,
       };
       const response = await updateBooking(event.id, payload, token!);
-      
-      if (response) { 
+
+      if (response) {
         setBookings(prev => prev.map(b => b._id === event.id ? response : b));
         setToast({ open: true, msg: 'Termin verschoben!', sev: 'success' });
       } else {
         throw new Error("Ungültige Antwort vom Server");
       }
     } catch (e: any) {
-      info.revert();
+      console.error(e);
       setToast({ open: true, msg: `Verschieben fehlgeschlagen: ${e.response?.data?.message || e.message}`, sev: 'error' });
     }
   }
 
-
-  // NEU: Funktion, die beim Klick auf einen leeren Slot ausgeführt wird
-  const handleDateClick = async (arg: DateClickArg) => {
+  // Slot click (react-big-calendar selectable slots)
+  const onSelectSlot = async (slotInfo: any) => {
     if (copiedBooking) {
-      const { user, service } = copiedBooking;
-      const staffId = arg.resource?.id;
-      const dateTime = arg.dateStr;
+      const { user: cbUser, service } = copiedBooking;
+      const staffId = slotInfo.resourceId;
+      const dateTime = slotInfo.start; // Date
 
       if (!staffId || !service?._id) {
         setToast({ open: true, msg: 'Mitarbeiter oder Service fehlen.', sev: 'error' });
@@ -306,12 +261,12 @@ function AdminPage() {
       }
 
       try {
-        const response = await createBooking(service._id, dateTime, staffId, token!, user._id);
+        const response = await createBooking(service._id, dateTime.toISOString(), staffId, token!, cbUser._id);
         if (response.booking) {
           setBookings(prev => [...prev, response.booking]);
           setToast({ open: true, msg: 'Termin erfolgreich eingefügt!', sev: 'success' });
         } else {
-           throw new Error(response.message || 'Fehler beim Erstellen des Termins');
+          throw new Error(response.message || 'Fehler beim Erstellen des Termins');
         }
       } catch (e: any) {
         setToast({ open: true, msg: e.response?.data?.message || 'Einfügen fehlgeschlagen.', sev: 'error' });
@@ -321,7 +276,7 @@ function AdminPage() {
     }
   };
 
-  // NEU: Funktion, die den Kopiermodus startet
+  // Kopieren starten
   const handleStartCopy = () => {
     if (!activeBooking) return;
     setCopiedBooking(activeBooking);
@@ -329,6 +284,7 @@ function AdminPage() {
     closeDialog();
   };
 
+  // Delete booking
   const handleDeleteBooking = async () => {
     if (!activeBooking || !token) return;
     try {
@@ -370,6 +326,29 @@ function AdminPage() {
     }
   };
 
+  // Event styling based on resource (staff)
+  const eventStyleGetter = (event: any) => {
+    const color = staffColors.get(event.resourceId) || '#8D6E63';
+    const style: React.CSSProperties = {
+      backgroundColor: color,
+      borderColor: color,
+      color: 'white',
+      borderRadius: 6,
+      paddingLeft: 6,
+    };
+    return { style };
+  };
+
+  // Resource header renderer
+  const ResourceHeader = ({ resource }: any) => (
+    <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 1, px: 1 }}>
+      <Avatar sx={{ bgcolor: staffColors.get(resource.id), width: 40, height: 40, fontSize: '1rem' }}>
+        {getInitials(resource.title)}
+      </Avatar>
+      <Typography variant="body1" fontWeight={600}>{resource.title}</Typography>
+    </Stack>
+  );
+
   return (
     <Box sx={{ p: { xs: 2, md: 4 }, backgroundColor: 'background.default', minHeight: '100vh' }}>
       <Container maxWidth="xl" sx={copiedBooking ? { cursor: 'copy' } : {}}>
@@ -396,38 +375,39 @@ function AdminPage() {
         </Stack>
 
         <Paper sx={{ p: { xs: 1, md: 2 } }}>
-          <FullCalendar
-            key={currentDate.toISOString()}
-            plugins={[resourceTimeGridPlugin, interactionPlugin]}
-            initialView="resourceTimeGridDay"
-            initialDate={currentDate}
-            locale="de"
-            allDaySlot={false}
-            headerToolbar={false}
-            height="auto"
-            slotDuration="00:15:00"
-            slotMinTime="09:00:00"
-            slotMaxTime="19:00:00"
-            slotLabelFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
-            eventTimeFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
-            nowIndicator={true}
-            editable={true}
-            droppable={true}
-            resources={calendarResources}
+          <DnDCalendar
+            localizer={localizer}
             events={calendarEvents}
-            eventDrop={handleEventDrop}
-            eventClick={(info) => openDialogFor(info.event.id)}
-            dateClick={handleDateClick} // NEU: dateClick Handler hinzugefügt
-            resourceAreaHeaderContent="Mitarbeiter"
-            resourceLabelContent={(arg) => (
-              <Stack direction="row" spacing={1.5} alignItems="center" sx={{ py: 1.5, px: 1 }}>
-                <Avatar sx={{ bgcolor: staffColors.get(arg.resource.id), width: 40, height: 40, fontSize: '1rem' }}>
-                  {getInitials(arg.resource.title)}
-                </Avatar>
-                <Typography variant="body1" fontWeight={600}>{arg.resource.title}</Typography>
-              </Stack>
-            )}
-            eventContent={(arg) => <CalendarEventContent arg={arg} />}
+            defaultView={Views.DAY}
+            views={{ day: true, week: true, agenda: true }}
+            step={15}
+            defaultDate={currentDate}
+            date={currentDate}
+            onNavigate={(date: Date) => setCurrentDate(date)}
+            selectable
+            onSelectEvent={(event: any) => openDialogFor(event.id)}
+            onEventDrop={onEventDrop}
+            onSelectSlot={onSelectSlot}
+            resizable
+            resources={calendarResources}
+            resourceIdAccessor={(resource: any) => (resource as CalendarResource).id}
+            resourceTitleAccessor={(resource: any) => (resource as CalendarResource).title}
+            components={{
+              event: (props: any) => {
+                // Default event display with customer name + title
+                const booking: BookingFull | undefined = props.event.booking;
+                const customerName = booking ? `${booking.user.firstName || ''} ${booking.user.lastName || ''}`.trim() || booking.user.email : '';
+                return (
+                  <div style={{ padding: 2 }}>
+                    <div style={{ fontWeight: 700 }}>{props.title}</div>
+                    <div style={{ fontSize: '0.8rem', opacity: 0.95 }}>{customerName}</div>
+                  </div>
+                );
+              },
+              resourceHeader: ResourceHeader
+            }}
+            eventPropGetter={(event: any) => eventStyleGetter(event)}
+            style={{ height: 'auto', minHeight: 600 }}
           />
         </Paper>
 

@@ -1,0 +1,32 @@
+.rbc-event {
+    background-color: #1976d2; /* Passt zum MUI Primary-Blau */
+    border-radius: 4px;
+    border: none;
+    padding: 2px 5px;
+    color: white;
+    cursor: pointer;
+}
+
+.rbc-event:focus {
+    outline: none;
+}
+
+.rbc-event.rbc-selected {
+    background-color: #115293; /* Dunkleres Blau bei Auswahl */
+}
+
+.rbc-time-slot {
+    border-top: 1px solid #eee;
+}
+
+.rbc-time-header-content {
+    border-bottom: 1px solid #ddd;
+}
+
+.rbc-time-view-resources .rbc-time-header-content {
+    border-left: 1px solid #ddd;
+}
+
+.rbc-time-view-resources .rbc-day-slot {
+    border-left: 1px solid #ddd;
+}
