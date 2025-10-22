@@ -20,36 +20,28 @@ function generateVoucherCode(): string {
 }
 
 export const createInvoice = async (req: SalonRequest, res: Response) => {
-  // Session / Transaction starten
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
+  // KEINE SESSION ODER TRANSAKTION MEHR NÖTIG FÜR DIE LOKALE ENTWICKLUNG
   try {
-    // Request-Body Felder (inkl. optionaler Felder)
     const {
-      bookingId,
       customerId,
       items,
       paymentMethod,
-      staffId: providedStaffId,
       discount,
       voucherCode: providedVoucherCode,
       amountGiven,
-      voucherPayment, // falls du einen separaten Betrag für Gutschein-Zahlung speicherst
-      totalAmount: providedTotalAmount, // optional (wir berechnen meist selbst)
+      totalAmount // Wir nennen es um, um Verwechslung zu vermeiden
     } = req.body;
 
-    if (!req.user || !req.salonId) {
+    const salonId = req.salonId;
+    const staffId = req.user?.userId;
+
+    if (!salonId || !staffId) {
       throw new Error('Authentifizierung fehlgeschlagen.');
     }
-    const salonId = req.salonId;
-    const staffId = providedStaffId || req.user.userId;
-
     if (!customerId) {
       throw new Error('Kunde ist erforderlich.');
     }
 
-    // Items verarbeiten (Produkte, Services, neue Gutscheine)
     const invoiceItems: { description: string; price: number }[] = [];
     let subTotal = 0;
 
@@ -57,8 +49,7 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
       for (const item of items) {
         switch (item.type) {
           case 'product': {
-            if (!item.id) throw new Error('Produkt-ID fehlt.');
-            const product = await Product.findById(item.id).session(session);
+            const product = await Product.findById(item.id);
             if (!product) throw new Error(`Produkt mit ID ${item.id} nicht gefunden.`);
             if (product.stock < 1) throw new Error(`Produkt "${product.name}" ist nicht mehr auf Lager.`);
 
@@ -66,15 +57,12 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
             subTotal += product.price;
 
             product.stock -= 1;
-            await product.save({ session });
+            await product.save();
             break;
           }
-
           case 'voucher': {
-            // Verkauf eines Gutscheins — neuer Voucher wird erstellt
             if (!item.value || item.value <= 0) throw new Error('Ungültiger Gutscheinwert.');
             const generatedVoucherCode = generateVoucherCode();
-
             const newVoucher = new Voucher({
               code: generatedVoucherCode,
               initialValue: item.value,
@@ -83,122 +71,81 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
               isActive: true,
               createdBy: staffId,
             });
-
-            await newVoucher.save({ session });
-
+            await newVoucher.save();
             invoiceItems.push({ description: `Gutschein: ${generatedVoucherCode}`, price: item.value });
             subTotal += item.value;
             break;
           }
-
           case 'service': {
-            if (!item.id) throw new Error('Dienstleistungs-ID fehlt.');
-            const service = await Service.findById(item.id).session(session);
+            const service = await Service.findById(item.id);
             if (!service) throw new Error(`Dienstleistung mit ID ${item.id} nicht gefunden.`);
-
             invoiceItems.push({ description: `${service.title}`, price: service.price });
             subTotal += service.price;
             break;
           }
-
           default:
             throw new Error(`Unbekannter Artikels-Typ: ${item.type}`);
         }
       }
     }
 
-    // Zwischensumme berechnet — jetzt Rabatt anwenden (falls vorhanden)
     let finalAmount = subTotal;
     if (discount && typeof discount.value === 'number' && discount.value > 0) {
       if (discount.type === 'percentage') {
-        finalAmount = subTotal * (1 - discount.value / 100);
+        finalAmount *= (1 - discount.value / 100);
       } else if (discount.type === 'fixed') {
-        finalAmount = subTotal - discount.value;
+        finalAmount -= discount.value;
       }
     }
-    finalAmount = Math.max(0, Number(finalAmount.toFixed(2))); // auf 2 Dezimalstellen runden
+    finalAmount = Math.max(0, Number(finalAmount.toFixed(2)));
 
-    // --- FALLS client totalAmount mitliefert, optional prüfen ---
-    if (typeof providedTotalAmount === 'number') {
-      // optional: wenn providedTotalAmount deutlich abweicht, könnte man warnen oder Fehler werfen.
-      // Hier nur prüfen (keine Exception), du kannst das Verhalten anpassen:
-      const diff = Math.abs(providedTotalAmount - finalAmount);
-      if (diff > 0.01) {
-        console.warn(
-          `Warnung: providedTotalAmount (${providedTotalAmount}) stimmt nicht exakt mit berechnetem finalAmount (${finalAmount}) überein.`
-        );
-      }
-    }
-
-    // Gutschein-Einlösung (wenn voucherCode angegeben) — reduziert finalAmount
     let redeemedAmount = 0;
     let redeemedVoucherCode: string | undefined = undefined;
-    if (providedVoucherCode) {
-      // Suche Gutschein in Session
-      const voucher = await Voucher.findOne({ code: providedVoucherCode, salon: salonId }).session(session);
-      if (!voucher || voucher.currentValue <= 0) {
-        throw new Error('Gutschein ist ungültig oder hat kein Guthaben.');
-      }
 
-      // Betrag, der durch Gutschein gedeckt werden kann
-      redeemedAmount = Math.min(finalAmount, voucher.currentValue);
-      finalAmount = Number((finalAmount - redeemedAmount).toFixed(2));
+    if (paymentMethod === 'voucher' && providedVoucherCode) {
+        const voucher = await Voucher.findOne({ code: providedVoucherCode, salon: salonId });
+        if (!voucher || voucher.currentValue <= 0) {
+            throw new Error('Gutschein ist ungültig oder hat kein Guthaben.');
+        }
 
-      voucher.currentValue = Number((voucher.currentValue - redeemedAmount).toFixed(2));
-      if (voucher.currentValue <= 0) {
-        voucher.currentValue = 0;
-        voucher.isActive = false;
-      }
-      await voucher.save({ session });
+        redeemedAmount = Math.min(finalAmount, voucher.currentValue);
+        
+        if (redeemedAmount < finalAmount) {
+            throw new Error('Guthaben des Gutscheins reicht nicht aus, um die Rechnung komplett zu bezahlen.');
+        }
 
-      redeemedVoucherCode = voucher.code;
+        finalAmount -= redeemedAmount;
+        voucher.currentValue -= redeemedAmount;
+
+        if (voucher.currentValue <= 0) {
+            voucher.currentValue = 0;
+            voucher.isActive = false;
+        }
+        await voucher.save();
+        redeemedVoucherCode = voucher.code;
     }
 
-    // Spezielle Logik: paymentMethod === 'voucher' — gesamte Zahlung aus Gutschein
-    // Wenn paymentMethod === 'voucher' erwarten wir, dass voucherCode angegeben wurde und genügend Guthaben vorhanden ist.
-    if (paymentMethod === 'voucher') {
-      if (!providedVoucherCode) {
-        throw new Error('Bei Zahlung per Gutschein muss ein Gutschein-Code angegeben werden.');
-      }
 
-      // Wir müssen erneut den Gutschein laden (oder wir behalten voucher oben).
-      // Falls oben bereits voucher geladen war und Gutschein vollständig genutzt wurde, finalAmount wäre 0.
-      // Um die gewünschte Semantik des "Extension"-Beispiels nachzubilden: voucher.currentValue muss >= finalAmount_before_redemption
-      // In unserem Ablauf haben wir den Gutschein bereits für 'redeemedAmount' reduziert. Wenn der intent ist,
-      // dass bei paymentMethod === 'voucher' die komplette Rechnung vom Gutschein bezahlt wird, sollten wir prüfen:
-      // -> if redeemedAmount < originalFinalAmount => Fehler (nicht genug Guthaben)
-      // In unserem Ablauf ist redeemedAmount = min(originalFinalAmount, voucher.currentValue)
-      // So prüfen wir:
-      if (finalAmount > 0) {
-        // Das heißt: Gutschein reichte nicht aus
-        throw new Error('Guthaben des Gutscheins reicht nicht aus, um die Rechnung komplett mit Gutschein zu bezahlen.');
-      }
-    }
-
-    // Falls keine Artikel -> Fehler
     if (invoiceItems.length === 0) {
       throw new Error('Keine Artikel für die Rechnung vorhanden.');
     }
 
-    // Wechselgeld-Berechnung (wenn Betrag gegeben wurde)
     let change = 0;
-    if (typeof amountGiven === 'number' && amountGiven >= finalAmount) {
-      change = Number((amountGiven - finalAmount).toFixed(2));
+    if (paymentMethod === 'cash' && typeof amountGiven === 'number' && amountGiven >= finalAmount) {
+        change = Number((amountGiven - finalAmount).toFixed(2));
     }
 
-    // Rechnungsnummer generieren (Datum + Zähler für den Tag)
+
     const today = new Date();
     const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
     const countToday = await Invoice.countDocuments({
       date: { $gte: dayjs(today).startOf('day').toDate() },
       salon: salonId,
-    }).session(session);
+    });
     const invoiceNumber = `${dateStr}-${countToday + 1}`;
 
-    // Neues Invoice-Objekt zusammenbauen
     const newInvoice = new Invoice({
       invoiceNumber,
-      booking: bookingId || null,
       customer: customerId,
       salon: salonId,
       staff: staffId,
@@ -206,49 +153,22 @@ export const createInvoice = async (req: SalonRequest, res: Response) => {
       discount: discount || null,
       redeemedVoucher: redeemedVoucherCode || null,
       redeemedAmount: redeemedAmount || 0,
-      amount: Number(finalAmount.toFixed(2)),
+      amount: finalAmount,
       paymentMethod,
-      voucherPayment: paymentMethod === 'voucher' ? voucherPayment ?? redeemedAmount : voucherPayment ?? redeemedAmount, // optional
-      voucherCode: paymentMethod === 'voucher' ? providedVoucherCode : providedVoucherCode ?? undefined, // Speichere wenn vorhanden
       date: today,
       status: 'paid',
-      amountGiven: typeof amountGiven === 'number' ? amountGiven : Number(finalAmount.toFixed(2)),
-      change,
+      amountGiven: amountGiven,
+      change: change,
     });
 
-    // Invoice speichern (in Transaction)
-    await newInvoice.save({ session });
+    await newInvoice.save();
 
-    // Booking updaten, falls vorhanden
-    if (bookingId) {
-      await Booking.findByIdAndUpdate(
-        bookingId,
-        { status: 'completed', invoiceNumber: newInvoice.invoiceNumber },
-        { session }
-      );
-    }
+    res.status(201).json(newInvoice);
 
-    // Alles committen
-    await session.commitTransaction();
-
-    // Session beenden
-    session.endSession();
-
-    // Antwort
-    return res.status(201).json(newInvoice);
   } catch (error: any) {
-    // Bei Fehler: Transaction aborten
-    try {
-      await session.abortTransaction();
-    } catch (abortErr) {
-      console.error('Fehler beim Abbrechen der Transaktion:', abortErr);
-    }
-    session.endSession();
-
     console.error('Fehler beim Erstellen der Rechnung:', error);
-    // 400 für validierungsfehler, 500 für serverfehler — hier vereinfacht 400 wenn message vorhanden
-    const status = error && error.message && /nicht|fehl|ungültig/i.test(error.message) ? 400 : 500;
-    return res.status(status).json({ message: error.message || 'Fehler beim Erstellen der Rechnung' });
+    const status = error.message.includes('nicht gefunden') || error.message.includes('erforderlich') ? 404 : 500;
+    res.status(status).json({ message: error.message || 'Fehler beim Erstellen der Rechnung' });
   }
 };
 

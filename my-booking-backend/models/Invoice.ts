@@ -42,7 +42,7 @@ const invoiceSchema = new Schema({
   redeemedVoucher: { type: String },
   redeemedAmount: { type: Number, default: 0 },
   amount: { type: Number, required: true },
-  paymentMethod: { type: String, required: true, enum: ['cash', 'card'] },
+  paymentMethod: { type: String, required: true, enum: ['cash', 'card', 'voucher'] },
   voucherPayment: {
     code: String,
     initialBalance: Number,
