@@ -29,7 +29,7 @@ export const getCurrentSalon = async (req: SalonRequest, res: Response) => {
                 } else {
                     const firstSalon = await Salon.findOne().sort({ createdAt: 1 });
                     if (firstSalon) {
-                         req.salonId = firstSalon._id.toString();
+                         req.salonId = (firstSalon._id as mongoose.Types.ObjectId).toString();
                     }
                 }
             }

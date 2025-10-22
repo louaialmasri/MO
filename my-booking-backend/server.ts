@@ -5,7 +5,7 @@ import cors from 'cors'
 import bodyParser from 'body-parser'
 import authRoutes from './routes/auth'
 import adminRoutes from './routes/admin'
-import mongoose from 'mongoose'
+import mongoose from 'mongoose' // Importiere mongoose vollständig
 import serviceRoutes from './routes/service'
 import bookingRoutes from './routes/booking'
 import userRoutes from './routes/user'
@@ -28,7 +28,7 @@ import voucherRoutes from './routes/voucher';
 import cron from 'node-cron'
 import dayjs from 'dayjs'
 import { Booking } from './models/Booking'
-import { Salon } from './models/Salon' // Salon importieren
+import { Salon, ISalon } from './models/Salon' // ISalon importieren
 import { sendEmail } from './utils/email'
 import de from 'dayjs/locale/de'; // Deutsche Lokalisierung importieren
 
@@ -102,7 +102,8 @@ cron.schedule('0 * * * *', async () => {
 
   try {
     // 1. Finde alle Salons, bei denen Erinnerungen aktiviert sind
-    const salonsToSendReminders = await Salon.find({ 'bookingRules.sendReminderEmails': true }).select('_id name');
+    // KORREKTUR: Typ explizit angeben
+    const salonsToSendReminders: Pick<ISalon, '_id' | 'name'>[] = await Salon.find({ 'bookingRules.sendReminderEmails': true }).select('_id name').lean();
     const salonIdsToSend = salonsToSendReminders.map(s => s._id);
 
     if (salonIdsToSend.length === 0) {
@@ -132,7 +133,8 @@ cron.schedule('0 * * * *', async () => {
     for (const booking of upcomingBookings) {
       // Prüfen, ob der Salon der Buchung Erinnerungen senden soll
       const staffSalonId = booking.staff?.salon?.toString();
-      const salonConfig = salonsToSendReminders.find(s => s._id.toString() === staffSalonId);
+      // KORREKTUR: Typ-sicherer Zugriff auf _id
+      const salonConfig = salonsToSendReminders.find(s => (s._id as mongoose.Types.ObjectId).toString() === staffSalonId);
 
       if (salonConfig && booking.user.email) {
           const salonName = salonConfig.name || "Ihrem Salon"; // Fallback-Name
@@ -181,3 +183,4 @@ mongoose.connect(mongoUri)
       console.error('❌ MongoDB Verbindungsfehler:', err);
       process.exit(1); // Beendet den Prozess bei DB-Fehler
   });
+
