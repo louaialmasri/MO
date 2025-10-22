@@ -140,7 +140,7 @@ export default function DashboardPage() {
   // NEU: Wiederverwendbare Komponente für eine Terminkarte
   const BookingCard = ({ booking, isPast = false }: { booking: BookingWithService, isPast?: boolean }) => (
     // KORREKTUR: Grid-Syntax angepasst
-    <Grid size={{ xs: 12, md: 6, lg: 4 }} key={booking._id}>
+    <Grid item xs={12} md={6} lg={4} key={booking._id}>
       <Card
         sx={{
           height: '100%',

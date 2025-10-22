@@ -331,7 +331,7 @@ export default function BookingPage() {
         return (
           <Grid container spacing={2}>
             {services.map((service) => (
-              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={service._id}>
+              <Grid item xs = {12} sm = {6} md = {4} key={service._id}>
                 <Card
                   variant="outlined"
                   sx={{
@@ -369,7 +369,7 @@ export default function BookingPage() {
               <Typography sx={{ mt: 2, ml: 2 }}>Keine verfügbaren Mitarbeiter für diesen Service gefunden.</Typography>
             ) : (
               staffForService.map((staff) => (
-                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={staff._id}>
+                <Grid item xs = {12} sm = {6} md = {4} key={staff._id}>
                   <Card
                     variant="outlined"
                     sx={{
@@ -399,7 +399,7 @@ export default function BookingPage() {
       case 3:
         return (
           <Grid container spacing={3}>
-            <Grid size={{ xs: 12, md: 5 }}>
+            <Grid item xs = {12} md = {5}>
               <Typography variant="h6" gutterBottom>Wähle ein Datum</Typography>
               <TextField
                 type="date"
@@ -410,7 +410,7 @@ export default function BookingPage() {
               />
             </Grid>
 
-            <Grid size={{ xs: 12, md: 7 }}>
+            <Grid item xs = {12} md = {7}>
               <Typography variant="h6" gutterBottom>Wähle eine Uhrzeit</Typography>
               {loading.slots ? (
                 <CircularProgress />
@@ -486,7 +486,7 @@ export default function BookingPage() {
       {!isFinalizing && (
         <>
           <Grid container spacing={4}>
-            <Grid size={{ xs: 12, md: 4 }}>
+            <Grid item xs = {12} md = {4}>
               <Paper sx={{ p: 2, borderRadius: 4 }}>
                 <Stepper activeStep={activeStep} orientation="vertical">
                   {effectiveSteps.map((label, index) => (
@@ -498,7 +498,7 @@ export default function BookingPage() {
               </Paper>
             </Grid>
 
-            <Grid size={{ xs: 12, md: 8 }}>
+            <Grid item xs = {12} md = {8}>
               <Box sx={{ minHeight: 400 }}>
                 {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
                 {renderStepContent(stepContentIndex)}

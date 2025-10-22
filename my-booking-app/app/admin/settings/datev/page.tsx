@@ -62,22 +62,22 @@ export default function DatevSettingsPage() {
           Trage hier die vom Steuerberater vorgegebenen Konten und Nummern ein. Diese werden für den CSV-Export benötigt.
         </Typography>
         <Grid container spacing={3}>
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid item xs = {12} sm= {6}>
             <TextField fullWidth label="Beraternummer" name="consultantNumber" value={settings.consultantNumber} onChange={handleChange} />
           </Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid item xs = {12} sm= {6}>
             <TextField fullWidth label="Mandantennummer" name="clientNumber" value={settings.clientNumber} onChange={handleChange} />
           </Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid item xs = {12} sm= {6}>
             <TextField fullWidth label="Erlöskonto Dienstleistungen" name="revenueAccountServices" value={settings.revenueAccountServices} onChange={handleChange} helperText="Standard: 8400 (SKR03)" />
           </Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid item xs = {12} sm= {6}>
             <TextField fullWidth label="Erlöskonto Produkte" name="revenueAccountProducts" value={settings.revenueAccountProducts} onChange={handleChange} helperText="Standard: 8400 (SKR03)" />
           </Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid item xs = {12} sm= {6}>
             <TextField fullWidth label="Kassenkonto" name="cashAccount" value={settings.cashAccount} onChange={handleChange} helperText="Standard: 1000 (SKR03)" />
           </Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid item xs = {12} sm= {6}>
             <TextField fullWidth label="Geldtransitkonto (Karte)" name="cardAccount" value={settings.cardAccount} onChange={handleChange} helperText="Standard: 1360 (SKR03)" />
           </Grid>
         </Grid>

@@ -215,7 +215,7 @@ const DashboardContent = () => {
       ) : (
         <>
           <Grid container spacing={3} sx={{ mb: 4 }}>
-            <Grid size={{ xs: 12, sm: 6 }}>
+            <Grid item xs = {12} sm = {6}>
               <Paper sx={{ p: 2.5, boxShadow: CARD_SHADOW, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', ...cardHoverEffect }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                   <Box sx={{ width: 56, height: 56, borderRadius: 2, bgcolor: PRIMARY_LIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -236,7 +236,7 @@ const DashboardContent = () => {
                 </Tooltip>
               </Paper>
             </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
+            <Grid item xs = {12} sm = {6}>
               <Paper sx={{ p: 2.5, boxShadow: CARD_SHADOW, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', ...cardHoverEffect }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                   <Box sx={{ width: 56, height: 56, borderRadius: 2, bgcolor: 'rgba(66,153,225,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -267,7 +267,7 @@ const DashboardContent = () => {
           </Paper>
 
           <Grid container spacing={4}>
-            <Grid size={{ xs: 12, md: 8 }}>
+            <Grid item xs = {12} md = {8}>
               <Paper sx={{ p: 3, boxShadow: CARD_SHADOW, borderRadius: 2, height: '100%', ...cardHoverEffect }}>
                 <Typography variant="h6" fontWeight={700}>Umsatz pro Mitarbeiter</Typography>
                 <Box sx={{ height: 340, mt: 2 }}>
@@ -275,7 +275,7 @@ const DashboardContent = () => {
                 </Box>
               </Paper>
             </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
+            <Grid item xs = {12} md = {4}>
               <Paper sx={{ p: 2.5, boxShadow: CARD_SHADOW, borderRadius: 2, height: '100%', ...cardHoverEffect }}>
                 <Typography variant="h6" fontWeight={700} gutterBottom>Top 5 Dienstleistungen</Typography>
                 <List dense>

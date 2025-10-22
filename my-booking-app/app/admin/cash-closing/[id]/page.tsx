@@ -77,7 +77,7 @@ export default function CashClosingDetailPage() {
 
       <Grid container spacing={4}>
         {/* Linke Spalte: Einnahmen */}
-        <Grid size={{ xs: 12, md: 6 }}>
+        <Grid item xs = {12} md= {6}>
           <Paper variant="outlined" sx={{ p: 3, height: '100%' }}>
             <Typography variant="h6" gutterBottom>Einnahmen gesamt:</Typography>
             <Stack spacing={1.5} mt={2}>
@@ -107,7 +107,7 @@ export default function CashClosingDetailPage() {
         </Grid>
         
         {/* Rechte Spalte: Kassenbewegungen */}
-        <Grid size={{ xs: 12, md: 6 }}>
+        <Grid item xs = {12} md= {6}>
            <Paper variant="outlined" sx={{ p: 3, height: '100%' }}>
               <Typography variant="h6" gutterBottom>Kassenbewegungen:</Typography>
               <Stack spacing={1.5} mt={2}>
@@ -137,7 +137,7 @@ export default function CashClosingDetailPage() {
         </Grid>
         
         {/* Untere Reihe: Zusammenfassung */}
-        <Grid size={{ xs: 12 }}>
+        <Grid item xs = {12}>
             <Paper variant="outlined" sx={{ p: 3, mt: 2, bgcolor: 'grey.50' }}>
                 <Stack spacing={1}>
                     <Stack direction="row" justifyContent="space-between">

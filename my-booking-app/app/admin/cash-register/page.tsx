@@ -195,7 +195,7 @@ export default function CashRegisterPage() {
       <Typography variant="h4" sx={{ my: 4 }}>Kasse / Sofortverkauf</Typography>
       <Grid container spacing={4}>
         {/* Linke Spalte */}
-        <Grid size={{ xs: 12, md: 7 }}>
+        <Grid item xs={12} md={7}>
           <Paper sx={{ p: 2, mb: 2 }}>
             <Typography variant="h6" gutterBottom>Dienstleistungen</Typography>
             <Stack direction="row" spacing={1} alignItems="center">
@@ -232,7 +232,7 @@ export default function CashRegisterPage() {
         </Grid>
 
         {/* Rechte Spalte: Warenkorb */}
-        <Grid size={{ xs: 12, md: 5 }}>
+        <Grid item xs={12} md={5}>
           <Paper sx={{ p: 2, position: 'sticky', top: '80px' }}>
             <Typography variant="h6" gutterBottom>Warenkorb</Typography>
             <Autocomplete

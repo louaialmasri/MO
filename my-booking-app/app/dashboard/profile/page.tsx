@@ -104,19 +104,19 @@ export default function ProfilePage() {
           <Typography variant="h6">Persönliche Daten</Typography>
         </Stack>
         <Grid container spacing={3}>
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid item xs = {12} sm = {6}>
             <TextField fullWidth label="Vorname" name="firstName" value={formData.firstName} onChange={handleFormChange} />
           </Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid item xs = {12} sm = {6}>
             <TextField fullWidth label="Nachname" name="lastName" value={formData.lastName} onChange={handleFormChange} />
           </Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid item xs = {12} sm = {6}>
             <TextField fullWidth label="E-Mail" name="email" value={formData.email} disabled />
           </Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid item xs = {12} sm = {6}>
             <TextField fullWidth label="Handynummer" name="phone" value={formData.phone} onChange={handleFormChange} />
           </Grid>
-          <Grid size={{ xs: 12 }}>
+          <Grid item xs = {12}>
             <TextField fullWidth label="Adresse (optional)" name="address" value={formData.address} onChange={handleFormChange} />
           </Grid>
         </Grid>
@@ -132,13 +132,13 @@ export default function ProfilePage() {
           <Typography variant="h6">Passwort ändern</Typography>
         </Stack>
         <Grid container spacing={3}>
-          <Grid size={{ xs: 12 }}>
+          <Grid item xs = {12}>
             <TextField fullWidth type="password" label="Aktuelles Passwort" name="currentPassword" value={passwordData.currentPassword} onChange={handlePasswordChange} />
           </Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid item xs = {12} sm = {6}>
             <TextField fullWidth type="password" label="Neues Passwort" name="newPassword" value={passwordData.newPassword} onChange={handlePasswordChange} />
           </Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid item xs = {12} sm = {6}>
             <TextField fullWidth type="password" label="Neues Passwort bestätigen" name="confirmPassword" value={passwordData.confirmPassword} onChange={handlePasswordChange} />
           </Grid>
         </Grid>

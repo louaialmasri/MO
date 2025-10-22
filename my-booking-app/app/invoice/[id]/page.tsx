@@ -87,7 +87,7 @@ export default function InvoicePage() {
 
                     {/* Zahlungsinformationen + ggf. Gutschein-Details */}
                    <Grid container spacing={2} sx={{ mb: 2 }}>
-                     <Grid size={{xs:12, md:6}}>
+                     <Grid item xs = {12} md = {6}>
                        <Typography variant="h6" gutterBottom>Zahlungsinformationen</Typography>
                        <Typography>
                          Zahlungsmethode:{' '}
@@ -97,7 +97,7 @@ export default function InvoicePage() {
                      </Grid>
 
                      {/* NEUER BLOCK FÜR GUTSCHEIN-DETAILS */}
-                     <Grid size={{xs:12, md:6}} >
+                     <Grid item xs = {12} md = {6}>
                        {invoice.paymentMethod === 'voucher' && invoice.redeemedVoucher && (
                          <Box sx={{ mt: 1, p: 1, border: '1px solid #eee', borderRadius: 1 }}>
                             <Typography variant="body2">Gutschein-Code: {invoice.redeemedVoucher}</Typography>
@@ -123,17 +123,17 @@ export default function InvoicePage() {
                                     <Box sx={{ mt: 2, p: 2, border: '1px solid', borderColor: 'grey.300', borderRadius: 1 }}>
                                         <Typography variant="h6" gutterBottom>Gutschein-Zahlung</Typography>
                                         <Grid container spacing={1}>
-                                        <Grid size={{xs:6}}><Typography>Gutschein-Code:</Typography></Grid>
-                                        <Grid size={{xs:6}}><Typography align="right">{invoice.voucherPayment.code}</Typography></Grid>
+                                        <Grid item xs = {6}><Typography>Gutschein-Code:</Typography></Grid>
+                                        <Grid item xs = {6}><Typography align="right">{invoice.voucherPayment.code}</Typography></Grid>
                                         
-                                        <Grid size={{xs:6}}><Typography>Guthaben vor Zahlung:</Typography></Grid>
-                                        <Grid size={{xs:6}}><Typography align="right">{invoice.voucherPayment.initialBalance.toFixed(2)} €</Typography></Grid>
+                                        <Grid item xs = {6}><Typography>Guthaben vor Zahlung:</Typography></Grid>
+                                        <Grid item xs = {6}><Typography align="right">{invoice.voucherPayment.initialBalance.toFixed(2)} €</Typography></Grid>
                                         
-                                        <Grid size={{xs:6}}><Typography>Bezahlter Betrag:</Typography></Grid>
-                                        <Grid size={{xs:6}}><Typography align="right">- {invoice.voucherPayment.paidAmount.toFixed(2)} €</Typography></Grid>
+                                        <Grid item xs = {6}><Typography>Bezahlter Betrag:</Typography></Grid>
+                                        <Grid item xs = {6}><Typography align="right">- {invoice.voucherPayment.paidAmount.toFixed(2)} €</Typography></Grid>
                                         
-                                        <Grid size={{xs:6}}><Typography variant="body2" sx={{ fontWeight: 'bold' }}>Neues Guthaben:</Typography></Grid>
-                                        <Grid size={{xs:6}}><Typography align="right" sx={{ fontWeight: 'bold' }}>{invoice.voucherPayment.remainingBalance.toFixed(2)} €</Typography></Grid>
+                                        <Grid item xs = {6}><Typography variant="body2" sx={{ fontWeight: 'bold' }}>Neues Guthaben:</Typography></Grid>
+                                        <Grid item xs = {6}><Typography align="right" sx={{ fontWeight: 'bold' }}>{invoice.voucherPayment.remainingBalance.toFixed(2)} €</Typography></Grid>
                                         </Grid>
                                     </Box>
                                 )}
