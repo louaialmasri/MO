@@ -3,7 +3,7 @@ import mongoose from 'mongoose'
 import { AuthRequest } from '../middlewares/authMiddleware'
 import { StaffSalon } from '../models/StaffSalon'
 import { ServiceSalon } from '../models/ServiceSalon'
-import { User } from '../models/user'
+import { User } from '../models/User'
 import { Service } from '../models/Service'
 
 export const assignStaffToSalon = async (req: AuthRequest, res: Response) => {

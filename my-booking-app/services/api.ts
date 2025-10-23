@@ -38,6 +38,7 @@ export type User = {
   phone?: string;
   skills?: { _id: string; title?: string }[];
   salons?: Salon[]; // Verwendet jetzt den erweiterten Salon-Typ
+  permissions?: string[];
 }
 
 export type Service = {
@@ -529,6 +530,21 @@ export async function updateUserSkills(userId: string, skills: string[], token: 
     headers: { Authorization: `Bearer ${token}` }
   });
   return res.data.user;
+}
+
+// --- NEUE FUNKTION ---
+/**
+ * Aktualisiert die speziellen Berechtigungen für einen Mitarbeiter.
+ * Nur für Admins.
+ * @param staffId ID des Mitarbeiters
+ * @param permissions Array der Berechtigungs-Strings
+ * @param token Admin-Authentifizierungstoken
+ */
+export async function updateStaffPermissions(staffId: string, permissions: string[], token: string): Promise<User> {
+    const res = await api.put(`/staff/${staffId}/permissions`, { permissions }, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return res.data.user; // Erwartet { success: true, user: {...} } vom Backend
 }
 
 export async function deleteUserById(id: string, token: string) {

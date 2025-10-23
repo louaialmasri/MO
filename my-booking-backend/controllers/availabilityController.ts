@@ -3,7 +3,7 @@ import mongoose from 'mongoose'
 import { AuthRequest } from '../middlewares/authMiddleware'
 import { Availability } from '../models/Availability'
 
-import { User } from '../models/user'
+import { User } from '../models/User'
 
 const canManage = (req: AuthRequest, targetStaffId: string) => {
   if (!req.user) return false

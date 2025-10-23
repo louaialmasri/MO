@@ -1,7 +1,9 @@
 import express from 'express';
-import { User } from '../models/user';
+import { User } from '../models/User';
 import { StaffSalon } from '../models/StaffSalon';
 import { SalonRequest } from '../middlewares/activeSalon';
+import { verifyAdmin } from '../middlewares/adminMiddleware';
+import { updateStaffPermissions } from '../controllers/userController';
 
 const router = express.Router();
 
@@ -54,5 +56,8 @@ router.put('/:staffId/skills', async (req, res) => {
         res.status(500).json({ message: 'Fehler beim Aktualisieren der Skills', error });
     }
 });
+
+// Die Berechtigungen eines Mitarbeiters aktualisieren (nur Admins)
+router.put('/:id/permissions', verifyAdmin, updateStaffPermissions);
 
 export default router;

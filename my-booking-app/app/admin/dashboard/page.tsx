@@ -1,16 +1,19 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/context/AuthContext';
-import { getDashboardStats, verifyDashboardPin, downloadDatevExport } from '@/services/api';
+import ProtectedRoute from '../../../components/ProtectedRoute';
+import { useAuth } from '../../../context/AuthContext';
+import { getDashboardStats, verifyDashboardPin, downloadDatevExport } from '../../../services/api'; 
 import {
   Container, Typography, Box, CircularProgress, Paper, Grid, Stack,
-  Button, ButtonGroup, TextField, Collapse, List, ListItem, ListItemText, Tooltip
+  Button, ButtonGroup, TextField, Collapse, List, ListItem, ListItemText, Tooltip, Alert
 } from '@mui/material';
+// KORREKTUR: Korrekter relativer Pfad
 import PinLock from './PinLock';
-import AdminBreadcrumbs from '@/components/AdminBreadcrumbs';
+import AdminBreadcrumbs from '../../../components/AdminBreadcrumbs';
 import dayjs from 'dayjs';
 import { Bar, Line } from 'react-chartjs-2';
+// ... (restliche Imports bleiben gleich) ...
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -28,6 +31,7 @@ import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 
+
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -41,6 +45,7 @@ ChartJS.register(
 );
 
 // --- Typen ---
+// ... (Typen bleiben gleich) ...
 type TopService = {
   name: string;
   totalRevenue: number;
@@ -63,7 +68,9 @@ type DashboardStats = {
   topServices: TopService[];
 };
 
+
 // --- Styling & Hilfsfunktionen ---
+// ... (Styling bleibt gleich) ...
 const PRIMARY = '#E2673A';
 const PRIMARY_LIGHT = 'rgba(226,103,58,0.12)';
 const CARD_SHADOW = '0 8px 20px rgba(15, 15, 15, 0.06)';
@@ -88,6 +95,7 @@ const calculatePercentageChange = (current: number, previous: number) => {
 
 // --- Dashboard-Komponente (unverändert) ---
 const DashboardContent = () => {
+  // ... (Inhalt von DashboardContent bleibt gleich wie in der vorherigen Version) ...
   const { token } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -104,7 +112,7 @@ const DashboardContent = () => {
 
   useEffect(() => {
     const fetchStats = async () => {
-      if (!token) return;
+       if (!token) return;
       setLoading(true);
       let from, to;
 
@@ -123,8 +131,13 @@ const DashboardContent = () => {
           ...data.stats,
           revenueByStaff: data.stats.revenueByStaff.sort((a: RevenueByStaff, b: RevenueByStaff) => b.totalRevenue - a.totalRevenue)
         });
-      } catch (error) {
-        console.error('Fehler beim Laden der Dashboard-Statistiken:', error);
+      } catch (error: any) {
+         if (error.response?.status === 403) {
+            console.warn('Keine Berechtigung zum Abrufen der Dashboard-Statistiken.');
+        } else {
+            console.error('Fehler beim Laden der Dashboard-Statistiken:', error);
+        }
+        setStats(null);
       } finally {
         setLoading(false);
       }
@@ -133,13 +146,13 @@ const DashboardContent = () => {
   }, [token, timeFilter, customDateRange]);
 
   const handleExport = async () => {
-    if (token) {
+     if (token) {
       await downloadDatevExport(exportRange.from, exportRange.to, token);
     }
   };
 
   const lineChartData = {
-    labels: stats?.dailyRevenue.map(d => dayjs(d.date).format('DD.MM')) || [],
+     labels: stats?.dailyRevenue.map(d => dayjs(d.date).format('DD.MM')) || [],
     datasets: [{
       label: 'Täglicher Umsatz',
       data: stats?.dailyRevenue.map(d => d.totalRevenue) || [],
@@ -153,13 +166,13 @@ const DashboardContent = () => {
     }],
   };
   const lineChartOptions: ChartOptions<'line'> = {
-    responsive: true, maintainAspectRatio: false,
+     responsive: true, maintainAspectRatio: false,
     plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `€ ${Number(ctx.parsed.y).toLocaleString('de-DE', { minimumFractionDigits: 2 })}` } } },
     scales: { y: { beginAtZero: true, ticks: { callback: (val) => `€ ${Number(val).toLocaleString('de-DE')}` } }, x: { grid: { display: false } } }
   };
 
   const barChartData = {
-    labels: stats?.revenueByStaff.map(s => s.staffName) || [],
+     labels: stats?.revenueByStaff.map(s => s.staffName) || [],
     datasets: [{
       label: 'Umsatz in €',
       data: stats?.revenueByStaff.map(s => s.totalRevenue) || [],
@@ -169,13 +182,13 @@ const DashboardContent = () => {
     }],
   };
   const barChartOptions: ChartOptions<'bar'> = {
-    responsive: true, maintainAspectRatio: false,
+     responsive: true, maintainAspectRatio: false,
     plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `€ ${Number(ctx.parsed.y).toLocaleString('de-DE', { minimumFractionDigits: 2 })}` } } },
     scales: { y: { beginAtZero: true, ticks: { callback: (val) => `€ ${Number(val).toLocaleString('de-DE')}` } }, x: { grid: { display: false } } },
   };
 
   const renderDateTitle = () => {
-    if (timeFilter === 'today') return dayjs().format('DD. MMMM YYYY');
+     if (timeFilter === 'today') return dayjs().format('DD. MMMM YYYY');
     if (timeFilter === 'week') return `Woche: ${dayjs().startOf('week').format('DD.MM')} - ${dayjs().endOf('week').format('DD.MM.YYYY')}`;
     if (timeFilter === 'month') return dayjs().format('MMMM YYYY');
     if (timeFilter === 'custom') return `${dayjs(customDateRange.from).format('DD.MM.YYYY')} - ${dayjs(customDateRange.to).format('DD.MM.YYYY')}`;
@@ -187,7 +200,7 @@ const DashboardContent = () => {
 
   return (
     <>
-      <AdminBreadcrumbs items={[{ label: 'Mein Salon', href: '/admin' }, { label: 'Dashboard' }]} />
+       <AdminBreadcrumbs items={[{ label: 'Mein Salon', href: '/admin' }, { label: 'Dashboard' }]} />
       <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 2 }}>
         <Box>
           <Typography variant="h4" fontWeight={800}>Umsatz-Dashboard</Typography>
@@ -210,8 +223,10 @@ const DashboardContent = () => {
         </Paper>
       </Collapse>
 
-      {loading || !stats ? (
+      {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', my: 6 }}><CircularProgress /></Box>
+      ) : !stats ? (
+           <Alert severity="warning" sx={{ mt: 3 }}>Keine Statistikdaten verfügbar oder keine Berechtigung zum Anzeigen.</Alert>
       ) : (
         <>
           <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -296,7 +311,7 @@ const DashboardContent = () => {
               </Paper>
             </Grid>
           </Grid>
-          
+
           <Paper sx={{ p: 3, mt: 4, borderRadius: 2, boxShadow: CARD_SHADOW, ...cardHoverEffect }}>
             <Typography variant="h5" fontWeight={700} gutterBottom>DATEV-Export</Typography>
             <Typography color="text.secondary" sx={{ mb: 3 }}>
@@ -331,6 +346,7 @@ const DashboardContent = () => {
           </Paper>
         </>
       )}
+
     </>
   );
 };
@@ -350,17 +366,24 @@ export default function AdminDashboardPage() {
     return await verifyDashboardPin(pin, token);
   };
 
+  // AuthLoading wird jetzt im ProtectedRoute gehandhabt, aber wir lassen es hier noch zur Sicherheit drin
   if (authLoading) {
     return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 5 }}><CircularProgress /></Box>;
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      {isUnlocked ? (
-        <DashboardContent />
-      ) : (
-        <PinLock onPinVerified={handlePinVerified} verifyPin={handleVerifyPin} />
-      )}
-    </Container>
+    // NEU: Ganze Seite mit ProtectedRoute umwickeln
+    // Erlaubt Admins ODER Staff mit der spezifischen Berechtigung
+    <ProtectedRoute permission="dashboard-access" redirectTo="/admin">
+        {/* Die ursprüngliche Logik für die PIN-Sperre bleibt bestehen */}
+        <Container maxWidth="lg" sx={{ py: 4 }}>
+        {isUnlocked ? (
+            <DashboardContent />
+        ) : (
+            <PinLock onPinVerified={handlePinVerified} verifyPin={handleVerifyPin} />
+        )}
+        </Container>
+    </ProtectedRoute>
   );
 }
+

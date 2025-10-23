@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+// KORREKTUR: Verwende Alias-Pfade
 import { useAuth } from '@/context/AuthContext'
 import {
   fetchSalons, createSalonApi, deleteSalonApi,
@@ -14,7 +15,7 @@ import {
   SalonGuard,
   fetchSalonsWithGuards, updateUserRole,
   updateUserSkills,
-} from '@/services/api'
+} from '@/services/api' // KORREKTUR: Verwende Alias-Pfade
 
 import {
   Container, Paper, Tabs, Tab, Divider, Stack, Box, Typography, TextField, MenuItem,
@@ -25,14 +26,16 @@ import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import TuneIcon from '@mui/icons-material/Tune'
 import EditIcon from '@mui/icons-material/Edit';
+import VpnKeyIcon from '@mui/icons-material/VpnKey';
+// KORREKTUR: Verwende Alias-Pfade
 import AdminBreadcrumbs from '@/components/AdminBreadcrumbs'
-import { Phone } from '@mui/icons-material'
+
 
 function fuzzy(txt: string, q: string) { return txt.toLowerCase().includes(q.toLowerCase()) }
 
 export default function AdminCatalogPage() {
   const { user, loading, token } = useAuth()
-  const router = useRouter()
+  const router = useRouter() // router initialisieren
 
   const [tab, setTab] = useState<'staff' | 'services' | 'salons'>('staff')
   const [salons, setSalons] = useState<Salon[]>([])
@@ -80,13 +83,15 @@ export default function AdminCatalogPage() {
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (loading) return
+    // ... (Logik bleibt gleich) ...
+     if (loading) return
     if (!user) return router.replace('/login')
     if (user.role !== 'admin') return router.replace('/')
-  }, [user, loading])
+  }, [user, loading, router]) // router als Abhängigkeit hinzugefügt
 
   useEffect(() => {
-    (async () => {
+    // ... (Logik bleibt gleich) ...
+     (async () => {
       if (!token) return;
       const [salonList, staffList, svcList, serviceCatList] = await Promise.all([
         fetchSalons(), fetchGlobalStaff(), fetchGlobalServices(), fetchServiceCategories(token)
@@ -100,7 +105,8 @@ export default function AdminCatalogPage() {
   }, [token])
 
   useEffect(() => {
-    (async () => {
+    // ... (Logik bleibt gleich) ...
+     (async () => {
       if (!salonId) return
       if (tab === 'staff') {
         setAssignedStaff(await listStaffAssignmentsForSalon(salonId))
@@ -111,6 +117,7 @@ export default function AdminCatalogPage() {
   }, [salonId, tab])
 
   const leftList = useMemo(() => {
+    // ... (Logik bleibt gleich) ...
     const roleOrder = { admin: 1, staff: 2, user: 3 };
 
     if (tab === 'staff') {
@@ -133,6 +140,7 @@ export default function AdminCatalogPage() {
   }, [tab, qLeft, gStaff, gServices, salons, staffFilter])
 
   const rightList = useMemo(() => {
+    // ... (Logik bleibt gleich) ...
     if (tab === 'staff') {
       return qRight ? assignedStaff.filter(s => fuzzy(`${s.firstName || ''} ${s.lastName || ''} ${s.email}`, qRight)) : assignedStaff
     }
@@ -145,6 +153,7 @@ export default function AdminCatalogPage() {
 
   // actions
   const onAssign = async (id: string) => {
+    // ... (Logik bleibt gleich) ...
     if (!salonId) return
     if (tab === 'staff') {
       await assignStaffToSalon(id, salonId)
@@ -157,6 +166,7 @@ export default function AdminCatalogPage() {
     }
   }
   const onApplyOverrides = async () => {
+    // ... (Logik bleibt gleich) ...
     if (!ovrSvc || !salonId) return
     await assignServiceToSalon({
       serviceId: ovrSvc._id, salonId,
@@ -169,7 +179,8 @@ export default function AdminCatalogPage() {
     await reloadGuards()
   }
   const onUnassign = async (id: string) => {
-    if (!salonId) return
+    // ... (Logik bleibt gleich) ...
+     if (!salonId) return
     if (tab === 'staff') {
       await unassignStaffFromSalon(id, salonId)
       setAssignedStaff(await listStaffAssignmentsForSalon(salonId))
@@ -184,7 +195,8 @@ export default function AdminCatalogPage() {
 
   // create global
   const createStaff = async () => {
-    if (!formStaff.email || !formStaff.password || !formStaff.firstName || !formStaff.lastName) {
+    // ... (Logik bleibt gleich) ...
+     if (!formStaff.email || !formStaff.password || !formStaff.firstName || !formStaff.lastName) {
       setToast({ open: true, msg: 'Bitte alle Felder ausfüllen', sev: 'error' })
       return
     }
@@ -201,7 +213,8 @@ export default function AdminCatalogPage() {
   }
 
   const createService = async () => {
-    const { title, price, duration, category } = formService
+    // ... (Logik bleibt gleich) ...
+     const { title, price, duration, category } = formService
     if (!title || !price || !duration || !category) {
       setToast({ open: true, msg: 'Bitte alle Felder inkl. Kategorie ausfüllen', sev: 'error' });
       return;
@@ -213,6 +226,7 @@ export default function AdminCatalogPage() {
   }
 
   const updateService = async () => {
+    // ... (Logik bleibt gleich) ...
     if (!editingServiceId) return;
 
     try {
@@ -238,6 +252,7 @@ export default function AdminCatalogPage() {
   };
 
   const handleCreateServiceCategory = async () => {
+    // ... (Logik bleibt gleich) ...
     if (!newServiceCategoryName.trim()) {
       setToast({ open: true, msg: 'Kategoriename darf nicht leer sein', sev: 'error' });
       return;
@@ -260,6 +275,7 @@ export default function AdminCatalogPage() {
   };
 
   const handleDeleteServiceCategory = async (id: string) => {
+    // ... (Logik bleibt gleich) ...
     try {
       await deleteServiceCategory(id, token!);
       setToast({ open: true, msg: 'Service-Kategorie erfolgreich gelöscht', sev: 'success' });
@@ -271,6 +287,7 @@ export default function AdminCatalogPage() {
   };
 
   const openEditCategoryDialog = (category: ServiceCategory) => {
+    // ... (Logik bleibt gleich) ...
     setEditingCategory(category);
     setNewServiceCategoryName(category.name);
     setDlgServiceCategoryOpen(true);
@@ -278,7 +295,8 @@ export default function AdminCatalogPage() {
 
 
   const createSalon = async () => {
-    if (!formSalon.name) { setToast({ open: true, msg: 'Name erforderlich', sev: 'error' }); return }
+    // ... (Logik bleibt gleich) ...
+     if (!formSalon.name) { setToast({ open: true, msg: 'Name erforderlich', sev: 'error' }); return }
     const s = await createSalonApi({ name: formSalon.name, logoUrl: formSalon.logoUrl || undefined })
     const list = await fetchSalons()
     setSalons(list)
@@ -290,20 +308,23 @@ export default function AdminCatalogPage() {
 
   // delete global
   const deleteStaff = async (id: string) => {
-    await deleteGlobalUser(id)
+    // ... (Logik bleibt gleich) ...
+     await deleteGlobalUser(id)
     setGStaff(await fetchGlobalStaff())
     // entfernt sich ggf. auch aus Zuweisungsliste beim Reload
     if (salonId) setAssignedStaff(await listStaffAssignmentsForSalon(salonId))
     setToast({ open: true, msg: 'Staff gelöscht', sev: 'success' })
   }
   const deleteService = async (id: string) => {
-    await deleteGlobalService(id)
+    // ... (Logik bleibt gleich) ...
+     await deleteGlobalService(id)
     setGServices(await fetchGlobalServices())
     if (salonId) setAssignedServices(await listServiceAssignmentsForSalon(salonId))
     setToast({ open: true, msg: 'Service gelöscht', sev: 'success' })
   }
   const deleteSalon = async (id: string) => {
-    try {
+    // ... (Logik bleibt gleich) ...
+     try {
       await deleteSalonApi(id)
       const list = await fetchSalons()
       setSalons(list)
@@ -318,14 +339,16 @@ export default function AdminCatalogPage() {
   }
 
   const openSkillDialog = (staff: GlobalStaff) => {
-    setCurrentStaff(staff);
+    // ... (Logik bleibt gleich) ...
+     setCurrentStaff(staff);
     const staffSkillIds = new Set((staff.skills || []).map(skill => typeof skill === 'string' ? skill : skill._id));
     setSelectedServices(staffSkillIds);
     setSkillDlgOpen(true);
   };
 
   const handleSkillToggle = (serviceId: string) => {
-    const newSelection = new Set(selectedServices);
+    // ... (Logik bleibt gleich) ...
+     const newSelection = new Set(selectedServices);
     if (newSelection.has(serviceId)) {
       newSelection.delete(serviceId);
     } else {
@@ -335,6 +358,7 @@ export default function AdminCatalogPage() {
   };
 
   const handleSaveSkills = async () => {
+    // ... (Logik bleibt gleich) ...
     if (!currentStaff || !token) return;
     try {
       const skillsArray = Array.from(selectedServices);
@@ -357,7 +381,8 @@ export default function AdminCatalogPage() {
   // Delete-Button letzter Salon
   const [salonGuards, setSalonGuards] = useState<Record<string, SalonGuard>>({})
   useEffect(() => {
-    (async () => {
+    // ... (Logik bleibt gleich) ...
+     (async () => {
       const guards = await fetchSalonsWithGuards()
       setSalonGuards(Object.fromEntries(guards.map(g => [g._id, g])))
     })().catch(() => { })
@@ -365,17 +390,20 @@ export default function AdminCatalogPage() {
 
   // nach Create/Delete unbedingt Guards neu laden:
   const reloadGuards = async () => {
-    const guards = await fetchSalonsWithGuards()
+    // ... (Logik bleibt gleich) ...
+     const guards = await fetchSalonsWithGuards()
     setSalonGuards(Object.fromEntries(guards.map(g => [g._id, g])))
   }
 
   const handleOpenEditStaff = (staff: GlobalStaff) => {
-    setFormEditStaff(staff);
+    // ... (Logik bleibt gleich) ...
+     setFormEditStaff(staff);
     setDlgEditStaffOpen(true);
   };
 
   const handleUpdateStaff = async () => {
-    if (!formEditStaff || !token) return;
+    // ... (Logik bleibt gleich) ...
+     if (!formEditStaff || !token) return;
     try {
       await updateUserRole(formEditStaff._id, formEditStaff.role, token);
       setGStaff(await fetchGlobalStaff());
@@ -387,6 +415,7 @@ export default function AdminCatalogPage() {
   };
 
   const renderSalonsTab = () => (
+    // ... (JSX bleibt gleich) ...
     <>
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
         <TextField size="small" placeholder="Suchen…" value={qLeft} onChange={(e) => setQLeft(e.target.value)} />
@@ -428,7 +457,8 @@ export default function AdminCatalogPage() {
     <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
       {/* LEFT: global katalog */}
       <Paper variant="outlined" sx={{ p: 2, flex: 1, borderRadius: 2 }}>
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+        {/* ... (Suchfeld, Filter, Button bleiben gleich) ... */}
+         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
           <TextField size="small" placeholder="Suchen…" value={qLeft} onChange={(e) => setQLeft(e.target.value)} />
           <FormControl size="small" sx={{ minWidth: 120 }}>
             <InputLabel>Rolle</InputLabel>
@@ -454,6 +484,14 @@ export default function AdminCatalogPage() {
             return (
               <ListItem key={id} secondaryAction={
                 <Stack direction="row" spacing={0.5} alignItems="center">
+                  {/* NEU: Button für Berechtigungen */}
+                  {item.role === 'staff' && (
+                     <Tooltip title="Berechtigungen verwalten">
+                       <IconButton onClick={() => router.push(`/admin/staff/${id}/permissions`)}>
+                         <VpnKeyIcon />
+                       </IconButton>
+                     </Tooltip>
+                  )}
                   {item.role === 'staff' && (
                     <Tooltip title="Fähigkeiten bearbeiten"><IconButton onClick={() => openSkillDialog(item)}><TuneIcon /></IconButton></Tooltip>
                   )}
@@ -462,7 +500,8 @@ export default function AdminCatalogPage() {
                   <Tooltip title="Global löschen"><IconButton color="error" onClick={() => deleteStaff(id)}><DeleteIcon /></IconButton></Tooltip>
                 </Stack>
               }>
-                <ListItemText
+                {/* ... (ListItemText bleibt gleich) ... */}
+                 <ListItemText
                   primary={`${item.firstName} ${item.lastName}`}
                   secondary={<Chip label={item.role} size="small" color={item.role === 'admin' ? 'secondary' : item.role === 'staff' ? 'primary' : 'default'} />}
                   secondaryTypographyProps={{ component: 'div' }}
@@ -474,7 +513,8 @@ export default function AdminCatalogPage() {
       </Paper>
 
       {/* RIGHT: zugeordnet im Salon */}
-      <Paper variant="outlined" sx={{ p: 2, flex: 1, borderRadius: 2 }}>
+      {/* ... (Rechte Spalte bleibt gleich) ... */}
+       <Paper variant="outlined" sx={{ p: 2, flex: 1, borderRadius: 2 }}>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
           <Typography fontWeight={700}>Zugeordnet: {salons.find(s => s._id === salonId)?.name || ''}</Typography>
           <Box sx={{ flex: 1 }} />
@@ -499,7 +539,8 @@ export default function AdminCatalogPage() {
   );
 
   const renderServicesTab = () => (
-    <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+    // ... (JSX bleibt gleich) ...
+     <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
       <Paper variant="outlined" sx={{ p: 2, flex: 2, borderRadius: 2 }}>
         {/* Globale Service-Liste */}
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
@@ -603,7 +644,8 @@ export default function AdminCatalogPage() {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <AdminBreadcrumbs items={[{ label: 'Mein Salon', href: '/admin' }, { label: 'Katalog & Zuordnungen' }]} />
+      {/* ... (Breadcrumbs, Titel, Tabs bleiben gleich) ... */}
+       <AdminBreadcrumbs items={[{ label: 'Mein Salon', href: '/admin' }, { label: 'Katalog & Zuordnungen' }]} />
 
       <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h4" fontWeight={800} sx={{ flex: 1 }}>Katalog & Zuordnungen</Typography>
@@ -628,8 +670,10 @@ export default function AdminCatalogPage() {
         </Box>
       </Paper>
 
+
       {/* DIALOGS */}
-      <Dialog open={dlgStaffOpen} onClose={() => setDlgStaffOpen(false)} fullWidth maxWidth="sm">
+      {/* ... (Alle Dialoge bleiben unverändert) ... */}
+        <Dialog open={dlgStaffOpen} onClose={() => setDlgStaffOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Neuen Staff-Mitarbeiter anlegen</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
           <TextField label="Vorname" value={formStaff.firstName} onChange={e => setFormStaff(p => ({ ...p, firstName: e.target.value }))} />
@@ -781,6 +825,7 @@ export default function AdminCatalogPage() {
         </DialogActions>
       </Dialog>
 
+
       <Snackbar open={toast.open} autoHideDuration={2200} onClose={() => setToast(p => ({ ...p, open: false }))}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         <Alert severity={toast.sev} variant="filled" onClose={() => setToast(p => ({ ...p, open: false }))}>
@@ -790,3 +835,4 @@ export default function AdminCatalogPage() {
     </Container>
   )
 }
+

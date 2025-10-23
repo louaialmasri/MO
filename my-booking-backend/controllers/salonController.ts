@@ -2,7 +2,7 @@ import { Response } from 'express'
 import mongoose, { Types } from 'mongoose'
 import { AuthRequest } from '../middlewares/authMiddleware'
 import { Salon, ISalon } from '../models/Salon' // ISalon importiert
-import { User } from '../models/user'
+import { User } from '../models/User'
 import { Service } from '../models/Service'
 import { Booking } from '../models/Booking'
 import { Availability } from '../models/Availability'
