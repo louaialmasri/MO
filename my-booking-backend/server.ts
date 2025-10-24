@@ -3,6 +3,9 @@ dotenv.config()
 import express from 'express'
 import cors from 'cors'
 import bodyParser from 'body-parser'
+// --- NEU: verifyToken hier importieren ---
+import { verifyToken } from './middlewares/authMiddleware'
+// --- Ende NEU ---
 import authRoutes from './routes/auth'
 import adminRoutes from './routes/admin'
 import mongoose from 'mongoose' // Importiere mongoose vollständig
@@ -68,11 +71,18 @@ app.options('*', cors({ // Preflight-Requests erlauben
 app.use(bodyParser.json())
 
 // --- Routen ---
-// Reihenfolge beachten: activeSalon Middleware *vor* den Routen, die sie benötigen.
-app.use('/api', authRoutes) // Auth hat keine Salon-Abhängigkeit per se
-app.use('/api', adminRoutes) // Admin-spezifische, nicht Salon-gebundene Routen
+// Auth hat keine Token-Abhängigkeit (logisch)
+app.use('/api', authRoutes)
 
-// Routen, die potenziell eine aktive Salon-ID benötigen
+// --- NEU: verifyToken hier global anwenden für alle nachfolgenden Routen ---
+app.use('/api', verifyToken);
+// --- Ende NEU ---
+
+// Admin-spezifische, nicht Salon-gebundene Routen (jetzt ohne explizites verifyToken)
+app.use('/api', adminRoutes)
+
+// Routen, die potenziell eine aktive Salon-ID benötigen (jetzt ohne explizites verifyToken)
+// activeSalon wird weiterhin pro Route/Gruppe angewendet, da es von req.user abhängt (das verifyToken jetzt setzt)
 app.use('/api/services', activeSalon, serviceRoutes)
 app.use('/api/bookings', activeSalon, bookingRoutes)
 app.use('/api/users', activeSalon, userRoutes)
@@ -82,17 +92,17 @@ app.use('/api/salons', activeSalon, salonRoutes) // Auch Salon-Routen brauchen g
 app.use('/api/assignments', activeSalon, assignmentRoutes)
 app.use('/api/admin', activeSalon, adminCatalogRoutes) // Admin-Katalog braucht Salon-Kontext
 app.use('/api/availability-templates', activeSalon, availabilityTemplateRoutes)
-app.use('/api/staff', activeSalon, staffRoutes);
+app.use('/api/staff', activeSalon, staffRoutes); // staffRoutes braucht jetzt kein verifyToken mehr
 app.use('/api/invoices', activeSalon, invoiceRoutes);
 app.use('/api/cash-closings', activeSalon, cashClosingRoutes);
 app.use('/api/product-categories', activeSalon, productCategoryRoutes);
 app.use('/api/products', activeSalon, productRoutes);
 app.use('/api/service-categories', activeSalon, serviceCategoryRoutes);
-app.use('/api/dashboard', activeSalon, dashboardRoutes);
+app.use('/api/dashboard', activeSalon, dashboardRoutes); // dashboardRoutes braucht jetzt kein verifyToken mehr
 app.use('/api/export', activeSalon, exportRoutes);
 app.use('/api/vouchers', activeSalon, voucherRoutes);
 
-// --- CRONJOB FÜR TERMINERINNERUNGEN (ANGEPASST) ---
+// --- CRONJOB FÜR TERMINERINNERUNGEN (unverändert) ---
 cron.schedule('0 * * * *', async () => {
   console.log('[Cronjob] Suche nach anstehenden Terminen für Erinnerungen...');
 
@@ -183,4 +193,3 @@ mongoose.connect(mongoUri)
       console.error('❌ MongoDB Verbindungsfehler:', err);
       process.exit(1); // Beendet den Prozess bei DB-Fehler
   });
-

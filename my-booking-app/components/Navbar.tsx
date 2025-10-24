@@ -20,7 +20,8 @@ import {
   MenuItem,
   Popper,
   Menu,
-  useTheme // Import useTheme hook
+  useTheme, // Import useTheme hook
+  Tooltip, // <<< NEU: Import für Tooltip
 } from '@mui/material';
 
 import MenuIcon from '@mui/icons-material/Menu';
@@ -41,6 +42,8 @@ import ContentCutIcon from '@mui/icons-material/ContentCut';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import SettingsApplicationsIcon from '@mui/icons-material/SettingsApplications'; // Neues Icon für allgemeine Einstellungen
 
+import DashboardIcon from '@mui/icons-material/Dashboard'; // <<< NEU: Import für Dashboard Icon
+
 import { useAuth } from '@/context/AuthContext';
 import { fetchSalons, type Salon } from '@/services/api';
 
@@ -58,6 +61,7 @@ export default function Navbar() {
   const [anchorElKasse, setAnchorElKasse] = useState<null | HTMLElement>(null);
   const [anchorElVerwaltung, setAnchorElVerwaltung] = useState<null | HTMLElement>(null);
   const [anchorElSettings, setAnchorElSettings] = useState<null | HTMLElement>(null);
+  const [anchorElUser, setAnchorElUser] = useState<null | HTMLElement>(null); // <<< NEU: State für User-Menü
 
   const [salons, setSalons] = useState<Salon[]>([]);
   const [activeSalonId, setActiveSalonId] = useState<string | null>(null);
@@ -74,6 +78,7 @@ export default function Navbar() {
     setAnchorElSettings(null);
     setMobileMenuAnchor(null); // Auch mobiles Menü schließen
     setSalonMenuAnchor(null); // Auch Salon-Menü schließen
+    setAnchorElUser(null); // <<< NEU: User-Menü schließen
   };
 
   const handleMenuLeave = () => {
@@ -92,6 +97,15 @@ export default function Navbar() {
     else if (menu === 'verwaltung') setAnchorElVerwaltung(event.currentTarget);
     else if (menu === 'settings') setAnchorElSettings(event.currentTarget);
   };
+
+  // <<< NEU: Handler für User-Menü (Öffnen/Schließen) ---
+  const handleOpenUserMenu = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorElUser(event.currentTarget);
+  };
+  const handleCloseUserMenu = () => {
+    setAnchorElUser(null);
+  };
+  // --- ENDE: Handler für User-Menü ---
 
   useEffect(() => {
     if (user?.role !== 'admin') return;
@@ -157,6 +171,19 @@ export default function Navbar() {
     closeAllMenus(); // Alle Menüs schließen beim Logout
     router.push('/login');
   };
+
+  // <<< NEU: handleProfile Funktion für Profil-Menü ---
+  const handleProfile = () => {
+    handleCloseUserMenu(); // Schließt nur das User-Menü
+    if(user?.role === 'admin') {
+      router.push('/admin'); // Admin-Hauptseite (Kalender)
+    } else if (user?.role === 'staff') {
+      router.push('/staff-dashboard'); // Staff-Hauptseite
+    } else {
+      router.push('/dashboard'); // Kunden-Dashboard
+    }
+  }
+  // --- ENDE: handleProfile ---
 
   const handleSalonChange = (salonId: string) => {
     setActiveSalonId(salonId);
@@ -286,19 +313,67 @@ export default function Navbar() {
     </Box>
   );
 
-   // User Navigation
+   // <<< START: User Navigation (STARK ERWEITERT) ---
    const userNav = (
-    <Box onMouseLeave={() => setHoveredButton(null)}>
-      {user && user.role !== 'admin' && (
-        <Button sx={navButtonStyle('termine')} onMouseEnter={() => {setHoveredButton('termine'); closeAllMenus();}} onClick={() => router.push(user.role === 'staff' ? '/staff-dashboard' : '/dashboard')}>Meine Termine</Button>
+    <Box onMouseLeave={() => setHoveredButton(null)} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+      {/* --- START: Dynamische Links für Staff (Desktop) --- */}
+      {user?.role === 'staff' && user.permissions?.includes('dashboard-access') && (
+        <Button
+          onClick={() => router.push('/admin/dashboard')}
+          variant="outlined"
+          startIcon={<DashboardIcon />}
+          sx={{
+            ...navButtonStyle('staff-dashboard'), // Wende den Button-Style an
+            color: scrolled ? 'primary.main' : 'white', // Überschreibe Farbe für Outlined-Button
+            borderColor: scrolled ? 'primary.main' : 'rgba(255, 255, 255, 0.5)',
+            '&:hover': {
+              borderColor: scrolled ? 'primary.dark' : 'white',
+              backgroundColor: scrolled ? 'rgba(226, 103, 58, 0.08)' : 'rgba(255, 255, 255, 0.1)',
+            }
+          }}
+          onMouseEnter={() => {setHoveredButton('staff-dashboard'); closeAllMenus();}}
+        >
+          Dashboard
+        </Button>
       )}
-      {user && user.role === 'staff' && (
+      {user?.role === 'staff' && user.permissions?.includes('cash-register-access') && (
+        <Button
+          onClick={() => router.push('/admin/cash-register')}
+          variant="outlined"
+          startIcon={<PointOfSaleIcon />}
+           sx={{
+            ...navButtonStyle('staff-kasse'), // Wende den Button-Style an
+            color: scrolled ? 'primary.main' : 'white', // Überschreibe Farbe für Outlined-Button
+            borderColor: scrolled ? 'primary.main' : 'rgba(255, 255, 255, 0.5)',
+            '&:hover': {
+              borderColor: scrolled ? 'primary.dark' : 'white',
+              backgroundColor: scrolled ? 'rgba(226, 103, 58, 0.08)' : 'rgba(255, 255, 255, 0.1)',
+            }
+          }}
+          onMouseEnter={() => {setHoveredButton('staff-kasse'); closeAllMenus();}}
+        >
+          Kasse
+        </Button>
+      )}
+      {/* --- ENDE: Dynamische Links für Staff (Desktop) --- */}
+
+      {/* Standard-Link für Staff/User */}
+      {(user?.role === 'staff') && (
+          <Button sx={navButtonStyle('termine')} onMouseEnter={() => {setHoveredButton('termine'); closeAllMenus();}} onClick={() => router.push('/staff-dashboard')}>Meine Termine</Button>
+      )}
+      {(user?.role === 'user') && (
+          <Button sx={navButtonStyle('termine')} onMouseEnter={() => {setHoveredButton('termine'); closeAllMenus();}} onClick={() => router.push('/dashboard')}>Meine Termine</Button>
+      )}
+      
+      {/* 'Termin buchen' für Staff bleibt erhalten */}
+      {user?.role === 'staff' && (
         <Button sx={navButtonStyle('booking')} onMouseEnter={() => {setHoveredButton('booking'); closeAllMenus();}} onClick={() => router.push('/booking')}>Termin buchen</Button>
       )}
     </Box>
   );
+  // --- ENDE: User Navigation ---
 
-   // Mobile Menü Items
+   // <<< START: Mobile Menü Items (ERWEITERT) ---
    const mobileMenuItems = user ? [
      // Conditionally render Admin items
      ...(user.role === 'admin' ? [
@@ -313,23 +388,54 @@ export default function Navbar() {
         <MenuItem key="m-products" onClick={() => handleNavigate('/admin/products')}>Produkte</MenuItem>,
         <MenuItem key="m-invoices" onClick={() => handleNavigate('/admin/invoices')}>Rechnungen</MenuItem>,
          <Divider key="m-div3" />,
-         <MenuItem key="m-settings" onClick={() => handleNavigate('/admin/settings/general')}>Einstellungen</MenuItem>,
+         <MenuItem key="m-settings" onClick={() => handleNavigate('/admin/general')}>Einstellungen</MenuItem>,
          <MenuItem key="m-avail" onClick={() => handleNavigate('/admin/availability')}>Arbeitszeiten</MenuItem>,
          <MenuItem key="m-template" onClick={() => handleNavigate('/admin/availability/templates')}>Zeit-Vorlagen</MenuItem>,
          <Divider key="m-div4" />,
      ] : []),
-      // Conditionally render Staff/User items
-     ...(user.role !== 'admin' ? [
-         <MenuItem key="m-user-dash" onClick={() => handleNavigate(user.role === 'staff' ? '/staff-dashboard' : '/dashboard')}>Meine Termine</MenuItem>,
-        ...(user.role === 'staff' ? [<MenuItem key="m-staff-book" onClick={() => handleNavigate('/booking')}>Termin buchen</MenuItem>] : []), // Nur für Staff
-         <Divider key="m-user-div" />,
+
+      // --- START: Staff/User Sektion ---
+      // Standard-Link für Staff
+     ...(user.role === 'staff' ? [
+         <MenuItem key="m-user-dash" onClick={() => handleNavigate('/staff-dashboard')}>Meine Termine</MenuItem>,
+         <MenuItem key="m-staff-book" onClick={() => handleNavigate('/booking')}>Termin buchen</MenuItem>
      ] : []),
+     // Standard-Link für User
+     ...(user.role === 'user' ? [
+         <MenuItem key="m-user-dash" onClick={() => handleNavigate('/dashboard')}>Meine Termine</MenuItem>
+     ] : []),
+
+     // --- START: Dynamische Links für Staff (Mobil) ---
+     ...(user.role === 'staff' && user.permissions?.includes('dashboard-access') ? [
+        <MenuItem key="m-staff-admin-dashboard" onClick={() => handleNavigate('/admin/dashboard')}>
+            <ListItemIcon><DashboardIcon fontSize="small" /></ListItemIcon>
+            <ListItemText>Dashboard</ListItemText>
+        </MenuItem>
+     ] : []),
+     ...(user.role === 'staff' && user.permissions?.includes('cash-register-access') ? [
+        <MenuItem key="m-staff-admin-cash" onClick={() => handleNavigate('/admin/cash-register')}>
+            <ListItemIcon><PointOfSaleIcon fontSize="small" /></ListItemIcon>
+            <ListItemText>Kasse</ListItemText>
+        </MenuItem>
+     ] : []),
+     // --- ENDE: Dynamische Links für Staff (Mobil) ---
+     
+     ...(user.role !== 'admin' ? [<Divider key="m-user-div" />] : []), // Trennlinie für Staff/User
+     // --- ENDE: Staff/User Sektion ---
+
+    // Profil & Logout Links (ersetzen alten Logout)
+    <MenuItem key="m-profile" onClick={handleProfile}>
+        <ListItemIcon><Avatar sx={{ width: 24, height: 24, fontSize: '0.8rem' }} alt={user.firstName || 'User'} src="/static/images/avatar/2.jpg" /></ListItemIcon>
+        <ListItemText>{user.role === 'admin' ? 'Admin-Center' : 'Mein Konto'}</ListItemText>
+    </MenuItem>,
     <MenuItem key="m-logout" onClick={handleLogout}><LogoutIcon fontSize="small" sx={{ mr: 1.5 }} />Logout</MenuItem>,
+
   ] : [
     <MenuItem key="m-login" onClick={() => handleNavigate('/login')}><LoginIcon fontSize="small" sx={{ mr: 1.5 }} />Login</MenuItem>,
     <MenuItem key="m-register" onClick={() => handleNavigate('/register')}>Registrieren</MenuItem>,
     <MenuItem key="m-guest-book" onClick={() => handleNavigate('/booking')}><EventAvailableIcon fontSize="small" sx={{ mr: 1.5 }} />Jetzt Buchen</MenuItem>,
   ];
+  // --- ENDE: Mobile Menü Items ---
 
   // AppBar und Toolbar Struktur
   return (
@@ -385,20 +491,40 @@ export default function Navbar() {
                   </Button>
                 </>
               ) : (
-                <Button
-                  variant="outlined"
-                  onClick={handleLogout}
-                  sx={{
-                    color: scrolled ? 'primary.main' : 'white',
-                    borderColor: scrolled ? 'primary.main' : 'rgba(255,255,255,0.5)',
-                    '&:hover': {
-                      backgroundColor: scrolled ? 'rgba(226, 103, 58, 0.08)' : 'rgba(255, 255, 255, 0.1)',
-                      borderColor: scrolled ? 'primary.dark' : 'white',
-                    }
-                  }}
-                >
-                  Logout
-                </Button>
+                // --- START: Ersatz für Logout Button durch Profil-Menü ---
+                <Box sx={{ flexGrow: 0, ml: 1 }}> {/* ml: 1 für Abstand */}
+                  <Tooltip title="Profil öffnen">
+                    <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
+                      <Avatar alt={user.firstName || 'User'} src="/static/images/avatar/2.jpg" />
+                    </IconButton>
+                  </Tooltip>
+                  <Menu
+                    sx={{ mt: '45px' }}
+                    id="menu-appbar-user"
+                    anchorEl={anchorElUser}
+                    anchorOrigin={{
+                      vertical: 'top',
+                      horizontal: 'right',
+                    }}
+                    keepMounted
+                    transformOrigin={{
+                      vertical: 'top',
+                      horizontal: 'right',
+                    }}
+                    open={Boolean(anchorElUser)}
+                    onClose={handleCloseUserMenu}
+                  >
+                    <MenuItem onClick={handleProfile}>
+                      <Typography textAlign="center">
+                        {user.role === 'admin' ? 'Admin-Center' : 'Mein Konto'}
+                      </Typography>
+                    </MenuItem>
+                    <MenuItem onClick={handleLogout}>
+                      <Typography textAlign="center">Logout</Typography>
+                    </MenuItem>
+                  </Menu>
+                </Box>
+                // --- ENDE: Ersatz für Logout Button ---
               )}
             </Box>
           )}
@@ -426,4 +552,3 @@ export default function Navbar() {
     </AppBar>
   );
 }
-
