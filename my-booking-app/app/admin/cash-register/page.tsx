@@ -13,18 +13,22 @@ import {
     InputAdornment,
     Radio,
     RadioGroup,
-    Chip
+    Chip,
+    CircularProgress // CircularProgress importieren
 } from '@mui/material';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/context/AuthContext'; // Pfad-Alias
 import { 
     fetchAllUsers, fetchProducts, fetchServices, createInvoice, validateVoucher,
-    User, Product as ProductType, Service, InvoicePayload, getWalkInCustomer
-} from '@/services/api';
+    User, Product as ProductType, Service, InvoicePayload, getWalkInCustomer, Invoice
+} from '@/services/api'; // Pfad-Alias
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import CardGiftcardIcon from '@mui/icons-material/CardGiftcard';
 import LocalOfferIcon from '@mui/icons-material/LocalOffer';
-import PaymentDialog from '@/components/PaymentDialog';
+import PaymentDialog from '@/components/PaymentDialog'; // Pfad-Alias
+// --- NEU: ProtectedRoute importieren ---
+import ProtectedRoute from '@/components/ProtectedRoute'; // Pfad-Alias
+import { useRouter } from 'next/navigation'; // useRouter importieren
 
 type CartItem = {
   cartItemId: string; 
@@ -35,7 +39,8 @@ type CartItem = {
   staffId?: string;
 };
 
-export default function CashRegisterPage() {
+// --- NEU: Gesamte Logik in eine Kind-Komponente 'CashRegisterContent' verschieben ---
+function CashRegisterContent() {
   const { token, user, salonId: activeSalonId } = useAuth();
   const [customers, setCustomers] = useState<User[]>([]);
   const [staff, setStaff] = useState<User[]>([]);
@@ -60,12 +65,14 @@ export default function CashRegisterPage() {
   const [voucherError, setVoucherError] = useState('');
 
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
-
-  // State,um die Salon-ID der Transaktion zu speichern
   const [transactionSalonId, setTransactionSalonId] = useState<string | null>(null);
+
+  // --- NEU: Ladezustand für die Initialdaten ---
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!token) return;
+    setIsLoading(true); // Laden starten
     const loadData = async () => {
         try {
             const [customerUsers, staffUsers, fetchedProducts, fetchedServices, walkInCustomer] = await Promise.all([
@@ -88,6 +95,8 @@ export default function CashRegisterPage() {
         } catch (error) {
             console.error("Fehler beim Laden der Kassendaten:", error);
             setToast({ open: true, msg: "Wichtige Daten konnten nicht geladen werden.", sev: 'error' });
+        } finally {
+            setIsLoading(false); // Laden beenden
         }
     };
     loadData();
@@ -102,7 +111,9 @@ export default function CashRegisterPage() {
       }
       
       const staffMember = staff.find(s => s._id === selectedStaffId);
-      const hasSkill = staffMember?.skills?.some(skill => skill._id === item._id);
+      // KORREKTUR: Sicherstellen, dass skills existiert
+      const skills = staffMember?.skills || [];
+      const hasSkill = skills.some(skill => (typeof skill === 'string' ? skill : skill._id) === item._id);
 
       if (!hasSkill) {
         const serviceTitle = (item as Service).title;
@@ -189,7 +200,16 @@ export default function CashRegisterPage() {
   const handleStaffChange = (staffId: string) => {
     setSelectedStaffId(staffId);
   };
-  
+
+  // --- NEU: Ladeanzeige, während die Daten geholt werden ---
+  if (isLoading) {
+    return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+            <CircularProgress />
+        </Box>
+    );
+  }
+
   return (
     <Container maxWidth="xl" sx={{ pb: 4 }}>
       <Typography variant="h4" sx={{ my: 4 }}>Kasse / Sofortverkauf</Typography>
@@ -372,8 +392,6 @@ export default function CashRegisterPage() {
         total={finalTotal}
         cart={cart}
         customer={selectedCustomer!}
-        // DIE ENTSCHEIDENDE ÄNDERUNG:
-        // Wir lesen den Wert direkt aus dem localStorage, der garantiert aktuell ist.
         salonId={typeof window !== 'undefined' ? localStorage.getItem('activeSalonId') : null}
         discount={discount}
       />
@@ -390,4 +408,21 @@ export default function CashRegisterPage() {
       </Snackbar>
     </Container>
   );
+}
+
+// --- NEU: Hauptkomponente, die den Schutz anwendet ---
+export default function ProtectedCashRegisterPage() {
+    const router = useRouter();
+    
+    // Wir wrappen den Inhalt in ProtectedRoute.
+    // Ein Staff-Mitglied benötigt 'cash-register-access'
+    // Wenn nicht berechtigt, wird zur Haupt-Admin-Seite weitergeleitet.
+    return (
+        <ProtectedRoute 
+            permission="cash-register-access" 
+            redirectTo="/admin"
+        >
+            <CashRegisterContent />
+        </ProtectedRoute>
+    );
 }
