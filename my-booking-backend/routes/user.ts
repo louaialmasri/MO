@@ -20,6 +20,7 @@ import {
 // --- NEU: Nur noch AuthRequest importieren ---
 import { AuthRequest } from '../middlewares/authMiddleware';
 import { verifyAdmin } from '../middlewares/adminMiddleware'; 
+import { verifyToken } from '../utils/jwt';
 
 const router = express.Router();
 
@@ -48,9 +49,11 @@ router.get('/walk-in', getOrCreateWalkInCustomer);
 // Route, um den letzten Termin abzurufen (verifyToken global)
 router.get('/:userId/last-booking', getLastBookingForUser);
 
-// NEUE ROUTEN FÜR PIN-VERWALTUNG (NUR ADMINS) (verifyToken global)
-router.post('/set-pin', verifyAdmin, setDashboardPin);
-router.post('/verify-pin', verifyAdmin, verifyDashboardPin);
+// Diese Routen benötigen KEINE verifyAdmin-Middleware,
+// da der Controller (setDashboardPin) die Logik selbst enthält.
+// Die globale verifyToken aus server.ts ist ausreichend.
+router.post('/set-pin', setDashboardPin);
+router.post('/verify-pin', verifyDashboardPin);
 
 // --- NEU: Route für Berechtigungen (verifyToken global) ---
 // (Diese Route war fälschlicherweise in staff.ts, user.ts ist aber der korrekte Ort)
