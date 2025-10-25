@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { User } from '../services/api';
+import api, { User } from '../services/api';
 
 interface AuthContextType {
   user: User | null
@@ -75,29 +75,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       return false;
   };
 
-  const refreshUser = async () => {
-  if (token) {
-    try {
-      // Annahme: /users/me gibt das User-Objekt inkl. hasDashboardPin zurück
-      const response = await fetch('/api/users/me', { // Passe den Pfad ggf. an deine API-Struktur an
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (!response.ok) throw new Error('Failed to fetch user');
-      const data = await response.json();
-      if (data.success && data.user) {
-        // Update den lokalen State mit den neuesten Daten
-        setUser(data.user);
-        setPermissions(data.user.permissions || []);
-        localStorage.setItem('user', JSON.stringify(data.user)); // Auch Local Storage aktualisieren
-      } else {
-         throw new Error('Invalid user data received');
+    const refreshUser = async () => {
+    if (token) {
+      try {
+        // Wir verwenden den axios-Client 'api'
+        const response = await api.get('/users/me', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.data.success && response.data.user) {
+          const updatedUser = response.data.user;
+          setUser(updatedUser);
+          setPermissions(updatedUser.permissions || []);
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+        } else {
+           throw new Error('Invalid user data received');
+        }
+      } catch (error) {
+        console.error("Fehler beim Aktualisieren der Benutzerdaten:", error);
+        logout(); // Bei Fehler ausloggen
       }
-    } catch (error) {
-      console.error("Fehler beim Aktualisieren der Benutzerdaten:", error);
-      // Optional: logout() aufrufen oder Fehler behandeln
     }
-  }
-};
+  };
 
 
   useEffect(() => {

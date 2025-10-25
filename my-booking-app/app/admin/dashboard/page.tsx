@@ -8,12 +8,11 @@ import {
   Container, Typography, Box, CircularProgress, Paper, Grid, Stack,
   Button, ButtonGroup, TextField, Collapse, List, ListItem, ListItemText, Tooltip, Alert
 } from '@mui/material';
-// KORREKTUR: Korrekter relativer Pfad
 import PinLock from './PinLock';
 import AdminBreadcrumbs from '../../../components/AdminBreadcrumbs';
 import dayjs from 'dayjs';
 import { Bar, Line } from 'react-chartjs-2';
-// ... (restliche Imports bleiben gleich) ...
+import CreatePinForm from './CreatePinForm'; 
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -354,11 +353,11 @@ const DashboardContent = () => {
 
 // --- Haupt-Seitenkomponente mit PIN-Sperre (ANGEPASST) ---
 export default function AdminDashboardPage() {
-  const { token, loading: authLoading } = useAuth();
-  const [isUnlocked, setIsUnlocked] = useState(false);
+  const { token, loading: authLoading, user } = useAuth();
+  const [isPinVerified, setIsPinVerified] = useState(false);
 
   const handlePinVerified = () => {
-    setIsUnlocked(true);
+    setIsPinVerified(true);
   };
 
   const handleVerifyPin = async (pin: string) => {
@@ -371,17 +370,37 @@ export default function AdminDashboardPage() {
     return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 5 }}><CircularProgress /></Box>;
   }
 
+  // Prüfen, ob der User (Admin ODER Staff) die Berechtigung hat.
+  // Wir nutzen hier die 'hasPermission'-Funktion aus dem AuthContext,
+  // die 'admin' automatisch 'true' zurückgibt.
+  const hasAccess = user && (user.role === 'admin' || user.permissions?.includes('dashboard-access'));
+  
+  // Zustand 1: Berechtigt, aber KEINE PIN gesetzt
+  const needsToCreatePin = hasAccess && !user.hasDashboardPin;
+
+  // Zustand 2: Berechtigt, HAT PIN, aber noch nicht eingegeben
+  const needsToVerifyPin = hasAccess && user.hasDashboardPin && !isPinVerified;
+
+  // Zustand 3: Berechtigt UND PIN eingegeben (oder Admin ohne gesetzte PIN)
+  const isUnlocked = isPinVerified || (user?.role === 'admin' && !user.hasDashboardPin);
+
   return (
     // NEU: Ganze Seite mit ProtectedRoute umwickeln
     // Erlaubt Admins ODER Staff mit der spezifischen Berechtigung
     <ProtectedRoute permission="dashboard-access" redirectTo="/admin">
-        {/* Die ursprüngliche Logik für die PIN-Sperre bleibt bestehen */}
         <Container maxWidth="lg" sx={{ py: 4 }}>
-        {isUnlocked ? (
-            <DashboardContent />
-        ) : (
+        {
+          needsToCreatePin ? (
+            <CreatePinForm onPinCreated={() => setIsPinVerified(true)} />
+          ) : needsToVerifyPin ? (
             <PinLock onPinVerified={handlePinVerified} verifyPin={handleVerifyPin} />
-        )}
+          ) : isUnlocked ? (
+            <DashboardContent />
+          ) : (
+            // Fallback, sollte durch ProtectedRoute eigentlich nicht erreicht werden
+            <Alert severity="error">Zugriff verweigert.</Alert>
+          )
+        }
         </Container>
     </ProtectedRoute>
   );

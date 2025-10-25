@@ -39,6 +39,7 @@ export type User = {
   skills?: { _id: string; title?: string }[];
   salons?: Salon[]; // Verwendet jetzt den erweiterten Salon-Typ
   permissions?: string[];
+  hasDashboardPin?: boolean;
 }
 
 export type Service = {
