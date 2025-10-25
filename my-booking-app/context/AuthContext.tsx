@@ -8,13 +8,13 @@ interface AuthContextType {
   token: string | null
   loading: boolean
   salonId: string | null;
-  // NEU: permissions hinzufügen
   permissions: string[];
   login: (user: User, token: string) => void
   logout: () => void
   selectSalon: (id: string) => void
-  // NEU: Funktion zum Prüfen einer Berechtigung
+  // Funktion zum Prüfen einer Berechtigung
   hasPermission: (permission: string) => boolean;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -27,6 +27,7 @@ const AuthContext = createContext<AuthContextType>({
   logout: () => {},
   selectSalon: (id: string) => {},
   hasPermission: (permission: string) => false, // NEU: Standardmäßig false
+  refreshUser: async () => {},
 })
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -34,13 +35,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [token, setToken] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [salonId, setSalonId] = useState<string | null>(null);
-  // NEU: State für permissions
   const [permissions, setPermissions] = useState<string[]>([]);
 
   const login = (loggedInUser: User, authToken: string) => {
     setUser(loggedInUser)
     setToken(authToken)
-    // NEU: Permissions aus dem User-Objekt setzen
     setPermissions(loggedInUser.permissions || []);
     localStorage.setItem('user', JSON.stringify(loggedInUser))
     localStorage.setItem('token', authToken)
@@ -51,7 +50,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser(null)
     setToken(null)
     setSalonId(null)
-    setPermissions([]); // NEU: Permissions zurücksetzen
+    setPermissions([]);
     localStorage.removeItem('user')
     localStorage.removeItem('token')
     localStorage.removeItem('salonId')
@@ -62,7 +61,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     localStorage.setItem('salonId', id)
   }
 
-  // NEU: Funktion zum Prüfen einer Berechtigung
+  // Funktion zum Prüfen einer Berechtigung
   const hasPermission = (permission: string): boolean => {
       // Admins haben immer Zugriff
       if (user?.role === 'admin') {
@@ -75,6 +74,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Normale User haben keine Sonderrechte
       return false;
   };
+
+  const refreshUser = async () => {
+  if (token) {
+    try {
+      // Annahme: /users/me gibt das User-Objekt inkl. hasDashboardPin zurück
+      const response = await fetch('/api/users/me', { // Passe den Pfad ggf. an deine API-Struktur an
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error('Failed to fetch user');
+      const data = await response.json();
+      if (data.success && data.user) {
+        // Update den lokalen State mit den neuesten Daten
+        setUser(data.user);
+        setPermissions(data.user.permissions || []);
+        localStorage.setItem('user', JSON.stringify(data.user)); // Auch Local Storage aktualisieren
+      } else {
+         throw new Error('Invalid user data received');
+      }
+    } catch (error) {
+      console.error("Fehler beim Aktualisieren der Benutzerdaten:", error);
+      // Optional: logout() aufrufen oder Fehler behandeln
+    }
+  }
+};
 
 
   useEffect(() => {
@@ -107,11 +130,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     token,
     loading,
     salonId,
-    permissions, // NEU: permissions bereitstellen
+    permissions,
     login,
     logout,
     selectSalon,
-    hasPermission, // NEU: hasPermission bereitstellen
+    hasPermission,
+    refreshUser,
   }), [user, token, loading, salonId, permissions]) // NEU: permissions als Abhängigkeit
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
