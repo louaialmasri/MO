@@ -927,11 +927,15 @@ export async function deleteProduct(id: string) {
 }
 
 // PIN Management for Admin Dashboard
-export const setDashboardPin = async (password: string, pin: string, token: string) => {
-  const res = await api.post('/users/set-pin', { password, pin }, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  return res.data;
+export const setDashboardPin = async (password: string, pin: string, token: string): Promise<{ success: boolean; message: string }> => {
+  const response = await apiClient.post(
+    '/users/me/dashboard-pin',
+    { password, pin },
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  return response.data;
 };
 
 export const verifyDashboardPin = async (pin: string, token: string) => {

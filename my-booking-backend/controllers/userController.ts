@@ -256,7 +256,6 @@ export const updateUserSkills = async (req: Request, res: Response) => {
 };
 
 
-// --- NEUE FUNKTION ---
 export const updateStaffPermissions = async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params; // Die ID des zu bearbeitenden Staff-Users
@@ -271,12 +270,27 @@ export const updateStaffPermissions = async (req: AuthRequest, res: Response) =>
         }
 
         // 2. Benutzer finden und sicherstellen, dass es ein Staff-Benutzer ist
-        const staffUser = await User.findById(id).select('role permissions'); // Wähle Rolle und Permissions aus
+        const staffUser = await User.findById(id).select('role permissions').lean(); // Wähle Rolle und Permissions aus
         if (!staffUser) {
             return res.status(404).json({ success: false, message: 'Mitarbeiter nicht gefunden.' });
         }
         if (staffUser.role !== 'staff') {
             return res.status(400).json({ success: false, message: 'Berechtigungen können nur für Mitarbeiter gesetzt werden.' });
+        }
+
+        const updateData: { permissions: string[]; dashboardPin?: null } = {
+            permissions: permissions
+        };
+
+        // Prüfen, ob die Dashboard-Berechtigung entfernt wird.
+        // Dafür holen wir den aktuellen Zustand des Users, bevor wir updaten.
+        
+        const hadPermission = staffUser?.permissions?.includes('dashboard-access');
+        const hasPermissionNow = permissions.includes('dashboard-access');
+
+        if (hadPermission && !hasPermissionNow) {
+            // Die Berechtigung wurde gerade entfernt, also löschen wir die PIN.
+            updateData.dashboardPin = null; 
         }
 
         // 3. Berechtigungen aktualisieren
@@ -342,7 +356,6 @@ export const getOrCreateWalkInCustomer = async (req: AuthRequest, res: Response)
 };
 
 export const getLastBookingForUser = async (req: AuthRequest, res: Response) => {
-  // ... (bestehender Code bleibt unverändert) ...
    try {
     const { userId } = req.params;
 
@@ -375,7 +388,6 @@ export const getLastBookingForUser = async (req: AuthRequest, res: Response) => 
 };
 
 export const setDashboardPin = async (req: AuthRequest, res: Response) => {
-  // ... (bestehender Code bleibt unverändert) ...
    try {
     const { password, pin } = req.body;
     const userId = req.user?.userId;
@@ -393,8 +405,13 @@ export const setDashboardPin = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ message: 'Benutzer nicht gefunden.' });
     }
 
-    if (user.role !== 'admin') {
-      return res.status(403).json({ message: 'Nicht autorisiert.' });
+    // Wer darf eine PIN setzen?
+    // 1. Ein Admin (für sich selbst)
+    // 2. Ein Mitarbeiter (staff), der die 'dashboard-access' Berechtigung hat (für sich selbst)
+    const isStaffWithPermission = user.role === 'staff' && user.permissions?.includes('dashboard-access');
+
+    if (user.role !== 'admin' && !isStaffWithPermission) {
+        return res.status(403).json({ message: 'Nicht autorisiert, eine PIN zu setzen.' });
     }
 
     if (!user.password) {
@@ -409,7 +426,6 @@ export const setDashboardPin = async (req: AuthRequest, res: Response) => {
 
     const pinHash = await bcrypt.hash(pin, 10);
     
-    // KORREKTUR: Verwende findByIdAndUpdate statt .save()
     await User.findByIdAndUpdate(userId, { dashboardPin: pinHash });
 
     res.json({ success: true, message: 'Dashboard-PIN erfolgreich gesetzt.' });
@@ -466,18 +482,28 @@ export const verifyDashboardPin = async (req: AuthRequest, res: Response) => {
   }
 };
 
+// my-booking-backend/controllers/userController.ts
+
 export const getMe = async (req: AuthRequest, res: Response) => {
-  // ... (bestehender Code bleibt unverändert) ...
    try {
     if (!req.user) {
       return res.status(401).json({ success: false, message: 'Nicht authentifiziert' });
     }
-    // KORREKTUR: Permissions mit abfragen, falls vorhanden
-    const user = await User.findById(req.user.userId).select('-password -dashboardPin +permissions');
+    
+    const user = await User.findById(req.user.userId).select('-password +permissions +dashboardPin');
     if (!user) {
       return res.status(404).json({ success: false, message: 'Benutzer nicht gefunden' });
     }
-    res.json({ success: true, user });
+
+    // Erstelle ein sicheres User-Objekt für die Antwort
+    const safeUser: any = user.toObject();
+    // Füge die neue Eigenschaft hinzu
+    safeUser.hasDashboardPin = !!safeUser.dashboardPin;
+    // Entferne den Hash, bevor er gesendet wird
+    delete safeUser.dashboardPin;
+    delete (safeUser as any).password;
+
+    res.json({ success: true, user: safeUser });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Serverfehler' });
   }
