@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { getStaffBookings, fetchServices, updateBooking, fetchAllUsers, deleteBooking, Service, User, StaffBooking } from '@/services/api';
+import { getStaffBookings, fetchServices, updateBooking, deleteBooking, Service, User, StaffBooking } from '@/services/api';
 import {
     Box, Typography, CircularProgress, Dialog, DialogTitle, DialogContent,
     DialogActions, Button, TextField, Tooltip, MenuItem, List, ListItem,
@@ -13,38 +13,17 @@ import {
 import dayjs from 'dayjs';
 import 'dayjs/locale/de';
 
-// Imports für react-big-calendar (verwenden jetzt moment-localizer für Konsistenz)
-import { Calendar, momentLocalizer, Views, EventProps, View } from 'react-big-calendar';
-import moment from 'moment';
-import 'moment/locale/de'; // Deutsche Lokalisierung für moment
-import 'react-big-calendar/lib/css/react-big-calendar.css';
+// START: Importiere die neue geteilte Komponente
+import BookingCalendar from '@/components/SharedCalendar'; 
+import { View, Views } from 'react-big-calendar';
+// ENDE: Import der neuen Komponente
+
 // WICHTIG: Importiere das geteilte CSS
 import '../admin/calendar-custom.css';
 // ENDE: Imports angepasst
 
-// Lokalisierung für moment.js einrichten
-moment.locale('de');
-const localizer = momentLocalizer(moment);
 
-// START: Deutsche Kalender-Texte
-const messages = {
-  allDay: 'Ganztägig',
-  previous: 'Zurück',
-  next: 'Weiter',
-  today: 'Heute',
-  month: 'Monat',
-  week: 'Woche',
-  day: 'Tag',
-  agenda: 'Liste',
-  date: 'Datum',
-  time: 'Zeit',
-  event: 'Termin',
-  noEventsInRange: 'Keine Termine in diesem Zeitraum.',
-  showMore: (total: number) => `+ ${total} weitere`,
-};
-// ENDE: Deutsche Kalender-Texte
-
-// Unser benutzerdefinierter Event-Typ für Typsicherheit
+// Unser benutzerdefinierter Event-Typ für Typsicherheit (unverändert)
 interface CalendarEvent {
     id: string;
     title: string;
@@ -53,29 +32,12 @@ interface CalendarEvent {
     original: StaffBooking;
 }
 
-// Komponente für das Aussehen der Termine
-const CalendarEventContent = ({ event }: EventProps<CalendarEvent>) => {
-    const serviceName = event.original.service?.title || 'Service';
-    const clientName = `${event.original.user?.firstName || ''} ${event.original.user?.lastName || ''}`.trim();
-
-    return (
-        <Box sx={{ height: '100%', overflow: 'hidden' }}>
-            <Typography variant="body2" sx={{ fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {clientName}
-            </Typography>
-            <Typography variant="caption" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
-                {serviceName}
-            </Typography>
-        </Box>
-    );
-};
-
 export default function StaffDashboardPage() {
     const { user, token, loading: authLoading } = useAuth();
     const router = useRouter();
     const [bookings, setBookings] = useState<StaffBooking[]>([]);
     const [services, setServices] = useState<Service[]>([]);
-    const [users, setUsers] = useState<User[]>([]);
+    // const [users, setUsers] = useState<User[]>([]); // Nicht mehr benötigt
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -84,16 +46,16 @@ export default function StaffDashboardPage() {
     const [editedData, setEditedData] = useState<{ serviceId: string; dateTime: string }>({ serviceId: '', dateTime: '' });
     const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({ open: false, message: '', severity: 'success' });
 
-    // START: State für Kalender-Steuerung
+    // START: State für Kalender-Steuerung (NEU)
     const [date, setDate] = useState(new Date());
-    const [view, setView] = useState<View>(Views.WEEK);
+    const [view, setView] = useState<View>(Views.DAY); // <--- DEFAULT AUF TAG GEÄNDERT
 
     const handleNavigate = useCallback((newDate: Date) => setDate(newDate), [setDate]);
     const handleView = useCallback((newView: View) => setView(newView), [setView]);
     // ENDE: State für Kalender-Steuerung
 
     useEffect(() => {
-        if (!authLoading && (!user || user.role !== 'staff')) {
+        if (!authLoading && (!user || (user.role !== 'staff' && user.role !== 'admin'))) {
             router.push('/login');
         }
     }, [user, authLoading, router]);
@@ -102,33 +64,81 @@ export default function StaffDashboardPage() {
         if (token) {
             try {
                 setLoading(true);
-                // Staff braucht keine 'allUsers' für die Kasse, nur die Services
                 const [staffBookings, allServices] = await Promise.all([
                     getStaffBookings(token),
-                    fetchServices(token), // Lädt Services für den Salon des Staffs
+                    fetchServices(token), 
                 ]);
                 setBookings(staffBookings);
                 setServices(allServices);
-                // setUsers(allUsers); // Nicht mehr nötig
             } catch (err) {
                 setError('Daten konnten nicht geladen werden.');
             } finally {
                 setLoading(false);
             }
         }
-    }, [token]); // Abhängigkeit 'fetchAllUsers' entfernt
+    }, [token]); 
 
     useEffect(() => {
         fetchData();
     }, [fetchData]);
     
+    // Kalender-Events (unverändert)
     const calendarEvents: CalendarEvent[] = useMemo(() => bookings.map(booking => ({
         id: booking._id,
         title: `${booking.service?.title || 'Service'} - ${booking.user?.firstName || ''} ${booking.user?.lastName || ''}`.trim(),
         start: new Date(booking.dateTime),
         end: new Date(new Date(booking.dateTime).getTime() + (booking.service?.duration || 30) * 60000),
-        original: booking
-    })), [bookings]);
+        original: booking,
+        // START: Füge die Ressourcen-ID hinzu
+        resourceId: user?._id, // Immer die ID des eingeloggten Staffs
+        booking: booking, // Füge das ganze Booking-Objekt hinzu
+        // ENDE: Ressourcen-ID
+    })), [bookings, user]);
+
+    // START: Kalender-Ressource für den Staff-Mitarbeiter (NEU)
+    const staffResource = useMemo(() => {
+        if (!user) return [];
+        return [{
+            id: user._id,
+            title: `${user.firstName} ${user.lastName}`.trim() || user.email
+        }];
+    }, [user]);
+
+    // Farb-Mapping (optional, aber gut für Konsistenz)
+    const staffColors = useMemo(() => {
+        if (!user) return new Map<string, string>();
+        return new Map<string, string>([[user._id, '#A1887F']]); // Eine Farbe für den Staff
+    }, [user]);
+    // ENDE: Kalender-Ressource
+
+    // Drag & Drop Handler (NEU)
+    const handleEventDrop = async ({ event, start, end }: any) => {
+        if (!token) return;
+        
+        // Finde das Original-Booking, um die Skill-Prüfung durchzuführen
+        const originalBooking = bookings.find(b => b._id === event.id);
+        if (!originalBooking) return;
+
+        // Skill-Prüfung (obwohl es derselbe Mitarbeiter sein sollte, schadet es nicht)
+        const serviceId = originalBooking.service?._id;
+        const hasSkill = user?.skills?.some(skill => (typeof skill === 'string' ? skill : skill._id) === serviceId);
+
+        if (!hasSkill) {
+            setSnackbar({ open: true, message: 'Du scheinst diesen Service nicht (mehr) anzubieten.', severity: 'error' });
+            return; // Verhindere das Verschieben
+        }
+
+        try {
+            await updateBooking(event.id, { dateTime: start.toISOString() }, token);
+            setSnackbar({ open: true, message: 'Termin verschoben!', severity: 'success' });
+            fetchData(); // Daten neu laden
+        } catch (err) {
+            setSnackbar({ open: true, message: 'Verschieben fehlgeschlagen.', severity: 'error' });
+            fetchData(); // Bei Fehler auch neu laden, um den Kalender zurückzusetzen
+        }
+    };
+    // ENDE: Drag & Drop Handler
+
 
     const handleEventClick = (event: CalendarEvent) => {
         setSelectedBooking(event.original);
@@ -157,7 +167,6 @@ export default function StaffDashboardPage() {
 
     const handleCancelBooking = async () => {
         if (selectedBooking && token) {
-            // Prüfung auf Stornierbarkeit (Regel könnte aus Backend/AuthContext kommen)
             if (!isCancellable(selectedBooking.dateTime)) {
                 setSnackbar({ open: true, message: 'Stornierung nicht mehr möglich (Frist abgelaufen).', severity: 'error' });
                 return;
@@ -174,10 +183,9 @@ export default function StaffDashboardPage() {
         }
     };
 
-    // Stornierungs-Logik (z.B. 24h vorher)
     const isCancellable = (dateTime: string) => dayjs(dateTime).isAfter(dayjs().add(24, 'hours'));
 
-    if (loading || authLoading) {
+    if (loading || authLoading || !user) {
         return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>;
     }
     
@@ -186,37 +194,31 @@ export default function StaffDashboardPage() {
     }
 
     return (
-        <Box>
-            <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-                <Typography variant="h4" gutterBottom>
-                    Mein Dashboard
+        <Box sx={{ p: { xs: 2, md: 4 }, backgroundColor: 'background.default', minHeight: '100vh' }}>
+            <Container maxWidth="xl"> {/* Auf xl geändert für mehr Platz */}
+                <Typography variant="h4" fontWeight={800} sx={{ mb: 3, mt: 2 }}>
+                    Mein Kalender
                 </Typography>
-                <Paper sx={{ p: 2, height: '80vh' }}>
-                    <Calendar
-                        localizer={localizer}
-                        culture='de'
-                        events={calendarEvents}
-                        startAccessor="start"
-                        endAccessor="end"
-                        style={{ height: '100%' }}
-                        onSelectEvent={handleEventClick}
-                        // START: Props für funktionierende Toolbar hinzugefügt
-                        views={{ month: true, week: true, day: true, agenda: true }} // Alle Ansichten
-                        date={date} // Gesteuertes Datum
-                        view={view} // Gesteuerte Ansicht
-                        onNavigate={handleNavigate} // Handler für Datum/Navigation
-                        onView={handleView} // Handler für Ansichtswechsel
-                        messages={messages} // Deutsche Texte
-                        // ENDE: Props hinzugefügt
-                        step={15}
-                        timeslots={4}
-                        components={{
-                            event: CalendarEventContent,
-                        }}
-                    />
-                </Paper>
                 
-                {/* Dialog für Termindetails und Bearbeitung */}
+                {/* START: Geteilte Kalender-Komponente wird hier gerendert */}
+                <BookingCalendar
+                    events={calendarEvents}
+                    resources={staffResource} // Nur den eigenen Mitarbeiter als Ressource
+                    view={view}
+                    date={date}
+                    onNavigate={handleNavigate}
+                    onView={handleView}
+                    onSelectEvent={(event: any) => handleEventClick(event.original)}
+                    onEventDrop={handleEventDrop}
+                    onSelectSlot={() => {}} // Kein "Einfügen" für Staff
+                    min={dayjs(date).set('hour', 8).set('minute', 0).toDate()} // Standard 8 Uhr
+                    max={dayjs(date).set('hour', 20).set('minute', 1).toDate()} // Standard 20 Uhr
+                    staffColors={staffColors}
+                />
+                {/* ENDE: Geteilte Kalender-Komponente */}
+
+                
+                {/* Dialog für Termindetails und Bearbeitung (unverändert) */}
                 <Dialog open={!!selectedBooking} onClose={() => setSelectedBooking(null)}>
                     <DialogTitle>{editMode ? 'Termin bearbeiten' : 'Termindetails'}</DialogTitle>
                     <DialogContent>
@@ -230,9 +232,8 @@ export default function StaffDashboardPage() {
                                             label="Service"
                                             onChange={(e) => setEditedData(prev => ({ ...prev, serviceId: e.target.value }))}
                                         >
-                                            {/* Filtert Services, die der Staff auch kann */}
                                             {services
-                                                .filter(service => user?.skills?.some(s => s._id === service._id))
+                                                .filter(service => user?.skills?.some(s => (typeof s === 'string' ? s : s._id) === service._id))
                                                 .map(service => (
                                                 <MenuItem key={service._id} value={service._id}>{service.title}</MenuItem>
                                             ))}
@@ -290,3 +291,4 @@ export default function StaffDashboardPage() {
         </Box>
     );
 }
+

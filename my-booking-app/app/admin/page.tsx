@@ -2,9 +2,7 @@
 
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
-// START: Imports hinzugefügt/angepasst
-import { useEffect, useMemo, useState, useCallback } from 'react'
-// ENDE: Imports hinzugefügt/angepasst
+import { useEffect, useMemo, useState, useCallback } from 'react' // <--- Hooks importiert
 import {
   fetchServices,
   getAllBookings,
@@ -18,52 +16,36 @@ import {
 } from '@/services/api'
 import dynamic from 'next/dynamic'
 import {
-  Box, Button, Chip, Stack, Dialog, DialogTitle, DialogContent,
-  DialogActions, TextField, MenuItem, Typography, Avatar, Tooltip, IconButton, Container, Paper,
+  Box, Button, Dialog, DialogTitle, DialogContent,
+  DialogActions, TextField, MenuItem, Typography, Tooltip, IconButton, Container,
   Snackbar, Alert,
   Divider,
   List,
   ListItem,
   ListItemText,
   CircularProgress,
+  Stack, // <--- Stack importiert
 } from '@mui/material'
 import type { Service } from '@/services/api'
 import dayjs from 'dayjs'
 import 'dayjs/locale/de';
 import AdminBreadcrumbs from '@/components/AdminBreadcrumbs'
-import './calendar-custom.css'
-
-// react-big-calendar + DnD
-// START: View und Views importiert
-import { Calendar as RBCalendar, Views, DateLocalizer, View } from 'react-big-calendar'
-// ENDE: View und Views importiert
-import moment from 'moment' // Keep moment for localizer
-import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop'
-import 'react-big-calendar/lib/css/react-big-calendar.css'
-import 'react-big-calendar/lib/addons/dragAndDrop/styles.css'
-
-// date-fns für min/max Zeitberechnung ---
+// START: Importiere die neue geteilte Komponente
+import BookingCalendar, {
+  localizer, // Importiere den moment-localizer
+  messages,  // Importiere die deutschen Texte
+} from '@/components/SharedCalendar' 
+import { View, Views } from 'react-big-calendar'
+// ENDE: Import der neuen Komponente
 import { setHours, setMinutes } from 'date-fns';
 
-
-dayjs.locale('de');
-moment.locale('de');
-
-// Beibehaltung des moment-Localizers für react-big-calendar
-const localizer: DateLocalizer = (require('react-big-calendar').momentLocalizer)(moment)
-const DnDCalendar = withDragAndDrop(RBCalendar as any)
-
 // Icons
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import TodayIcon from '@mui/icons-material/Today';
 import PaymentIcon from '@mui/icons-material/Payment';
 import DeleteIcon from '@mui/icons-material/Delete';
 import HistoryIcon from '@mui/icons-material/History';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 
-
-// --- TYP-DEFINITIONEN ---
+// --- TYP-DEFINITIONEN (unverändert) ---
 type User = {
   _id: string
   email: string
@@ -98,7 +80,7 @@ type CalendarResource = {
   title: string;
 }
 
-// --- HELPER-FUNKTIONEN ---
+// --- HELPER-FUNKTIONEN (unverändert) ---
 const getInitials = (name = '') => name ? name.split(' ').map(n => n[0]).join('').toUpperCase() : '';
 
 const translateAction = (action: string) => {
@@ -110,24 +92,6 @@ const translateAction = (action: string) => {
     default: return action;
   }
 };
-
-// --- START: Deutsche Kalender-Texte ---
-const messages = {
-  allDay: 'Ganztägig',
-  previous: 'Zurück',
-  next: 'Weiter',
-  today: 'Heute',
-  month: 'Monat',
-  week: 'Woche',
-  day: 'Tag',
-  agenda: 'Liste',
-  date: 'Datum',
-  time: 'Zeit',
-  event: 'Termin',
-  noEventsInRange: 'Keine Termine in diesem Zeitraum.',
-  showMore: (total: number) => `+ ${total} weitere`,
-};
-// --- ENDE: Deutsche Kalender-Texte ---
 
 
 // --- KOMPONENTEN ---
@@ -143,7 +107,6 @@ function AdminPage() {
   const [edit, setEdit] = useState<{ dateTime: string; serviceId: string; staffId: string }>({
     dateTime: '', serviceId: '', staffId: ''
   })
-  // const [currentDate, setCurrentDate] = useState<Date>(new Date()) // ERSETZT
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [amountGiven, setAmountGiven] = useState('');
@@ -156,16 +119,18 @@ function AdminPage() {
   const [calendarMinTime, setCalendarMinTime] = useState<Date | undefined>(undefined);
   const [calendarMaxTime, setCalendarMaxTime] = useState<Date | undefined>(undefined);
 
-  // START: State für Kalender-Steuerung
+  // START: State für Kalender-Steuerung (NEU)
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
-  const [view, setView] = useState<View>(Views.WEEK); // Standardansicht auf Woche
+  const [view, setView] = useState<View>(Views.DAY); // <--- DEFAULT AUF TAG GEÄNDERT
 
+  // Callbacks für die Toolbar
   const handleNavigate = useCallback((newDate: Date) => setCurrentDate(newDate), [setCurrentDate]);
   const handleView = useCallback((newView: View) => setView(newView), [setView]);
   // ENDE: State für Kalender-Steuerung
 
   const staffUsers = useMemo(() => users.filter(u => u.role === 'staff'), [users]);
 
+  // Farb-Mapping für Mitarbeiter (unverändert)
   const staffColors = useMemo(() => {
     const palette = ['#A1887F', '#FFAB40', '#4DB6AC', '#BA68C8', '#7986CB', '#4FC3F7', '#F06292', '#AED581'];
     const colorMap = new Map<string, string>();
@@ -175,31 +140,32 @@ function AdminPage() {
     return colorMap;
   }, [staffUsers]);
 
+  const fetchData = useCallback(async () => {
+    if (!token) return;
+    try {
+      const [bookingsData, staffUsersData, servicesData] = await Promise.all([
+        getAllBookings(token),
+        fetchAllUsers(token, 'staff'),
+        fetchServices(token),
+      ]);
+      setBookings(bookingsData);
+      setUsers(staffUsersData);
+      setServices(servicesData);
+    } catch (error) {
+      console.error("Failed to fetch admin data:", error);
+      setToast({ open: true, msg: 'Kerndaten konnten nicht geladen werden.', sev: 'error' });
+    }
+  }, [token]);
+
   // Lade Kern-Daten (Termine, Mitarbeiter, Services)
   useEffect(() => {
     if (!user || user.role !== 'admin' || !token) {
       return;
     }
-
-    const fetchData = async () => {
-      try {
-        const [bookingsData, staffUsersData, servicesData] = await Promise.all([
-          getAllBookings(token),
-          fetchAllUsers(token, 'staff'),
-          fetchServices(token),
-        ]);
-        setBookings(bookingsData);
-        setUsers(staffUsersData);
-        setServices(servicesData);
-      } catch (error) {
-        console.error("Failed to fetch admin data:", error);
-        setToast({ open: true, msg: 'Kerndaten konnten nicht geladen werden.', sev: 'error' });
-      }
-    };
     fetchData();
-  }, [user, token, router]);
+  }, [user, token, router, fetchData]);
 
-  // Lade Salon-Öffnungszeiten ---
+  // Lade Salon-Öffnungszeiten (unverändert)
   useEffect(() => {
     if (!token) return;
 
@@ -209,69 +175,55 @@ function AdminPage() {
         if (salonData.salon?.openingHours) {
           setSalonOpeningHours(salonData.salon.openingHours);
         } else {
-          setSalonOpeningHours(null); // Explizit auf null setzen, falls nicht gefunden
+          setSalonOpeningHours(null); 
         }
       } catch (error) {
         console.error("Fehler beim Laden der Salon-Öffnungszeiten:", error);
-        setSalonOpeningHours(null); // Auf null setzen bei Fehler
+        setSalonOpeningHours(null); 
         setToast({ open: true, msg: 'Öffnungszeiten konnten nicht geladen werden.', sev: 'error' });
       }
     };
     fetchSalonData();
-  }, [token]); // Nur von Token abhängig
+  }, [token]); 
 
-  // Setze Kalender min/max basierend auf currentDate und Öffnungszeiten ---
+  // Setze Kalender min/max (unverändert)
   useEffect(() => {
     if (!salonOpeningHours) {
-       // Setze Standardwerte (z.B. 8-20 Uhr), wenn keine Öffnungszeiten geladen werden konnten
        const defaultMin = setHours(setMinutes(currentDate, 0), 8);
-       // Standard-Max leicht erhöht ---
-       const defaultMax = setHours(setMinutes(currentDate, 1), 20); // 20:01
+       const defaultMax = setHours(setMinutes(currentDate, 1), 20); 
        setCalendarMinTime(defaultMin);
        setCalendarMaxTime(defaultMax);
        return;
     }
-
-    const dayOfWeek = currentDate.getDay(); // Sonntag = 0, Montag = 1, ...
+    const dayOfWeek = currentDate.getDay(); 
     const hoursRule = salonOpeningHours.find(h => h.weekday === dayOfWeek);
-
     if (hoursRule && hoursRule.isOpen && hoursRule.open && hoursRule.close) {
       try {
-        // Parse "HH:mm" strings
         const [openH, openM] = hoursRule.open.split(':').map(Number);
         const [closeH, closeM] = hoursRule.close.split(':').map(Number);
-
-        // Erzeuge Date-Objekte für min/max
         const minTime = setHours(setMinutes(currentDate, openM), openH);
         let maxTime = setHours(setMinutes(currentDate, closeM), closeH);
-
-        // Eine Minute zur maxTime hinzufügen ---
-        // Wenn die Schließzeit nicht Mitternacht ist, füge eine Minute hinzu
         if (!(closeH === 0 && closeM === 0)) {
-           maxTime = new Date(maxTime.getTime() + 60000); // + 1 Minute
+           maxTime = new Date(maxTime.getTime() + 60000); 
         } else {
-           // Fallback für Mitternacht bleibt 23:59
            maxTime = setHours(setMinutes(currentDate, 59), 23);
         }
-
         setCalendarMinTime(minTime);
         setCalendarMaxTime(maxTime);
       } catch (e) {
         console.error("Fehler beim Parsen der Öffnungszeiten:", e);
-        // Fallback bei Parsing-Fehler
         const defaultMin = setHours(setMinutes(currentDate, 0), 8);
         const defaultMax = setHours(setMinutes(currentDate, 0), 20);
         setCalendarMinTime(defaultMin);
         setCalendarMaxTime(defaultMax);
       }
     } else {
-      // Wenn Tag geschlossen ist, einen eingeschränkten Bereich anzeigen
       const defaultMin = setHours(setMinutes(currentDate, 0), 9);
       const defaultMax = setHours(setMinutes(currentDate, 0), 17);
       setCalendarMinTime(defaultMin);
       setCalendarMaxTime(defaultMax);
     }
-  }, [currentDate, salonOpeningHours]); // Abhängig vom Datum und den geladenen Zeiten
+  }, [currentDate, salonOpeningHours]); 
 
   const openDialogFor = (bookingId: string) => {
     const b = bookings.find(x => x._id === bookingId);
@@ -294,6 +246,7 @@ function AdminPage() {
     setShowHistory(false);
   };
 
+  // Kalender-Events (unverändert)
   const calendarEvents = useMemo(() => {
     return bookings
       .filter(b => b && b.staff && b.staff._id && b.user)
@@ -315,6 +268,7 @@ function AdminPage() {
       });
   }, [bookings, services]);
 
+  // Kalender-Ressourcen (Mitarbeiter) (unverändert)
   const calendarResources: CalendarResource[] = useMemo(() => {
     return staffUsers.map(s => ({
       id: s._id,
@@ -322,6 +276,7 @@ function AdminPage() {
     }));
   }, [staffUsers]);
 
+  // Drag & Drop Handler (unverändert)
   const onEventDrop = async ({ event, start, end, resourceId }: any) => {
     const originalBooking = bookings.find(b => b._id === event.id);
     if (!originalBooking) {
@@ -353,6 +308,7 @@ function AdminPage() {
       const response = await updateBooking(event.id, payload, token!);
 
       if (response) {
+        // Statt die ganze Liste neu zu laden, ersetzen wir nur den einen Termin
         setBookings(prev => prev.map(b => b._id === event.id ? response : b));
         setToast({ open: true, msg: 'Termin verschoben!', sev: 'success' });
       } else {
@@ -361,9 +317,11 @@ function AdminPage() {
     } catch (e: any) {
       console.error(e);
       setToast({ open: true, msg: `Verschieben fehlgeschlagen: ${e.response?.data?.message || e.message}`, sev: 'error' });
+      fetchData(); // Nur bei Fehler neu laden, um revert darzustellen
     }
   }
-
+  
+  // Slot-Auswahl-Handler (Kopieren & Einfügen) (unverändert)
   const onSelectSlot = async (slotInfo: any) => {
     if (copiedBooking) {
       const { user: cbUser, service } = copiedBooking;
@@ -378,7 +336,7 @@ function AdminPage() {
       try {
         const response = await createBooking(service._id, dateTime.toISOString(), staffId, token!, cbUser._id);
         if (response.booking) {
-          setBookings(prev => [...prev, response.booking]);
+          setBookings(prev => [...prev, response.booking]); // Termin zur Liste hinzufügen
           setToast({ open: true, msg: 'Termin erfolgreich eingefügt!', sev: 'success' });
         } else {
           throw new Error(response.message || 'Fehler beim Erstellen des Termins');
@@ -391,6 +349,7 @@ function AdminPage() {
     }
   };
 
+  // Restliche Handler (Kopieren, Löschen, Bezahlen) (unverändert)
   const handleStartCopy = () => {
     if (!activeBooking) return;
     setCopiedBooking(activeBooking);
@@ -428,7 +387,7 @@ function AdminPage() {
     if (!activeBooking || !token) return;
     try {
       await markBookingAsPaid(activeBooking._id, 'cash', parseFloat(amountGiven), token);
-      const updatedBookings = await getAllBookings(token);
+      const updatedBookings = await getAllBookings(token); // Neu laden
       setBookings(updatedBookings);
       handleClosePaymentDialog();
       closeDialog();
@@ -439,90 +398,44 @@ function AdminPage() {
     }
   };
 
-  const eventStyleGetter = (event: any) => {
-    const color = staffColors.get(event.resourceId) || '#8D6E63';
-    const style: React.CSSProperties = {
-      backgroundColor: color,
-      borderColor: color,
-      color: 'white',
-      borderRadius: 6,
-      paddingLeft: 6,
-    };
-    return { style };
-  };
-
-  const ResourceHeader = ({ resource }: any) => (
-    <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 1, px: 1 }}>
-      <Avatar sx={{ bgcolor: staffColors.get(resource.id), width: 40, height: 40, fontSize: '1rem' }}>
-        {getInitials(resource.title)}
-      </Avatar>
-      <Typography variant="body1" fontWeight={600}>{resource.title}</Typography>
-    </Stack>
-  );
+  // --- RENDER-TEIL ---
 
   return (
     <Box sx={{ p: { xs: 2, md: 4 }, backgroundColor: 'background.default', minHeight: '100vh' }}>
       <Container maxWidth="xl" sx={copiedBooking ? { cursor: 'copy' } : {}}>
         <AdminBreadcrumbs items={[{ label: 'Mein Salon', href: '/admin' }, { label: 'Kalender' }]} />
-
-        {/* START: Externe Toolbar entfernt */}
+        
+        {/* Die Toolbar wird jetzt von der BookingCalendar-Komponente gerendert */}
         <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3, mt: 2 }}>
-           <Typography variant="h4" fontWeight={800} sx={{ flexGrow: 1 }}>
-            Kalender
+          <Typography variant="h4" fontWeight={800} sx={{ flexGrow: 1 }}>
+            Kalenderübersicht (Admin)
           </Typography>
-           {/* Die Toolbar wird jetzt vom Kalender selbst gerendert */}
         </Stack>
-        {/* ENDE: Externe Toolbar entfernt */}
-
-
-        <Paper sx={{ p: { xs: 1, md: 2 } }}>
-          {/* Zeige Ladeanzeige, während min/max Zeiten berechnet werden */}
-          {!calendarMinTime || !calendarMaxTime ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 600 }}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <DnDCalendar
-              localizer={localizer}
-              events={calendarEvents}
-              // START: Ansichten, Datum und Handler hinzugefügt
-              defaultView={Views.WEEK}
-              views={{ month: true, week: true, day: true, agenda: true }} // Alle Ansichten aktiviert
-              step={15}
-              date={currentDate} // Gesteuertes Datum
-              view={view} // Gesteuerte Ansicht
-              onNavigate={handleNavigate} // Handler für Datum/Navigation
-              onView={handleView} // Handler für Ansichtswechsel
-              messages={messages} // Deutsche Texte
-              // ENDE: Ansichten, Datum und Handler hinzugefügt
-              onSelectEvent={(event: any) => openDialogFor(event.id)}
-              onEventDrop={onEventDrop}
-              onSelectSlot={onSelectSlot}
-              resizable
-              resources={calendarResources}
-              resourceIdAccessor={(resource: any) => (resource as CalendarResource).id}
-              resourceTitleAccessor={(resource: any) => (resource as CalendarResource).title}
-              min={calendarMinTime}
-              max={calendarMaxTime}
-              components={{
-                event: (props: any) => {
-                  const booking: BookingFull | undefined = props.event.booking;
-                  const customerName = booking ? `${booking.user.firstName || ''} ${booking.user.lastName || ''}`.trim() || booking.user.email : '';
-                  return (
-                    <div style={{ padding: 2 }}>
-                      <div style={{ fontWeight: 700 }}>{props.title}</div>
-                      <div style={{ fontSize: '0.8rem', opacity: 0.95 }}>{customerName}</div>
-                    </div>
-                  );
-                },
-                resourceHeader: ResourceHeader
-              }}
-              eventPropGetter={(event: any) => eventStyleGetter(event)}
-              style={{ height: 'auto', minHeight: 'calc(100vh - 280px)' }} // Responsive Höhe
-            />
-          )}
-        </Paper>
-
+        
+        {/* START: Geteilte Kalender-Komponente wird hier gerendert */}
+        {!calendarMinTime || !calendarMaxTime ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 600 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <BookingCalendar
+            events={calendarEvents}
+            resources={calendarResources}
+            view={view}
+            date={currentDate}
+            onNavigate={handleNavigate}
+            onView={handleView}
+            onSelectEvent={(event: any) => openDialogFor(event.id)}
+            onEventDrop={onEventDrop}
+            onSelectSlot={onSelectSlot}
+            min={calendarMinTime}
+            max={calendarMaxTime}
+            staffColors={staffColors}
+          />
+        )}
+        {/* ENDE: Geteilte Kalender-Komponente */}
+        
+        {/* --- DIALOGE (unverändert) --- */}
         <Dialog open={openEvent} onClose={closeDialog} fullWidth maxWidth="xs">
           <DialogTitle>{editMode ? 'Buchung bearbeiten' : 'Buchungsdetails'}</DialogTitle>
           <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
@@ -669,6 +582,8 @@ function AdminPage() {
             </Button>
           </DialogActions>
         </Dialog>
+        {/* --- ENDE DIALOGE --- */}
+
 
         <Snackbar open={toast.open} autoHideDuration={4000} onClose={() => setToast(p => ({ ...p, open: false }))}>
           <Alert onClose={() => setToast(p => ({ ...p, open: false }))} severity={toast.sev} sx={{ width: '100%' }}>
@@ -681,3 +596,4 @@ function AdminPage() {
 }
 
 export default dynamic(() => Promise.resolve(AdminPage), { ssr: false })
+
