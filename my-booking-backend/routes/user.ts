@@ -12,12 +12,8 @@ import {
     getMe,
     updateMe,
     changePassword,
-    // --- NEU: updateStaffPermissions importieren ---
     updateStaffPermissions
 } from '../controllers/userController';
-// --- ALT: verifyToken hier nicht mehr importieren ---
-// import { AuthRequest, verifyToken } from '../middlewares/authMiddleware';
-// --- NEU: Nur noch AuthRequest importieren ---
 import { AuthRequest } from '../middlewares/authMiddleware';
 import { verifyAdmin } from '../middlewares/adminMiddleware'; 
 import { verifyToken } from '../utils/jwt';

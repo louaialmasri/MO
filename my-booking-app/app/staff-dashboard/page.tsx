@@ -1,5 +1,6 @@
 'use client';
 
+// START: Imports angepasst
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -12,16 +13,36 @@ import {
 import dayjs from 'dayjs';
 import 'dayjs/locale/de';
 
-// NEU: Imports für react-big-calendar
-import { Calendar, dateFnsLocalizer, Views, EventProps } from 'react-big-calendar';
-import { format, parse, startOfWeek, getDay } from 'date-fns';
-import { de } from 'date-fns/locale';
+// Imports für react-big-calendar (verwenden jetzt moment-localizer für Konsistenz)
+import { Calendar, momentLocalizer, Views, EventProps, View } from 'react-big-calendar';
+import moment from 'moment';
+import 'moment/locale/de'; // Deutsche Lokalisierung für moment
 import 'react-big-calendar/lib/css/react-big-calendar.css';
+// WICHTIG: Importiere das geteilte CSS
+import '../admin/calendar-custom.css';
+// ENDE: Imports angepasst
 
-// Lokalisierung für date-fns einrichten
-dayjs.locale('de');
-const locales = { 'de': de };
-const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales });
+// Lokalisierung für moment.js einrichten
+moment.locale('de');
+const localizer = momentLocalizer(moment);
+
+// START: Deutsche Kalender-Texte
+const messages = {
+  allDay: 'Ganztägig',
+  previous: 'Zurück',
+  next: 'Weiter',
+  today: 'Heute',
+  month: 'Monat',
+  week: 'Woche',
+  day: 'Tag',
+  agenda: 'Liste',
+  date: 'Datum',
+  time: 'Zeit',
+  event: 'Termin',
+  noEventsInRange: 'Keine Termine in diesem Zeitraum.',
+  showMore: (total: number) => `+ ${total} weitere`,
+};
+// ENDE: Deutsche Kalender-Texte
 
 // Unser benutzerdefinierter Event-Typ für Typsicherheit
 interface CalendarEvent {
@@ -63,6 +84,14 @@ export default function StaffDashboardPage() {
     const [editedData, setEditedData] = useState<{ serviceId: string; dateTime: string }>({ serviceId: '', dateTime: '' });
     const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({ open: false, message: '', severity: 'success' });
 
+    // START: State für Kalender-Steuerung
+    const [date, setDate] = useState(new Date());
+    const [view, setView] = useState<View>(Views.WEEK);
+
+    const handleNavigate = useCallback((newDate: Date) => setDate(newDate), [setDate]);
+    const handleView = useCallback((newView: View) => setView(newView), [setView]);
+    // ENDE: State für Kalender-Steuerung
+
     useEffect(() => {
         if (!authLoading && (!user || user.role !== 'staff')) {
             router.push('/login');
@@ -73,21 +102,21 @@ export default function StaffDashboardPage() {
         if (token) {
             try {
                 setLoading(true);
-                const [staffBookings, allServices, allUsers] = await Promise.all([
+                // Staff braucht keine 'allUsers' für die Kasse, nur die Services
+                const [staffBookings, allServices] = await Promise.all([
                     getStaffBookings(token),
-                    fetchServices(token),
-                    fetchAllUsers(token, 'customer')
+                    fetchServices(token), // Lädt Services für den Salon des Staffs
                 ]);
                 setBookings(staffBookings);
                 setServices(allServices);
-                setUsers(allUsers);
+                // setUsers(allUsers); // Nicht mehr nötig
             } catch (err) {
                 setError('Daten konnten nicht geladen werden.');
             } finally {
                 setLoading(false);
             }
         }
-    }, [token]);
+    }, [token]); // Abhängigkeit 'fetchAllUsers' entfernt
 
     useEffect(() => {
         fetchData();
@@ -128,6 +157,12 @@ export default function StaffDashboardPage() {
 
     const handleCancelBooking = async () => {
         if (selectedBooking && token) {
+            // Prüfung auf Stornierbarkeit (Regel könnte aus Backend/AuthContext kommen)
+            if (!isCancellable(selectedBooking.dateTime)) {
+                setSnackbar({ open: true, message: 'Stornierung nicht mehr möglich (Frist abgelaufen).', severity: 'error' });
+                return;
+            }
+
             try {
                 await deleteBooking(selectedBooking._id, token);
                 setSnackbar({ open: true, message: 'Termin erfolgreich storniert!', severity: 'success' });
@@ -139,6 +174,7 @@ export default function StaffDashboardPage() {
         }
     };
 
+    // Stornierungs-Logik (z.B. 24h vorher)
     const isCancellable = (dateTime: string) => dayjs(dateTime).isAfter(dayjs().add(24, 'hours'));
 
     if (loading || authLoading) {
@@ -164,26 +200,18 @@ export default function StaffDashboardPage() {
                         endAccessor="end"
                         style={{ height: '100%' }}
                         onSelectEvent={handleEventClick}
-                        views={[Views.WEEK, Views.DAY, Views.AGENDA]}
-                        defaultView={Views.WEEK}
+                        // START: Props für funktionierende Toolbar hinzugefügt
+                        views={{ month: true, week: true, day: true, agenda: true }} // Alle Ansichten
+                        date={date} // Gesteuertes Datum
+                        view={view} // Gesteuerte Ansicht
+                        onNavigate={handleNavigate} // Handler für Datum/Navigation
+                        onView={handleView} // Handler für Ansichtswechsel
+                        messages={messages} // Deutsche Texte
+                        // ENDE: Props hinzugefügt
                         step={15}
                         timeslots={4}
                         components={{
                             event: CalendarEventContent,
-                        }}
-                        messages={{
-                            allDay: 'Ganztägig',
-                            previous: 'Zurück',
-                            next: 'Weiter',
-                            today: 'Heute',
-                            month: 'Monat',
-                            week: 'Woche',
-                            day: 'Tag',
-                            agenda: 'Liste',
-                            date: 'Datum',
-                            time: 'Zeit',
-                            event: 'Termin',
-                            noEventsInRange: 'Keine Termine in diesem Zeitraum.',
                         }}
                     />
                 </Paper>
@@ -202,7 +230,10 @@ export default function StaffDashboardPage() {
                                             label="Service"
                                             onChange={(e) => setEditedData(prev => ({ ...prev, serviceId: e.target.value }))}
                                         >
-                                            {services.map(service => (
+                                            {/* Filtert Services, die der Staff auch kann */}
+                                            {services
+                                                .filter(service => user?.skills?.some(s => s._id === service._id))
+                                                .map(service => (
                                                 <MenuItem key={service._id} value={service._id}>{service.title}</MenuItem>
                                             ))}
                                         </Select>
@@ -236,7 +267,7 @@ export default function StaffDashboardPage() {
                                 {selectedBooking && isCancellable(selectedBooking.dateTime) ? (
                                     <Button onClick={handleCancelBooking} color="error">Stornieren</Button>
                                 ) : (
-                                    <Tooltip title="Stornierung nicht mehr möglich (weniger als 24h)">
+                                    <Tooltip title="Stornierung nicht mehr möglich (Frist abgelaufen)">
                                         <span><Button disabled>Stornieren</Button></span>
                                     </Tooltip>
                                 )}

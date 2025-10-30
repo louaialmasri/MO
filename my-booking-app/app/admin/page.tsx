@@ -2,7 +2,9 @@
 
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+// START: Imports hinzugefügt/angepasst
+import { useEffect, useMemo, useState, useCallback } from 'react'
+// ENDE: Imports hinzugefügt/angepasst
 import {
   fetchServices,
   getAllBookings,
@@ -32,7 +34,9 @@ import AdminBreadcrumbs from '@/components/AdminBreadcrumbs'
 import './calendar-custom.css'
 
 // react-big-calendar + DnD
-import { Calendar as RBCalendar, Views, DateLocalizer } from 'react-big-calendar'
+// START: View und Views importiert
+import { Calendar as RBCalendar, Views, DateLocalizer, View } from 'react-big-calendar'
+// ENDE: View und Views importiert
 import moment from 'moment' // Keep moment for localizer
 import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
@@ -107,6 +111,24 @@ const translateAction = (action: string) => {
   }
 };
 
+// --- START: Deutsche Kalender-Texte ---
+const messages = {
+  allDay: 'Ganztägig',
+  previous: 'Zurück',
+  next: 'Weiter',
+  today: 'Heute',
+  month: 'Monat',
+  week: 'Woche',
+  day: 'Tag',
+  agenda: 'Liste',
+  date: 'Datum',
+  time: 'Zeit',
+  event: 'Termin',
+  noEventsInRange: 'Keine Termine in diesem Zeitraum.',
+  showMore: (total: number) => `+ ${total} weitere`,
+};
+// --- ENDE: Deutsche Kalender-Texte ---
+
 
 // --- KOMPONENTEN ---
 function AdminPage() {
@@ -121,7 +143,7 @@ function AdminPage() {
   const [edit, setEdit] = useState<{ dateTime: string; serviceId: string; staffId: string }>({
     dateTime: '', serviceId: '', staffId: ''
   })
-  const [currentDate, setCurrentDate] = useState<Date>(new Date())
+  // const [currentDate, setCurrentDate] = useState<Date>(new Date()) // ERSETZT
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [amountGiven, setAmountGiven] = useState('');
@@ -133,6 +155,14 @@ function AdminPage() {
   const [salonOpeningHours, setSalonOpeningHours] = useState<OpeningHours[] | null>(null);
   const [calendarMinTime, setCalendarMinTime] = useState<Date | undefined>(undefined);
   const [calendarMaxTime, setCalendarMaxTime] = useState<Date | undefined>(undefined);
+
+  // START: State für Kalender-Steuerung
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [view, setView] = useState<View>(Views.WEEK); // Standardansicht auf Woche
+
+  const handleNavigate = useCallback((newDate: Date) => setCurrentDate(newDate), [setCurrentDate]);
+  const handleView = useCallback((newView: View) => setView(newView), [setView]);
+  // ENDE: State für Kalender-Steuerung
 
   const staffUsers = useMemo(() => users.filter(u => u.role === 'staff'), [users]);
 
@@ -435,25 +465,15 @@ function AdminPage() {
       <Container maxWidth="xl" sx={copiedBooking ? { cursor: 'copy' } : {}}>
         <AdminBreadcrumbs items={[{ label: 'Mein Salon', href: '/admin' }, { label: 'Kalender' }]} />
 
+        {/* START: Externe Toolbar entfernt */}
         <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3, mt: 2 }}>
-          <Typography variant="h4" fontWeight={800} sx={{ flexGrow: 1 }}>
+           <Typography variant="h4" fontWeight={800} sx={{ flexGrow: 1 }}>
             Kalender
           </Typography>
-          <Stack direction="row" spacing={1} component={Paper} elevation={0} sx={{ p: 0.5, borderRadius: '12px' }}>
-            <Tooltip title="Vorheriger Tag">
-              <IconButton onClick={() => setCurrentDate(dayjs(currentDate).subtract(1, 'day').toDate())}><ChevronLeftIcon /></IconButton>
-            </Tooltip>
-            <Button variant="outlined" startIcon={<TodayIcon />} onClick={() => setCurrentDate(new Date())}>
-              Heute
-            </Button>
-            <Tooltip title="Nächster Tag">
-              <IconButton onClick={() => setCurrentDate(dayjs(currentDate).add(1, 'day').toDate())}><ChevronRightIcon /></IconButton>
-            </Tooltip>
-          </Stack>
-          <Typography variant="h6" sx={{ minWidth: '280px', textAlign: 'right', fontWeight: 500 }}>
-            {dayjs(currentDate).format('dddd, DD. MMMM YYYY')}
-          </Typography>
+           {/* Die Toolbar wird jetzt vom Kalender selbst gerendert */}
         </Stack>
+        {/* ENDE: Externe Toolbar entfernt */}
+
 
         <Paper sx={{ p: { xs: 1, md: 2 } }}>
           {/* Zeige Ladeanzeige, während min/max Zeiten berechnet werden */}
@@ -465,13 +485,16 @@ function AdminPage() {
             <DnDCalendar
               localizer={localizer}
               events={calendarEvents}
-              defaultView={Views.DAY}
-              views={{ day: true, week: true, agenda: true }}
+              // START: Ansichten, Datum und Handler hinzugefügt
+              defaultView={Views.WEEK}
+              views={{ month: true, week: true, day: true, agenda: true }} // Alle Ansichten aktiviert
               step={15}
-              defaultDate={currentDate}
-              date={currentDate}
-              onNavigate={(date: Date) => setCurrentDate(date)}
-              selectable
+              date={currentDate} // Gesteuertes Datum
+              view={view} // Gesteuerte Ansicht
+              onNavigate={handleNavigate} // Handler für Datum/Navigation
+              onView={handleView} // Handler für Ansichtswechsel
+              messages={messages} // Deutsche Texte
+              // ENDE: Ansichten, Datum und Handler hinzugefügt
               onSelectEvent={(event: any) => openDialogFor(event.id)}
               onEventDrop={onEventDrop}
               onSelectSlot={onSelectSlot}
@@ -479,10 +502,8 @@ function AdminPage() {
               resources={calendarResources}
               resourceIdAccessor={(resource: any) => (resource as CalendarResource).id}
               resourceTitleAccessor={(resource: any) => (resource as CalendarResource).title}
-              // --- NEU: min und max Zeiten setzen ---
               min={calendarMinTime}
               max={calendarMaxTime}
-              // --- Ende Neu ---
               components={{
                 event: (props: any) => {
                   const booking: BookingFull | undefined = props.event.booking;
@@ -497,22 +518,7 @@ function AdminPage() {
                 resourceHeader: ResourceHeader
               }}
               eventPropGetter={(event: any) => eventStyleGetter(event)}
-              style={{ height: 'auto', minHeight: 600 }}
-              // Deutsche Texte für den Kalender
-              messages={{
-                allDay: 'Ganztägig',
-                previous: 'Zurück',
-                next: 'Weiter',
-                today: 'Heute',
-                month: 'Monat',
-                week: 'Woche',
-                day: 'Tag',
-                agenda: 'Agenda',
-                date: 'Datum',
-                time: 'Zeit',
-                event: 'Termin',
-                noEventsInRange: 'Keine Termine in diesem Zeitraum.',
-              }}
+              style={{ height: 'auto', minHeight: 'calc(100vh - 280px)' }} // Responsive Höhe
             />
           )}
         </Paper>
