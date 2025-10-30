@@ -12,24 +12,30 @@ import {
 } from '@mui/material';
 import dayjs from 'dayjs';
 import 'dayjs/locale/de';
+import { setHours, setMinutes } from 'date-fns'; // Für min/max Zeiten
 
-// START: Importiere die neue geteilte Komponente
-import BookingCalendar from '@/components/SharedCalendar'; 
-import { View, Views } from 'react-big-calendar';
+// START: Importiere die neue geteilte Komponente und ihre Utils
+import BookingCalendar, {
+  localizer,
+  messages,
+} from '@/components/BookingCalendar' 
+import { View, Views } from 'react-big-calendar'
 // ENDE: Import der neuen Komponente
 
-// WICHTIG: Importiere das geteilte CSS
+// WICHTIG: Importiere das geteilte CSS (wird von BookingCalendar gemacht, aber sicher ist sicher)
 import '../admin/calendar-custom.css';
 // ENDE: Imports angepasst
 
 
-// Unser benutzerdefinierter Event-Typ für Typsicherheit (unverändert)
+// Unser benutzerdefinierter Event-Typ für Typsicherheit
 interface CalendarEvent {
     id: string;
     title: string;
     start: Date;
     end: Date;
-    original: StaffBooking;
+    original: StaffBooking; // Behalten wir für den Dialog
+    booking: StaffBooking;  // Hinzugefügt für EventContent
+    resourceId: string;     // Hinzugefügt für Ressourcen-Ansicht
 }
 
 export default function StaffDashboardPage() {
@@ -48,13 +54,15 @@ export default function StaffDashboardPage() {
 
     // START: State für Kalender-Steuerung (NEU)
     const [date, setDate] = useState(new Date());
-    const [view, setView] = useState<View>(Views.DAY); // <--- DEFAULT AUF TAG GEÄNDERT
+    // --- WUNSCH: Standard auf Tagesansicht ---
+    const [view, setView] = useState<View>(Views.DAY); 
 
     const handleNavigate = useCallback((newDate: Date) => setDate(newDate), [setDate]);
     const handleView = useCallback((newView: View) => setView(newView), [setView]);
     // ENDE: State für Kalender-Steuerung
 
     useEffect(() => {
+        // Leitet um, wenn nicht eingeloggt oder KEIN staff/admin
         if (!authLoading && (!user || (user.role !== 'staff' && user.role !== 'admin'))) {
             router.push('/login');
         }
@@ -66,7 +74,7 @@ export default function StaffDashboardPage() {
                 setLoading(true);
                 const [staffBookings, allServices] = await Promise.all([
                     getStaffBookings(token),
-                    fetchServices(token), 
+                    fetchServices(token), // Lädt Services für den Salon des Staffs
                 ]);
                 setBookings(staffBookings);
                 setServices(allServices);
@@ -82,18 +90,20 @@ export default function StaffDashboardPage() {
         fetchData();
     }, [fetchData]);
     
-    // Kalender-Events (unverändert)
-    const calendarEvents: CalendarEvent[] = useMemo(() => bookings.map(booking => ({
+    // Kalender-Events (ANGEPASST für Ressourcen)
+    const calendarEvents: CalendarEvent[] = useMemo(() => {
+      if (!user) return []; // Sicherstellen, dass user existiert
+      return bookings.map(booking => ({
         id: booking._id,
         title: `${booking.service?.title || 'Service'} - ${booking.user?.firstName || ''} ${booking.user?.lastName || ''}`.trim(),
         start: new Date(booking.dateTime),
         end: new Date(new Date(booking.dateTime).getTime() + (booking.service?.duration || 30) * 60000),
         original: booking,
-        // START: Füge die Ressourcen-ID hinzu
-        resourceId: user?._id, // Immer die ID des eingeloggten Staffs
-        booking: booking, // Füge das ganze Booking-Objekt hinzu
-        // ENDE: Ressourcen-ID
-    })), [bookings, user]);
+        // --- NEU: Für EventContent und Ressourcen ---
+        booking: booking,
+        resourceId: user._id, // ID des eingeloggten Staffs
+    }))
+  }, [bookings, user]);
 
     // START: Kalender-Ressource für den Staff-Mitarbeiter (NEU)
     const staffResource = useMemo(() => {
@@ -113,18 +123,17 @@ export default function StaffDashboardPage() {
 
     // Drag & Drop Handler (NEU)
     const handleEventDrop = async ({ event, start, end }: any) => {
-        if (!token) return;
+        if (!token || !user) return;
         
-        // Finde das Original-Booking, um die Skill-Prüfung durchzuführen
         const originalBooking = bookings.find(b => b._id === event.id);
         if (!originalBooking) return;
 
-        // Skill-Prüfung (obwohl es derselbe Mitarbeiter sein sollte, schadet es nicht)
         const serviceId = originalBooking.service?._id;
+        // KORREKTUR: Prüfe skills auf User-Objekt, das `skills` als Array von Objekten hat
         const hasSkill = user?.skills?.some(skill => (typeof skill === 'string' ? skill : skill._id) === serviceId);
 
         if (!hasSkill) {
-            setSnackbar({ open: true, message: 'Du scheinst diesen Service nicht (mehr) anzubieten.', severity: 'error' });
+            setSnackbar({ open: true, message: 'Du scheinst diesen Service nicht (mehr) anzubieten.', sev: 'error' });
             return; // Verhindere das Verschieben
         }
 
@@ -185,6 +194,14 @@ export default function StaffDashboardPage() {
 
     const isCancellable = (dateTime: string) => dayjs(dateTime).isAfter(dayjs().add(24, 'hours'));
 
+    // Min/Max Zeiten für den Kalender (Standard, da Staff-Seite keine Salon-Zeiten lädt)
+    const { minTime, maxTime } = useMemo(() => {
+        const min = setHours(setMinutes(date, 0), 8); // 08:00
+        const max = setHours(setMinutes(date, 1), 20); // 20:01
+        return { minTime: min, maxTime: max };
+    }, [date]);
+
+
     if (loading || authLoading || !user) {
         return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>;
     }
@@ -202,6 +219,9 @@ export default function StaffDashboardPage() {
                 
                 {/* START: Geteilte Kalender-Komponente wird hier gerendert */}
                 <BookingCalendar
+                    // WICHTIG: Props an die neue Komponente übergeben
+                    localizer={localizer}
+                    messages={messages}
                     events={calendarEvents}
                     resources={staffResource} // Nur den eigenen Mitarbeiter als Ressource
                     view={view}
@@ -211,8 +231,8 @@ export default function StaffDashboardPage() {
                     onSelectEvent={(event: any) => handleEventClick(event.original)}
                     onEventDrop={handleEventDrop}
                     onSelectSlot={() => {}} // Kein "Einfügen" für Staff
-                    min={dayjs(date).set('hour', 8).set('minute', 0).toDate()} // Standard 8 Uhr
-                    max={dayjs(date).set('hour', 20).set('minute', 1).toDate()} // Standard 20 Uhr
+                    min={minTime} 
+                    max={maxTime} 
                     staffColors={staffColors}
                 />
                 {/* ENDE: Geteilte Kalender-Komponente */}
@@ -233,6 +253,7 @@ export default function StaffDashboardPage() {
                                             onChange={(e) => setEditedData(prev => ({ ...prev, serviceId: e.target.value }))}
                                         >
                                             {services
+                                                // KORREKTUR: Prüfe skills auf User-Objekt
                                                 .filter(service => user?.skills?.some(s => (typeof s === 'string' ? s : s._id) === service._id))
                                                 .map(service => (
                                                 <MenuItem key={service._id} value={service._id}>{service.title}</MenuItem>

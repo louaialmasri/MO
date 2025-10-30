@@ -163,6 +163,7 @@ const CustomToolbar: React.FC<any> = ({
 }
 
 // Eigener Event-Stil (Dein Code aus Staff-Dashboard, jetzt zentral)
+// --- UX-UPGRADE: Lesbarkeit & Text-Umbruch ---
 const EventContent: React.FC<EventProps<any>> = ({ event }) => {
   const serviceName = event.booking?.service?.title || event.title || 'Termin'
   const clientName =
@@ -173,42 +174,49 @@ const EventContent: React.FC<EventProps<any>> = ({ event }) => {
     'Kunde'
 
   return (
-    <Box sx={{ height: '100%', overflow: 'hidden', display: 'flex', gap: 1 }}>
-      <EventNoteIcon sx={{ fontSize: '1rem', opacity: 0.8, mt: '2px' }} />
-      <Box>
-        <Typography
-          variant="body2"
-          sx={{
-            fontWeight: 'bold',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
-        >
-          {clientName}
-        </Typography>
-        <Typography
-          variant="caption"
-          sx={{
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            display: 'block',
-          }}
-        >
-          {serviceName}
-        </Typography>
-      </Box>
+    <Box sx={{ 
+      height: '100%', 
+      overflow: 'visible', // Erlaube Umbruch
+      display: 'flex', 
+      flexDirection: 'column', // Untereinander statt nebeneinander
+      gap: 0.5 
+    }}>
+      <Typography
+        variant="body2"
+        sx={{
+          fontWeight: 'bold',
+          whiteSpace: 'normal', // ERLAUBE UMBRUCH
+          lineHeight: 1.3,
+          wordBreak: 'break-word',
+        }}
+      >
+        {clientName}
+      </Typography>
+      <Typography
+        variant="caption"
+        sx={{
+          whiteSpace: 'normal', // ERLAUBE UMBRUCH
+          display: 'flex', // Für Icon-Ausrichtung
+          alignItems: 'center',
+          lineHeight: 1.3,
+          wordBreak: 'break-word',
+        }}
+      >
+        <EventNoteIcon sx={{ fontSize: '0.875rem', mr: 0.5, opacity: 0.8 }} />
+        {serviceName}
+      </Typography>
     </Box>
   )
 }
 
 // Eigener Header für Ressourcen (Dein Code aus Admin-Seite, jetzt zentral)
+// --- UX-UPGRADE: Padding angepasst ---
 const ResourceHeader: React.FC<{ resource: any; staffColors: Map<string, string> }> = ({ resource, staffColors }) => {
+  // Hilfsfunktion, da sie außerhalb des globalen Scopes ist
   const getInitials = (name = '') => name ? name.split(' ').map(n => n[0]).join('').toUpperCase() : '';
   
   return (
-     <Stack direction="row" spacing={1.5} alignItems="center" sx={{ py: 1.5, px: 1, borderBottom: 1, borderColor: 'divider' }}>
+     <Stack direction="row" spacing={1.5} alignItems="center" sx={{ py: 1, px: 1, borderBottom: 1, borderColor: 'divider' }}>
       <Avatar sx={{ bgcolor: staffColors.get(resource.id), width: 40, height: 40, fontSize: '1rem' }}>
         {getInitials(resource.title)}
       </Avatar>
@@ -222,7 +230,8 @@ const ResourceHeader: React.FC<{ resource: any; staffColors: Map<string, string>
 // Erstellen des Drag-and-Drop-fähigen Kalenders
 const DnDCalendar = withDragAndDrop(RBCalendar as any)
 
-interface BookingCalendarProps {
+// Interface für die Props der Komponente
+export interface BookingCalendarProps {
   events: any[]
   resources: any[]
   view: View
@@ -270,7 +279,7 @@ export default function BookingCalendar({
       borderColor: color,
       color: 'white',
       borderRadius: 6,
-      paddingLeft: 6,
+      // paddingLeft: 6, // Entfernt, wird durch CSS global gesteuert
       opacity: event.booking?.status === 'paid' ? 0.6 : 1, // Bezahlte Termine ausgrauen
       border: event.booking?.status === 'paid' ? '1px dashed #fff' : 'none',
     }
@@ -296,10 +305,14 @@ export default function BookingCalendar({
         components={components}
         events={events}
         resources={resources}
-        resourceIdAccessor="id"
-        resourceTitleAccessor="title"
-        step={15} // 15-Minuten-Raster
-        timeslots={4} // 4 Slots pro Stunde
+        // --- TYPESCRIPT-FIX: Hier werden jetzt Funktionen übergeben ---
+        resourceIdAccessor={(resource: any) => resource.id}
+        resourceTitleAccessor={(resource: any) => resource.title}
+        // --- ENDE FIX ---
+        // --- UX-FIX: GRÖSSERE SLOTS ---
+        step={30} // 30-Minuten-Raster
+        timeslots={2} // 2 Slots pro Stunde (ergibt 30-Minuten-Blöcke)
+        // --- ENDE UX-FIX ---
         selectable
         // === ZUSTANDSSTEUERUNG (jetzt funktional) ===
         view={view}
@@ -319,3 +332,4 @@ export default function BookingCalendar({
     </Paper>
   )
 }
+

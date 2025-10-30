@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState, useCallback } from 'react' // <--- Hooks importiert
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import {
   fetchServices,
   getAllBookings,
@@ -19,31 +19,38 @@ import {
   Box, Button, Dialog, DialogTitle, DialogContent,
   DialogActions, TextField, MenuItem, Typography, Tooltip, IconButton, Container,
   Snackbar, Alert,
-  Divider,
   List,
   ListItem,
   ListItemText,
   CircularProgress,
-  Stack, // <--- Stack importiert
+  Stack,
 } from '@mui/material'
 import type { Service } from '@/services/api'
 import dayjs from 'dayjs'
 import 'dayjs/locale/de';
 import AdminBreadcrumbs from '@/components/AdminBreadcrumbs'
-// START: Importiere die neue geteilte Komponente
+
+// START: Importiere die neue geteilte Komponente und ihre Utils
 import BookingCalendar, {
-  localizer, // Importiere den moment-localizer
-  messages,  // Importiere die deutschen Texte
-} from '@/components/SharedCalendar' 
+  localizer,
+  messages,
+} from '@/components/BookingCalendar' 
 import { View, Views } from 'react-big-calendar'
+// WICHTIG: Das CSS wird jetzt von BookingCalendar.tsx importiert
+// import './calendar-custom.css' // Nicht mehr hier benötigt
 // ENDE: Import der neuen Komponente
+
+// date-fns für min/max Zeitberechnung
 import { setHours, setMinutes } from 'date-fns';
+
+dayjs.locale('de');
 
 // Icons
 import PaymentIcon from '@mui/icons-material/Payment';
 import DeleteIcon from '@mui/icons-material/Delete';
 import HistoryIcon from '@mui/icons-material/History';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+
 
 // --- TYP-DEFINITIONEN (unverändert) ---
 type User = {
@@ -114,14 +121,15 @@ function AdminPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [copiedBooking, setCopiedBooking] = useState<BookingFull | null>(null);
 
-  // State für Salon-Daten und Kalendergrenzen ---
+  // State für Salon-Daten und Kalendergrenzen
   const [salonOpeningHours, setSalonOpeningHours] = useState<OpeningHours[] | null>(null);
   const [calendarMinTime, setCalendarMinTime] = useState<Date | undefined>(undefined);
   const [calendarMaxTime, setCalendarMaxTime] = useState<Date | undefined>(undefined);
 
   // START: State für Kalender-Steuerung (NEU)
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
-  const [view, setView] = useState<View>(Views.DAY); // <--- DEFAULT AUF TAG GEÄNDERT
+  // --- WUNSCH: Standard auf Tagesansicht ---
+  const [view, setView] = useState<View>(Views.DAY); 
 
   // Callbacks für die Toolbar
   const handleNavigate = useCallback((newDate: Date) => setCurrentDate(newDate), [setCurrentDate]);
@@ -160,10 +168,12 @@ function AdminPage() {
   // Lade Kern-Daten (Termine, Mitarbeiter, Services)
   useEffect(() => {
     if (!user || user.role !== 'admin' || !token) {
+      // Optional: Leite zu einer anderen Seite, wenn kein Admin
+      // router.push('/login'); 
       return;
     }
     fetchData();
-  }, [user, token, router, fetchData]);
+  }, [user, token, router, fetchData]); // fetchData als Abhängigkeit hinzugefügt
 
   // Lade Salon-Öffnungszeiten (unverändert)
   useEffect(() => {
@@ -188,6 +198,7 @@ function AdminPage() {
 
   // Setze Kalender min/max (unverändert)
   useEffect(() => {
+    // Setze ein Fallback, falls Öffnungszeiten nicht geladen werden können
     if (!salonOpeningHours) {
        const defaultMin = setHours(setMinutes(currentDate, 0), 8);
        const defaultMax = setHours(setMinutes(currentDate, 1), 20); 
@@ -195,35 +206,46 @@ function AdminPage() {
        setCalendarMaxTime(defaultMax);
        return;
     }
-    const dayOfWeek = currentDate.getDay(); 
+
+    const dayOfWeek = currentDate.getDay(); // Sonntag = 0, Montag = 1, ...
     const hoursRule = salonOpeningHours.find(h => h.weekday === dayOfWeek);
+
     if (hoursRule && hoursRule.isOpen && hoursRule.open && hoursRule.close) {
       try {
+        // Parse "HH:mm" strings
         const [openH, openM] = hoursRule.open.split(':').map(Number);
         const [closeH, closeM] = hoursRule.close.split(':').map(Number);
+
+        // Erzeuge Date-Objekte für min/max
         const minTime = setHours(setMinutes(currentDate, openM), openH);
         let maxTime = setHours(setMinutes(currentDate, closeM), closeH);
-        if (!(closeH === 0 && closeM === 0)) {
-           maxTime = new Date(maxTime.getTime() + 60000); 
+
+        // Eine Minute zur maxTime hinzufügen, damit der Slot *bis* zur vollen Stunde geht
+        if (!(closeH === 0 && closeM === 0)) { // Nicht anwenden, wenn die Zeit 00:00 ist
+           maxTime = new Date(maxTime.getTime() + 60000); // + 1 Minute
         } else {
+           // Fallback für Mitternacht (23:59)
            maxTime = setHours(setMinutes(currentDate, 59), 23);
         }
+
         setCalendarMinTime(minTime);
         setCalendarMaxTime(maxTime);
       } catch (e) {
         console.error("Fehler beim Parsen der Öffnungszeiten:", e);
+        // Fallback bei Parsing-Fehler
         const defaultMin = setHours(setMinutes(currentDate, 0), 8);
         const defaultMax = setHours(setMinutes(currentDate, 0), 20);
         setCalendarMinTime(defaultMin);
         setCalendarMaxTime(defaultMax);
       }
     } else {
+      // Wenn Tag geschlossen ist, einen eingeschränkten Bereich anzeigen (z.B. 9-17 Uhr)
       const defaultMin = setHours(setMinutes(currentDate, 0), 9);
       const defaultMax = setHours(setMinutes(currentDate, 0), 17);
       setCalendarMinTime(defaultMin);
       setCalendarMaxTime(defaultMax);
     }
-  }, [currentDate, salonOpeningHours]); 
+  }, [currentDate, salonOpeningHours]); // Abhängig vom Datum und den geladenen Zeiten
 
   const openDialogFor = (bookingId: string) => {
     const b = bookings.find(x => x._id === bookingId);
@@ -253,17 +275,17 @@ function AdminPage() {
       .map((b) => {
         const service = services.find(s => s._id === (b.service?._id || b.serviceId));
         const start = new Date(b.dateTime);
-        const duration = service?.duration ?? 30;
+        const duration = service?.duration ?? 30; // Standard 30 Min, falls Service gelöscht wurde
         const end = new Date(start.getTime() + duration * 60000);
         const staffId = b.staff?._id;
 
         return {
           id: b._id,
-          title: service?.title ?? 'Service',
+          title: service?.title ?? 'Unbekannter Service', // Fallback-Titel
           start,
           end,
           resourceId: staffId,
-          booking: b,
+          booking: b, // Das ganze Booking-Objekt für EventContent
         };
       });
   }, [bookings, services]);
@@ -284,10 +306,17 @@ function AdminPage() {
       return;
     }
 
+    // Prüfe, ob der Service existiert
+    const serviceId = originalBooking.service?._id || originalBooking.serviceId;
+    if (!serviceId) {
+       setToast({ open: true, msg: 'Service für diesen Termin nicht gefunden.', sev: 'error' });
+       return;
+    }
+
     const newStaffId = resourceId || originalBooking.staff?._id;
     if (newStaffId && newStaffId !== originalBooking.staff?._id) {
-      const serviceId = originalBooking.service?._id || originalBooking.serviceId;
       const newStaffMember = staffUsers.find(staff => staff._id === newStaffId);
+      // Skill-Prüfung
       const hasSkill = newStaffMember?.skills?.some(skill => (typeof skill === 'string' ? skill : skill._id) === serviceId);
 
       if (!hasSkill) {
@@ -296,7 +325,7 @@ function AdminPage() {
           msg: `Mitarbeiter ${newStaffMember?.firstName} beherrscht diesen Service nicht.`,
           sev: 'error'
         });
-        return;
+        return; // Verhindert das Verschieben
       }
     }
 
@@ -305,10 +334,11 @@ function AdminPage() {
         dateTime: start.toISOString(),
         staffId: newStaffId || originalBooking.staff?._id,
       };
+      // Sende das Update
       const response = await updateBooking(event.id, payload, token!);
 
       if (response) {
-        // Statt die ganze Liste neu zu laden, ersetzen wir nur den einen Termin
+        // Optimistisches Update im UI
         setBookings(prev => prev.map(b => b._id === event.id ? response : b));
         setToast({ open: true, msg: 'Termin verschoben!', sev: 'success' });
       } else {
@@ -317,7 +347,7 @@ function AdminPage() {
     } catch (e: any) {
       console.error(e);
       setToast({ open: true, msg: `Verschieben fehlgeschlagen: ${e.response?.data?.message || e.message}`, sev: 'error' });
-      fetchData(); // Nur bei Fehler neu laden, um revert darzustellen
+      fetchData(); // Lade Daten neu, um den Kalender zurückzusetzen
     }
   }
   
@@ -344,9 +374,13 @@ function AdminPage() {
       } catch (e: any) {
         setToast({ open: true, msg: e.response?.data?.message || 'Einfügen fehlgeschlagen.', sev: 'error' });
       } finally {
-        setCopiedBooking(null);
+        setCopiedBooking(null); // Kopier-Modus beenden
       }
     }
+    // Optional: Hier könnte man einen Dialog zum Erstellen eines neuen Termins öffnen
+    // else {
+    //   console.log('Freien Slot ausgewählt:', slotInfo);
+    // }
   };
 
   // Restliche Handler (Kopieren, Löschen, Bezahlen) (unverändert)
@@ -413,12 +447,15 @@ function AdminPage() {
         </Stack>
         
         {/* START: Geteilte Kalender-Komponente wird hier gerendert */}
-        {!calendarMinTime || !calendarMaxTime ? (
+        {(!calendarMinTime || !calendarMaxTime) ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 600 }}>
             <CircularProgress />
           </Box>
         ) : (
           <BookingCalendar
+            // WICHTIG: Props an die neue Komponente übergeben
+            localizer={localizer}
+            messages={messages}
             events={calendarEvents}
             resources={calendarResources}
             view={view}
@@ -454,7 +491,7 @@ function AdminPage() {
                   </TextField>
                   <TextField select label="Mitarbeiter" value={edit.staffId} onChange={(e) => setEdit({ ...edit, staffId: e.target.value })}>
                     {staffUsers
-                      .filter(s => Array.isArray(s.skills) && s.skills.some((sk: any) => sk._id === edit.serviceId))
+                      .filter(s => Array.isArray(s.skills) && s.skills.some((sk: any) => (typeof sk === 'string' ? sk : sk._id) === edit.serviceId))
                       .map(s => <MenuItem key={s._id} value={s._id}>{s.name || `${s.firstName} ${s.lastName}`}</MenuItem>)}
                   </TextField>
                 </>
@@ -595,5 +632,6 @@ function AdminPage() {
   )
 }
 
+// Wichtig: 'dynamic' import beibehalten, da Kalender Client-seitig ist
 export default dynamic(() => Promise.resolve(AdminPage), { ssr: false })
 
