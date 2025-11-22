@@ -4,7 +4,7 @@ import React from 'react'
 import {
   Calendar as RBCalendar,
   Views,
-  DateLocalizer,
+  DateLocalizer, // Beibehalten für Prop-Typ
   View,
   Components,
   EventProps,
@@ -17,7 +17,6 @@ import withDragAndDrop, {
 import 'moment/locale/de'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css'
-// Wir importieren das globale Styling direkt hier
 import '../app/admin/calendar-custom.css'
 
 import {
@@ -34,9 +33,8 @@ import {
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import TodayIcon from '@mui/icons-material/Today'
-import EventNoteIcon from '@mui/icons-material/EventNote' // Icon für Termine
+import EventNoteIcon from '@mui/icons-material/EventNote'
 
-// --- LOKALISIERUNG ---
 moment.locale('de')
 export const localizer = momentLocalizer(moment)
 
@@ -56,16 +54,12 @@ export const messages = {
   showMore: (total: number) => `+ ${total} weitere`,
 }
 
-// --- KALENDER-KOMPONENTEN (INTERN) ---
-
-// Eigene Toolbar-Komponente (Das UX-Upgrade)
 const CustomToolbar: React.FC<any> = ({
   label,
   view,
   views,
   onNavigate,
   onView,
-  date,
 }) => {
   return (
     <Stack
@@ -75,7 +69,6 @@ const CustomToolbar: React.FC<any> = ({
       justifyContent="space-between"
       sx={{ p: 1.5, borderBottom: 1, borderColor: 'divider' }}
     >
-      {/* Linke Seite: Navigation */}
       <Stack direction="row" spacing={1} alignItems="center">
         <Tooltip title="Zurück">
           <IconButton
@@ -92,7 +85,7 @@ const CustomToolbar: React.FC<any> = ({
           startIcon={<TodayIcon />}
           onClick={() => onNavigate('TODAY')}
           sx={{
-            bgcolor: 'primary.main', // Deine Akzentfarbe
+            bgcolor: 'primary.main',
             color: 'white',
             '&:hover': { bgcolor: 'primary.dark' },
           }}
@@ -109,8 +102,6 @@ const CustomToolbar: React.FC<any> = ({
           </IconButton>
         </Tooltip>
       </Stack>
-
-      {/* Mitte: Aktuelles Datum/Zeitraum */}
       <Typography
         variant="h6"
         fontWeight={600}
@@ -118,8 +109,6 @@ const CustomToolbar: React.FC<any> = ({
       >
         {label}
       </Typography>
-
-      {/* Rechts: Ansicht-Umschalter */}
       <ButtonGroup
         variant="outlined"
         size="small"
@@ -162,8 +151,6 @@ const CustomToolbar: React.FC<any> = ({
   )
 }
 
-// Eigener Event-Stil (Dein Code aus Staff-Dashboard, jetzt zentral)
-// --- UX-UPGRADE: Lesbarkeit & Text-Umbruch ---
 const EventContent: React.FC<EventProps<any>> = ({ event }) => {
   const serviceName = event.booking?.service?.title || event.title || 'Termin'
   const clientName =
@@ -172,47 +159,73 @@ const EventContent: React.FC<EventProps<any>> = ({ event }) => {
     }`.trim() ||
     event.booking?.user?.email ||
     'Kunde'
+  
+  // Zeit formatieren
+  const timeRange = `${moment(event.start).format('HH:mm')} - ${moment(event.end).format('HH:mm')}`;
 
   return (
     <Box sx={{ 
-      height: '100%', 
-      overflow: 'visible', // Erlaube Umbruch
       display: 'flex', 
-      flexDirection: 'column', // Untereinander statt nebeneinander
-      gap: 0.5 
+      flexDirection: 'column',
+      justifyContent: 'flex-start', // Startet oben
+      height: '100%',
+      overflow: 'hidden',
+      pt: 0.5 // Kleines Padding oben
     }}>
+      {/* 1. ZEILE: Name des Kunden (Extra Fett) */}
       <Typography
         variant="body2"
         sx={{
-          fontWeight: 'bold',
-          whiteSpace: 'normal', // ERLAUBE UMBRUCH
-          lineHeight: 1.3,
-          wordBreak: 'break-word',
+          fontWeight: 700, // 700 = Bold
+          lineHeight: 1.2,
+          mb: 0.5, // Kleiner Abstand nach unten
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis'
         }}
       >
         {clientName}
       </Typography>
-      <Typography
-        variant="caption"
-        sx={{
-          whiteSpace: 'normal', // ERLAUBE UMBRUCH
-          display: 'flex', // Für Icon-Ausrichtung
-          alignItems: 'center',
-          lineHeight: 1.3,
-          wordBreak: 'break-word',
-        }}
+      
+      {/* 2. ZEILE: Dienstleistung und Uhrzeit (Nebeneinander) */}
+      <Stack 
+        direction="row" 
+        justifyContent="space-between" 
+        alignItems="center" 
+        sx={{ width: '100%' }}
       >
-        <EventNoteIcon sx={{ fontSize: '0.875rem', mr: 0.5, opacity: 0.8 }} />
-        {serviceName}
-      </Typography>
+        {/* Dienstleistung (links) */}
+        <Typography
+          variant="caption"
+          sx={{
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            mr: 1, // Abstand zur Uhrzeit
+            opacity: 0.9
+          }}
+        >
+          <EventNoteIcon sx={{ fontSize: '0.7rem', mr: 0.3, verticalAlign: 'text-bottom' }} />
+          {serviceName}
+        </Typography>
+
+        {/* Uhrzeit (rechts) */}
+        <Typography 
+          variant="caption" 
+          sx={{ 
+            fontWeight: 'bold', 
+            whiteSpace: 'nowrap',
+            fontSize: '0.75rem' // Etwas kleiner, damit es gut passt
+          }}
+        >
+          {timeRange}
+        </Typography>
+      </Stack>
     </Box>
   )
 }
 
-// Eigener Header für Ressourcen (Dein Code aus Admin-Seite, jetzt zentral)
-// --- UX-UPGRADE: Padding angepasst ---
 const ResourceHeader: React.FC<{ resource: any; staffColors: Map<string, string> }> = ({ resource, staffColors }) => {
-  // Hilfsfunktion, da sie außerhalb des globalen Scopes ist
   const getInitials = (name = '') => name ? name.split(' ').map(n => n[0]).join('').toUpperCase() : '';
   
   return (
@@ -225,20 +238,21 @@ const ResourceHeader: React.FC<{ resource: any; staffColors: Map<string, string>
   )
 };
 
-// --- DIE HAUPTKOMPONENTE ---
-
-// Erstellen des Drag-and-Drop-fähigen Kalenders
 const DnDCalendar = withDragAndDrop(RBCalendar as any)
 
-// Interface für die Props der Komponente
+// FIX 1: TypeScript-Fehler beheben
+// Die Props `localizer` und `messages` wurden der Komponente übergeben,
+// waren aber hier nicht im Interface deklariert. Das ist jetzt korrigiert.
 export interface BookingCalendarProps {
+  localizer: DateLocalizer; // HINZUGEFÜGT
+  messages: any; // HINZUGEFÜGT
   events: any[]
   resources: any[]
   view: View
   date: Date
-  onNavigate: (newDate: Date) => void
+  onNavigate: (newDate: Date | 'TODAY' | 'PREV' | 'NEXT') => void // Typ angepasst
   onView: (newView: View) => void
-  onSelectEvent: (event: any) => void
+  onDoubleClickEvent?: (event: any) => void // NEU: Prop für Doppelklick
   onEventDrop: withDragAndDropProps['onEventDrop']
   onSelectSlot?: (slotInfo: any) => void
   min: Date
@@ -247,13 +261,16 @@ export interface BookingCalendarProps {
 }
 
 export default function BookingCalendar({
+  // Props werden jetzt korrekt übergeben
+  localizer,
+  messages,
   events,
   resources,
   view,
   date,
   onNavigate,
   onView,
-  onSelectEvent,
+  onDoubleClickEvent,
   onEventDrop,
   onSelectSlot,
   min,
@@ -261,26 +278,22 @@ export default function BookingCalendar({
   staffColors,
 }: BookingCalendarProps) {
 
-  // Definiere die Komponenten, die wir überschreiben wollen
   const components: Components = {
-    toolbar: CustomToolbar, // Unsere neue MUI-Toolbar
-    event: EventContent, // Unser Event-Design
-    // Wir rendern den Ressourcen-Header nur, wenn Ressourcen vorhanden sind
+    toolbar: CustomToolbar,
+    event: EventContent,
     resourceHeader: resources.length > 0
       ? (props) => <ResourceHeader {...props} staffColors={staffColors} />
       : undefined,
   }
 
-  // Event-Styling-Funktion
   const eventStyleGetter = (event: any) => {
-    const color = staffColors.get(event.resourceId) || '#8D6E63' // Fallback-Farbe
+    const color = staffColors.get(event.resourceId) || '#8D6E63'
     const style: React.CSSProperties = {
       backgroundColor: color,
       borderColor: color,
       color: 'white',
       borderRadius: 6,
-      // paddingLeft: 6, // Entfernt, wird durch CSS global gesteuert
-      opacity: event.booking?.status === 'paid' ? 0.6 : 1, // Bezahlte Termine ausgrauen
+      opacity: event.booking?.status === 'paid' ? 0.6 : 1,
       border: event.booking?.status === 'paid' ? '1px dashed #fff' : 'none',
     }
     return { style }
@@ -290,12 +303,13 @@ export default function BookingCalendar({
     <Paper
       variant="outlined"
       sx={{
-        p: { xs: 0.5, sm: 1, md: 2 }, // Weniger Padding auf Mobilgeräten
+        p: { xs: 0.5, sm: 1, md: 2 },
         borderRadius: 2,
-        // Responsive Höhe: 
-        // 110px Navbar + 64px Breadcrumbs/Titel + 48px Padding = ~222px
-        height: 'calc(100vh - 225px)', 
-        minHeight: 600,
+        // FIX 2: Höhe des Kalenders deutlich vergrößern
+        // Die Höhe ist nun nicht mehr an den Viewport gekoppelt,
+        // sondern hat eine feste, große Mindesthöhe, die das Scrollen ermöglicht.
+        height: 'auto', // Entfernt die feste Kopplung an die Bildschirmhöhe
+        minHeight: '1200px', // Deutlich vergrößerte Mindesthöhe
         backgroundColor: 'background.paper',
       }}
     >
@@ -305,31 +319,27 @@ export default function BookingCalendar({
         components={components}
         events={events}
         resources={resources}
-        // --- TYPESCRIPT-FIX: Hier werden jetzt Funktionen übergeben ---
         resourceIdAccessor={(resource: any) => resource.id}
         resourceTitleAccessor={(resource: any) => resource.title}
-        // --- ENDE FIX ---
-        // --- UX-FIX: GRÖSSERE SLOTS ---
-        step={30} // 30-Minuten-Raster
-        timeslots={2} // 2 Slots pro Stunde (ergibt 30-Minuten-Blöcke)
-        // --- ENDE UX-FIX ---
+        // FIX 3: Kleinere Zeitschritte für größere Slots
+        // Ein 15-Minuten-Raster sorgt für mehr Platz und eine detailliertere Ansicht.
+        step={15}
+        timeslots={4} // 4 Slots pro Stunde = 15-Minuten-Blöcke
         selectable
-        // === ZUSTANDSSTEUERUNG (jetzt funktional) ===
         view={view}
         date={date}
         onNavigate={onNavigate}
         onView={onView}
-        // === ENDE ZUSTANDSSTEUERUNG ===
-        onSelectEvent={onSelectEvent}
+        // WICHTIG: onDoubleClickEvent wird an den Kalender gegeben
+        onDoubleClickEvent={onDoubleClickEvent}
         onEventDrop={onEventDrop}
         onSelectSlot={onSelectSlot}
         resizable
         min={min}
         max={max}
         eventPropGetter={eventStyleGetter}
-        dayLayoutAlgorithm="no-overlap" // Verhindert überlappende Events
+        dayLayoutAlgorithm="no-overlap"
       />
     </Paper>
   )
 }
-

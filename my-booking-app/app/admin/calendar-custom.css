@@ -1,3 +1,8 @@
+/* 1. Die Standard-Uhrzeit vom Kalender AUSBLENDEN (wir machen unsere eigene) */
+.rbc-event-label {
+  display: none !important;
+}
+
 /* Generelles Styling für den Kalender-Container */
 .rbc-calendar {
   border-radius: 8px;
@@ -89,6 +94,7 @@
 /* Horizontale Zeit-Linien */
 .rbc-timeslot-group {
   border-bottom: 1px solid #f0f0f0; /* Subtile graue Linien */
+  min-height: 80px;
 }
 
 /* Event-Styling */
@@ -108,4 +114,10 @@
 /* Ausgewähltes Event (wenn man darauf klickt) */
 .rbc-event.rbc-selected {
   background-color: #555 !important; /* Dunklerer Hintergrund für ausgewählte Termine */
+}
+
+/* Optional: Schriftgröße im Event etwas anpassen */
+.rbc-event-content {
+  font-size: 0.85rem;
+  height: 100%; /* Wichtig für die Positionierung */
 }

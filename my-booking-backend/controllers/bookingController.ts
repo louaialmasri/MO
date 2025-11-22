@@ -85,7 +85,7 @@ export const createBooking = async (req: AuthRequest & SalonRequest, res: Respon
     await booking.save()
 
     const savedBooking = await Booking.findById(booking._id)
-        .populate<{ user: { firstName: string, email: string } }>('user', 'firstName email')
+        .populate<{ user: { firstName: string, lastName: string, email: string } }>('user', 'firstName email')
         .populate<{ service: { title: string } }>('service', 'title')
         .populate<{ staff: { firstName: string, lastName: string } }>('staff', 'firstName lastName')
         .populate('history.executedBy', 'firstName lastName');
